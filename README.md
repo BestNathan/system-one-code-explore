@@ -118,6 +118,7 @@ InspectCallee(...)
 - `fixtures/` — offline fixture repository.
 - `docs/` — design notes and historical pilot reports.
 - `ROADMAP.md` — next research milestones.
+- `docs/setup.md` — Actions environments, secrets, and benchmark setup.
 
 ## Running offline tests
 
