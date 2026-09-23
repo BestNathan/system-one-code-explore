@@ -1,0 +1,8 @@
+[project]
+name = "system-one-code-explorer"
+version = "0.1.0"
+description = "Research runtime for System One code exploration through progressively disclosed state and action spaces."
+requires-python = ">=3.11"
+
+[tool.unittest]
+start-directory = "tests"

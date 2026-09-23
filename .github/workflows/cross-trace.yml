@@ -1,0 +1,660 @@
+name: System One / System 2 Cross-Trace
+
+on:
+  workflow_dispatch:
+    inputs:
+      subject_repository:
+        description: Subject repository
+        required: true
+        default: BestNathan/nession
+        type: string
+      subject_ref:
+        description: Subject ref resolved once and shared by both agents
+        required: true
+        default: staging
+        type: string
+      query:
+        description: Verbatim localization task given to both systems
+        required: true
+        default: Help me optimize the websocket connection implementation
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  QUERY: ${{ inputs.query || 'Help me optimize the websocket connection implementation' }}
+  SUBJECT_REPOSITORY: ${{ inputs.subject_repository || 'BestNathan/nession' }}
+  SUBJECT_REF: ${{ inputs.subject_ref || 'staging' }}
+
+jobs:
+  resolve-subject:
+    name: Resolve shared subject revision
+    runs-on: ubuntu-24.04
+    outputs:
+      subject_sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - name: Checkout subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_REF }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve exact revision
+        id: revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  system-one:
+    name: System One progressive reader
+    needs: resolve-subject
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    env:
+      TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+    steps:
+      - name: Checkout explorer harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact subject revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ needs.resolve-subject.outputs.subject_sha }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run System One locator
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
+          TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/system-one
+          python3 src/system_one_range_runtime.py \
+            subject \
+            "$QUERY" \
+            --directory-threshold 0.50 \
+            --file-threshold 0.65 \
+            --window-lines 140 \
+            --parallel-threshold 0.65 \
+            --evidence-threshold 0.65 \
+            --max-jumps 2 \
+            --max-file-epochs 32 \
+            --subject-repository "$SUBJECT_REPOSITORY" \
+            --subject-revision "${{ needs.resolve-subject.outputs.subject_sha }}" \
+            --model "$TYPESAFE_MODEL" \
+            --trace-file artifacts/system-one/trace.jsonl \
+            --output-json artifacts/system-one/result.json \
+            --output-localization-json artifacts/system-one/localization-result.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path("artifacts/system-one")
+          result=json.loads((root/"result.json").read_text())
+          manifest={
+              "query": os.environ["QUERY"],
+              "subject_repository": os.environ["SUBJECT_REPOSITORY"],
+              "subject_sha": "${{ needs.resolve-subject.outputs.subject_sha }}",
+              "model": os.environ["TYPESAFE_MODEL"],
+              "architecture": result.get("architecture"),
+              "thresholds": result.get("thresholds"),
+              "metrics": result.get("metrics"),
+          }
+          (root/"manifest.json").write_text(json.dumps(manifest, indent=2)+"\n")
+          PY
+
+      - name: Upload System One evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-locator-cross-trace-system-one-${{ github.run_id }}
+          path: artifacts/system-one/
+          if-no-files-found: error
+          retention-days: 90
+
+  claude-reference:
+    name: Claude Code System 2 trace
+    needs: resolve-subject
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    env:
+      CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+      ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}
+    steps:
+      - name: Checkout explorer harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact subject revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ needs.resolve-subject.outputs.subject_sha }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned Claude Code
+        run: |
+          set -euo pipefail
+          npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+          claude --version
+
+      - name: Require DS Claude configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_API_KEY"
+          test -n "$ANTHROPIC_BASE_URL"
+          test -n "$CLAUDE_MODEL"
+          case "$CLAUDE_MODEL" in
+            sonnet|opus|haiku|default)
+              echo "Use an explicit CLAUDE_MODEL in ds, not a moving alias." >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Build verbatim-task localization prompt
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/claude-reference
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          query=os.environ["QUERY"]
+          prompt=f"""User task (verbatim):
+          {query}
+
+          Perform an independent System 2 code-localization run for this task.
+          Your only job in this session is to decide the final relevant files
+          and the exact source ranges that matter.
+
+          Investigate this repository using Read, Glob, Grep, and read-only Bash commands.
+          Do not modify any file. Do not use git history, GitHub issues, the network, or external context.
+          Search and read enough source code to identify the files and exact code regions that materially matter to the task.
+
+          IMPORTANT:
+          - Do NOT calculate, estimate, label, or output confidence in this session.
+          - Do NOT include any JSON key named "confidence".
+          - This session decides localization only. Confidence will be analyzed later by a completely fresh session.
+
+          Your final answer MUST be only valid JSON, with no Markdown fences, in this schema:
+          {{
+            "schema_version": 1,
+            "kind": "code-localization-draft",
+            "task": {query!r},
+            "producer": {{
+              "system": "claude_code",
+              "model": "{os.environ['CLAUDE_MODEL']}"
+            }},
+            "summary": "short description of the implementation areas that matter",
+            "files": [
+              {{
+                "path": "repository-relative/path",
+                "role": "primary|supporting|context",
+                "reason": "why this file is valuable to the task",
+                "evidence": [
+                  {{
+                    "start_line": 1,
+                    "end_line": 20,
+                    "reason": "what valuable implementation is in this range"
+                  }}
+                ]
+              }}
+            ]
+          }}
+
+          Definitions:
+          - primary: directly implements the requested behavior or its core lifecycle.
+          - supporting: a direct dependency/caller/state component needed to understand the primary behavior.
+          - context: useful surrounding wiring, but not core implementation.
+
+          Requirements:
+          - Rank files from most to least relevant.
+          - Include only repository-relative file paths.
+          - Include files only after inspecting their contents.
+          - Ground each primary/supporting file with at least one concrete line range.
+          - Prefer precision over listing every file whose name contains related words.
+          - Do not propose edits; this run is localization only.
+          """
+          Path("artifacts/claude-reference/localization-prompt.txt").write_text(prompt)
+          PY
+
+      - name: Run Claude localization session with raw execution trace
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json \
+            --verbose \
+            --model "$CLAUDE_MODEL" \
+            --effort high \
+            --max-turns 100 \
+            --permission-mode dontAsk \
+            --no-session-persistence \
+            --setting-sources '' \
+            --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' \
+            --disable-slash-commands \
+            --tools 'Bash,Read,Glob,Grep' \
+            --allowedTools 'Bash(*)' 'Read' 'Glob' 'Grep' \
+            --disallowedTools 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/claude-reference/localization-prompt.txt \
+            > ../artifacts/claude-reference/localization.raw.jsonl
+
+      - name: Normalize localization-only draft and execution path
+        run: |
+          set -euo pipefail
+          python3 src/claude_reference_trace.py \
+            --raw-jsonl artifacts/claude-reference/localization.raw.jsonl \
+            --subject-root subject \
+            --query "$QUERY" \
+            --model "$CLAUDE_MODEL" \
+            --subject-sha "${{ needs.resolve-subject.outputs.subject_sha }}" \
+            --output-draft artifacts/claude-reference/localization-draft.json \
+            --output-trace artifacts/claude-reference/execution-path.json \
+            --output-manifest artifacts/claude-reference/localization-manifest.json \
+            --output-summary artifacts/claude-reference/execution-summary.md
+
+      - name: Build fresh-session confidence prompt
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          draft=json.loads(
+              Path("artifacts/claude-reference/localization-draft.json").read_text()
+          )
+          query=os.environ["QUERY"]
+          immutable=json.dumps(draft, ensure_ascii=False, indent=2)
+
+          prompt=f"""User task (verbatim):
+          {query}
+
+          You are a NEW, independent confidence-assessment session.
+
+          The previous session has already completed code localization.
+          You must NOT search the repository and must NOT change its localization result.
+          The immutable draft below already contains the final files, roles, reasons,
+          evidence ranges, and exact source text.
+
+          Your only job is to assess confidence in that fixed result.
+
+          You MUST preserve:
+          - exact file count, order, and paths;
+          - exact evidence count, order, start_line, and end_line;
+          - the previous session's localization decisions.
+
+          Return only valid JSON, with no Markdown fences:
+          {{
+            "schema_version": 1,
+            "kind": "code-localization-confidence-assessment",
+            "task": {query!r},
+            "overall": {{
+              "score": 0.0,
+              "reason": "why this overall confidence is appropriate"
+            }},
+            "files": [
+              {{
+                "path": "must exactly match the corresponding draft file",
+                "score": 0.0,
+                "reason": "confidence rationale for this file",
+                "evidence": [
+                  {{
+                    "start_line": 1,
+                    "end_line": 20,
+                    "score": 0.0,
+                    "reason": "confidence rationale for this evidence range"
+                  }}
+                ]
+              }}
+            ]
+          }}
+
+          Scores are self-assessments from 0 to 1, not calibrated probabilities.
+          Do not add or remove files. Do not add or remove evidence ranges.
+          Do not change paths or line numbers. Do not perform localization again.
+          The top-level "files" array is REQUIRED even when you are uncertain.
+          It must contain exactly {len(draft.get("files", []))} entries, one for
+          every draft file in the same order. Never return only "overall".
+
+          IMMUTABLE LOCALIZATION DRAFT:
+          {immutable}
+          """
+          Path("artifacts/claude-reference/confidence-prompt.txt").write_text(prompt)
+          PY
+
+      - name: Run fresh Claude confidence session without tools
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json \
+            --verbose \
+            --model "$CLAUDE_MODEL" \
+            --effort high \
+            --max-turns 20 \
+            --permission-mode dontAsk \
+            --no-session-persistence \
+            --setting-sources '' \
+            --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' \
+            --disable-slash-commands \
+            --tools '' \
+            --disallowedTools 'Bash' 'Read' 'Glob' 'Grep' 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/claude-reference/confidence-prompt.txt \
+            > ../artifacts/claude-reference/confidence.raw.jsonl
+
+      - name: Merge immutable localization with confidence assessment
+        run: |
+          set -euo pipefail
+          python3 src/claude_confidence_finalize.py \
+            --draft artifacts/claude-reference/localization-draft.json \
+            --confidence-raw-jsonl artifacts/claude-reference/confidence.raw.jsonl \
+            --localization-manifest artifacts/claude-reference/localization-manifest.json \
+            --model "$CLAUDE_MODEL" \
+            --subject-sha "${{ needs.resolve-subject.outputs.subject_sha }}" \
+            --subject-repository "$SUBJECT_REPOSITORY" \
+            --output-result artifacts/claude-reference/localization-result.json \
+            --output-confidence-manifest artifacts/claude-reference/confidence-manifest.json \
+            --output-manifest artifacts/claude-reference/manifest.json \
+            --output-summary artifacts/claude-reference/confidence-summary.md
+
+      - name: Upload Claude trace and result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-locator-cross-trace-claude-${{ github.run_id }}
+          path: artifacts/claude-reference/
+          if-no-files-found: error
+          retention-days: 90
+
+  compare:
+    name: Compare localization records
+    needs:
+      - resolve-subject
+      - system-one
+      - claude-reference
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout explorer harness
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download System One evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: code-locator-cross-trace-system-one-${{ github.run_id }}
+          path: artifacts/system-one
+
+      - name: Download Claude trace and result
+        uses: actions/download-artifact@v4
+        with:
+          name: code-locator-cross-trace-claude-${{ github.run_id }}
+          path: artifacts/claude-reference
+
+      - name: Compare file and range localization
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/comparison
+          python3 src/compare_localization_results.py \
+            --left artifacts/system-one/localization-result.json \
+            --right artifacts/claude-reference/localization-result.json \
+            --output-json artifacts/comparison/comparison.json \
+            --output-markdown artifacts/comparison/summary.md
+          cat artifacts/comparison/summary.md >> "$GITHUB_STEP_SUMMARY"
+          if test -f artifacts/claude-reference/execution-summary.md; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat artifacts/claude-reference/execution-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -f artifacts/claude-reference/confidence-summary.md; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat artifacts/claude-reference/confidence-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          payload={
+              "subject_sha": "${{ needs.resolve-subject.outputs.subject_sha }}",
+              "system_one": json.loads(Path("artifacts/system-one/manifest.json").read_text()),
+              "claude": json.loads(Path("artifacts/claude-reference/manifest.json").read_text()),
+          }
+          Path("artifacts/comparison/run-manifest.json").write_text(
+              json.dumps(payload, indent=2, ensure_ascii=False)+"\n"
+          )
+          PY
+
+      - name: Upload accuracy comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-locator-cross-trace-comparison-${{ github.run_id }}
+          path: artifacts/comparison/
+          if-no-files-found: error
+          retention-days: 90
+
+  quality-evaluate:
+    name: Blind Claude localization quality review
+    needs:
+      - resolve-subject
+      - system-one
+      - claude-reference
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    env:
+      CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+      ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}
+    steps:
+      - name: Checkout explorer harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact subject revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ needs.resolve-subject.outputs.subject_sha }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned Claude Code
+        run: |
+          set -euo pipefail
+          npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+          claude --version
+
+      - name: Require evaluator configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_API_KEY"
+          test -n "$ANTHROPIC_BASE_URL"
+          test -n "$CLAUDE_MODEL"
+
+      - name: Download System One localization result
+        uses: actions/download-artifact@v4
+        with:
+          name: code-locator-cross-trace-system-one-${{ github.run_id }}
+          path: artifacts/system-one
+
+      - name: Download Claude localization result
+        uses: actions/download-artifact@v4
+        with:
+          name: code-locator-cross-trace-claude-${{ github.run_id }}
+          path: artifacts/claude-reference
+
+      - name: Prepare anonymous candidates and identical rubrics
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/quality-evaluation/candidate-a
+          mkdir -p artifacts/quality-evaluation/candidate-b
+
+          python3 src/localization_quality_evaluation.py prepare \
+            --input artifacts/system-one/localization-result.json \
+            --candidate-id candidate-a \
+            --output-candidate artifacts/quality-evaluation/candidate-a/candidate.json \
+            --output-prompt artifacts/quality-evaluation/candidate-a/prompt.txt
+
+          python3 src/localization_quality_evaluation.py prepare \
+            --input artifacts/claude-reference/localization-result.json \
+            --candidate-id candidate-b \
+            --output-candidate artifacts/quality-evaluation/candidate-b/candidate.json \
+            --output-prompt artifacts/quality-evaluation/candidate-b/prompt.txt
+
+      - name: Evaluate anonymous candidate A in fresh Claude session
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json \
+            --verbose \
+            --model "$CLAUDE_MODEL" \
+            --effort high \
+            --max-turns 80 \
+            --permission-mode dontAsk \
+            --no-session-persistence \
+            --setting-sources '' \
+            --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' \
+            --disable-slash-commands \
+            --tools 'Bash,Read,Glob,Grep' \
+            --allowedTools 'Bash(*)' 'Read' 'Glob' 'Grep' \
+            --disallowedTools 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/quality-evaluation/candidate-a/prompt.txt \
+            > ../artifacts/quality-evaluation/candidate-a/evaluator.raw.jsonl
+
+      - name: Evaluate anonymous candidate B in fresh Claude session
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json \
+            --verbose \
+            --model "$CLAUDE_MODEL" \
+            --effort high \
+            --max-turns 80 \
+            --permission-mode dontAsk \
+            --no-session-persistence \
+            --setting-sources '' \
+            --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' \
+            --disable-slash-commands \
+            --tools 'Bash,Read,Glob,Grep' \
+            --allowedTools 'Bash(*)' 'Read' 'Glob' 'Grep' \
+            --disallowedTools 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/quality-evaluation/candidate-b/prompt.txt \
+            > ../artifacts/quality-evaluation/candidate-b/evaluator.raw.jsonl
+
+      - name: Finalize scorecards and combined report
+        run: |
+          set -euo pipefail
+
+          python3 src/localization_quality_evaluation.py finalize \
+            --candidate artifacts/quality-evaluation/candidate-a/candidate.json \
+            --raw-jsonl artifacts/quality-evaluation/candidate-a/evaluator.raw.jsonl \
+            --subject-root subject \
+            --model "$CLAUDE_MODEL" \
+            --output-json artifacts/quality-evaluation/candidate-a/scorecard.json \
+            --output-markdown artifacts/quality-evaluation/candidate-a/report.md
+
+          python3 src/localization_quality_evaluation.py finalize \
+            --candidate artifacts/quality-evaluation/candidate-b/candidate.json \
+            --raw-jsonl artifacts/quality-evaluation/candidate-b/evaluator.raw.jsonl \
+            --subject-root subject \
+            --model "$CLAUDE_MODEL" \
+            --output-json artifacts/quality-evaluation/candidate-b/scorecard.json \
+            --output-markdown artifacts/quality-evaluation/candidate-b/report.md
+
+          python3 src/localization_quality_evaluation.py report \
+            --candidate-a artifacts/quality-evaluation/candidate-a/scorecard.json \
+            --candidate-b artifacts/quality-evaluation/candidate-b/scorecard.json \
+            --candidate-a-label "System One" \
+            --candidate-b-label "Claude Code" \
+            --output-json artifacts/quality-evaluation/evaluation-report.json \
+            --output-markdown artifacts/quality-evaluation/evaluation-report.md
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("artifacts/quality-evaluation")
+          manifest = {
+              "schema_version": 1,
+              "kind": "code-localization-quality-evaluation-run",
+              "subject_sha": "${{ needs.resolve-subject.outputs.subject_sha }}",
+              "task": "${{ env.QUERY }}",
+              "evaluator_model": "${{ env.CLAUDE_MODEL }}",
+              "candidate_mapping": {
+                  "candidate-a": "System One",
+                  "candidate-b": "Claude Code",
+              },
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+          )
+          PY
+
+          cat artifacts/quality-evaluation/evaluation-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload blind quality evaluation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-locator-quality-evaluation-${{ github.run_id }}
+          path: artifacts/quality-evaluation/
+          if-no-files-found: error
+          retention-days: 90
