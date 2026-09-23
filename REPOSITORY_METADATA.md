@@ -21,4 +21,4 @@ Suggested GitHub topics:
 
 Repository name:
 
-`system-one-code-explorer`
+`system-one-code-explore`
