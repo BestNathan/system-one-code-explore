@@ -20,6 +20,7 @@ def load(name):
 
 A = load("system_one_evidence_guided_runtime")
 B = load("system_one_adaptive_zoom")
+C = load("system_one_relevance_frontier")
 
 
 class EvidenceGuidedTest(unittest.TestCase):
@@ -199,6 +200,132 @@ class AdaptiveZoomGeometryTest(unittest.TestCase):
                     "probability_frontier_converged",
                     "round_budget_exhausted",
                     "frontier_exhausted",
+                },
+            )
+
+
+class RelevanceFrontierTest(unittest.TestCase):
+    def make_state(self):
+        return {
+            "path": "src/x.py",
+            "phase1_score": 0.9,
+            "line_count": 100,
+            "round": 2,
+            "nodes": {},
+            "leaf_ids": [],
+            "observations": [],
+            "observation_by_id": {},
+            "action_history": [],
+            "termination": None,
+            "stable_rounds": 0,
+            "previous_signature": None,
+            "max_frontier_leaves": 24,
+        }
+
+    def test_parent_child_gradient_discloses_missing_sibling(self):
+        state = self.make_state()
+        parent = C.new_node("c1", 1, 100)
+        parent["score_history"] = [0.87]
+        parent["status"] = "internal"
+        parent["children"] = ["c1.L", "c1.R"]
+        left = C.new_node("c1.L", 1, 50, 1, "c1")
+        right = C.new_node("c1.R", 51, 100, 1, "c1")
+        right["score_history"] = [0.48]
+        right["observation_ids"] = ["obs"]
+        state["nodes"] = {
+            "c1": parent,
+            "c1.L": left,
+            "c1.R": right,
+        }
+        state["leaf_ids"] = ["c1.L", "c1.R"]
+
+        actions = C.generate_actions(
+            state,
+            max_actions=3,
+            target_region_lines=24,
+            refine_threshold=0.72,
+            gradient_threshold=0.18,
+            volatility_threshold=0.12,
+        )
+
+        self.assertEqual("resolve_gradient", actions[0]["kind"])
+        self.assertEqual("c1.L", actions[0]["node_id"])
+        self.assertAlmostEqual(0.39, actions[0]["source"]["gradient"])
+
+    def test_score_volatility_discloses_refinement(self):
+        state = self.make_state()
+        node = C.new_node("c1", 1, 200)
+        node["observation_ids"] = ["obs"]
+        node["score_history"] = [0.42, 0.81]
+        state["nodes"] = {"c1": node}
+        state["leaf_ids"] = ["c1"]
+
+        actions = C.generate_actions(
+            state,
+            max_actions=3,
+            target_region_lines=48,
+            refine_threshold=0.9,
+            gradient_threshold=0.18,
+            volatility_threshold=0.12,
+        )
+
+        self.assertTrue(any(
+            item["kind"] == "volatility_revisit"
+            for item in actions
+        ))
+
+    def test_initial_frontier_scales_with_file_size(self):
+        self.assertEqual(1, C.initial_region_count(100))
+        self.assertEqual(2, C.initial_region_count(500))
+        self.assertEqual(3, C.initial_region_count(1200))
+        self.assertEqual(4, C.initial_region_count(3000))
+        self.assertEqual(6, C.initial_region_count(6000))
+
+    def test_offline_frontier_runs_with_ten_round_cap(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            path = root / "notes.md"
+            lines = [
+                ("TARGET websocket implementation" if i == 250 else f"line {i}")
+                for i in range(1, 501)
+            ]
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            candidate = {
+                "score": 0.9,
+                "payload": {
+                    "path": "notes.md",
+                    "extension": ".md",
+                },
+            }
+            trace = type(
+                "Trace",
+                (),
+                {"emit": lambda self, *args, **kwargs: None},
+            )()
+            decider = C.OfflineRelevanceFrontierDecider(trace)
+
+            state, _ = C.run_frontier_file(
+                root,
+                "find websocket implementation",
+                candidate,
+                decider,
+                trace,
+                max_rounds=10,
+                max_actions_per_round=3,
+                probe_lines=64,
+                target_region_lines=32,
+                final_window_lines=16,
+            )
+
+            self.assertLessEqual(state["round"], 10)
+            self.assertGreater(len(state["observations"]), 0)
+            self.assertGreater(state["frontier_coverage"], 0)
+            self.assertIn(
+                state["termination"],
+                {
+                    "frontier_stable",
+                    "frontier_exhausted",
+                    "round_budget_exhausted",
                 },
             )
 
