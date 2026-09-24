@@ -43,7 +43,7 @@ jobs:
 
       - name: Run online posterior A/B
         env:
-          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
         run: |
           set -euo pipefail
           test -n "$TYPESAFE_API_KEY"
