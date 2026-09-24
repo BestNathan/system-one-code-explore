@@ -107,7 +107,7 @@ jobs:
             --source "subject/$FILE_PATH" \
             --query "$GOAL" \
             --target-lines 8 \
-            --stride-lines 16 \
+            --stride-lines 8 \
             --output-prompt "artifacts/teacher/$CASE_ID/prompt.txt" \
             --output-manifest "artifacts/teacher/$CASE_ID/manifest.json"
 
@@ -140,7 +140,7 @@ jobs:
               --source "subject/$FILE_PATH" \
               --query "$GOAL" \
               --target-lines 8 \
-              --stride-lines 16 \
+              --stride-lines 8 \
               --raw-output "$ROOT/output-attempt-$attempt.txt" \
               --output "$ROOT/reference.json"; then
               echo "$attempt" > "$ROOT/accepted-attempt.txt"
