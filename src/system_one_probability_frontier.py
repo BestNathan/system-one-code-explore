@@ -38,6 +38,16 @@ def observed_mask(frontier):
     return "".join("1" if x else "0" for x in frontier["observed"])
 
 
+def snapshot_frontier(frontier, probes, usage):
+    return {
+        "probes": int(probes),
+        "sampled_source_lines": sum(1 for x in frontier["observed"] if x),
+        "relevance": [float(x) for x in frontier["relevance"]],
+        "uncertainty": [float(x) for x in frontier["uncertainty"]],
+        "usage": {k: int(v) for k, v in usage.items()},
+    }
+
+
 def frontier_view(frontier):
     return {
         "line_count": frontier["line_count"],
@@ -363,11 +373,13 @@ def phase0_probability_frontier(
     max_batch=4,
     probability_threshold=None,
     max_total_probes=24,
+    respect_stop=True,
 ):
     """Build a whole-file relevance probability frontier."""
     frontier = new_probability_frontier(line_count)
     usage = empty_usage()
     history = []
+    snapshots = []
     total_probes = 0
 
     # First epoch is a reproducible random/stratified bootstrap batch.
@@ -388,7 +400,8 @@ def phase0_probability_frontier(
             observation["end_line"],
             score,
         )
-    total_probes += len(bootstrap)
+        total_probes += 1
+        snapshots.append(snapshot_frontier(frontier, total_probes, usage))
     history.append({"epoch": 0, "actions": bootstrap, "scores": scores})
 
     for epoch in range(1, max_epochs + 1):
@@ -412,8 +425,19 @@ def phase0_probability_frontier(
             max_batch=min(max_batch, max_total_probes - total_probes),
         )
         merge_usage(usage, current)
-        if policy["stop_probability"] >= 0.5 and not policy["selected_actions"]:
-            break
+        if not policy["selected_actions"]:
+            if respect_stop and policy["stop_probability"] >= 0.5:
+                break
+            # Convergence benchmarks may deliberately continue beyond the
+            # model's natural stopping point to measure the full budget curve.
+            probabilities = policy.get("probabilities", {})
+            best = max(
+                actions,
+                key=lambda item: float(probabilities.get(item["id"], 0.0)),
+            )
+            policy["selected_actions"] = [best]
+            policy["selected_ids"] = [best["id"]]
+            policy["forced_progress"] = True
         observations = execute_probe_batch(root, path, policy["selected_actions"])
         scores, current = decider.score_probe_observations(
             goal, path, frontier, observations
@@ -426,7 +450,8 @@ def phase0_probability_frontier(
                 observation["end_line"],
                 score,
             )
-        total_probes += len(observations)
+            total_probes += 1
+            snapshots.append(snapshot_frontier(frontier, total_probes, usage))
         history.append({
             "epoch": epoch,
             "policy": policy,
@@ -437,6 +462,8 @@ def phase0_probability_frontier(
         "kind": "whole_file_probability_frontier_v5",
         "frontier": frontier,
         "history": history,
+        "snapshots": snapshots,
         "probes": total_probes,
         "sample_lines": sample_lines,
+        "respect_stop": bool(respect_stop),
     }, usage
