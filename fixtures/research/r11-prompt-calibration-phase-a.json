@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "kind": "r11-system-one-prompt-calibration-phase-a",
+  "run_id": 36026215590,
+  "cases": 3,
+  "dataset_warning": "All three broad goal/file pairs produced no low (<0.35) examples. Phase A is positive-heavy and evaluates high-vs-mid separation, not true hard-negative rejection.",
+  "prompts": {
+    "generic_relevance": {
+      "pearson": 0.3788663,
+      "spearman": 0.4025551,
+      "high_vs_rest_auc": 0.7225,
+      "precision_at_high_count": 0.7,
+      "brier_high_label": 0.225819,
+      "mean_high_probability": 0.644333
+    },
+    "material_evidence": {
+      "pearson": 0.286066,
+      "spearman": 0.312710,
+      "high_vs_rest_auc": 0.670463,
+      "precision_at_high_count": 0.666667,
+      "brier_high_label": 0.249247,
+      "mean_high_probability": 0.565333
+    },
+    "counterfactual_answer_impact": {
+      "pearson": 0.121988,
+      "spearman": 0.177514,
+      "high_vs_rest_auc": 0.587222,
+      "precision_at_high_count": 0.633333,
+      "brier_high_label": 0.279393,
+      "mean_high_probability": 0.519333
+    },
+    "minimal_evidence_keep": {
+      "pearson": 0.303191,
+      "spearman": 0.302552,
+      "high_vs_rest_auc": 0.660694,
+      "precision_at_high_count": 0.633333,
+      "brier_high_label": 0.243339,
+      "mean_high_probability": 0.508333
+    },
+    "mechanism_match": {
+      "pearson": 0.272806,
+      "spearman": 0.282962,
+      "high_vs_rest_auc": 0.677407,
+      "precision_at_high_count": 0.7,
+      "brier_high_label": 0.246572,
+      "mean_high_probability": 0.619667
+    }
+  },
+  "per_case_notes": {
+    "command_broker_ownership": {
+      "examples": 19,
+      "low_examples": 0,
+      "best_auc": "mechanism_match",
+      "best_auc_value": 0.4722,
+      "warning": "generic relevance inverted high vs mid means on this broad goal"
+    },
+    "extension_registry_integrity": {
+      "examples": 20,
+      "low_examples": 0,
+      "best_auc": "generic_relevance",
+      "best_auc_value": 0.83,
+      "generic_pearson": 0.679,
+      "generic_precision_at_high_count": 0.8
+    },
+    "git_agent_security": {
+      "examples": 18,
+      "low_examples": 0,
+      "best_auc": "generic_relevance",
+      "best_auc_value": 0.8875,
+      "generic_pearson": 0.628,
+      "generic_precision_at_high_count": 0.9
+    }
+  }
+}
