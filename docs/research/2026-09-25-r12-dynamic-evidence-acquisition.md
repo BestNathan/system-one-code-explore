@@ -4,151 +4,200 @@
 
 Current research iteration.
 
+The initial single-Choice design was rejected before becoming canonical.
+R12 now uses independent Noul action scores and reads every remaining action
+whose marginal-evidence probability clears a fixed threshold.
+
 ## Why R12 exists
 
 R10 proved that completed Phase0 trajectories already contain useful code
 evidence, but its selector was deliberately artificial:
 
-- sort observed micro-probes by score;
+- rank observed micro-probes;
 - expand them to 32 lines;
 - keep exactly six.
 
-That was useful as a diagnostic, but it is not a plausible final evidence
-runtime. The number of useful snippets should depend on the task and on what
-has already been read.
+That is a useful diagnostic baseline, not a final evidence runtime.
 
-R12 replaces the fixed-count selector with a second System One state machine.
+The number of useful code ranges should emerge from the task, the Phase0
+probability frontier, and evidence already materialized.
 
-## Question
-
-Given a completed Phase0 probability frontier, can System One dynamically read
-full code ranges until the remaining action space no longer contains evidence
-worth acquiring?
-
-## State transition
+## Core state machine
 
 ```text
 completed Phase0 probability frontier
         |
         v
-partition whole file into equal evidence tiles
+partition whole file into equal 32-line ReadRange actions
         |
         v
-remaining ReadRange actions + Stop
+score EVERY remaining action with independent Noul
         |
         v
-System One Choice
+read ALL actions whose Noul >= threshold
         |
-        +--> Stop
+        v
+add literal source to accumulated evidence
         |
-        +--> Read one tile
-                 |
-                 v
-          add literal source to evidence
-                 |
-                 v
-          remove tile from action space
-                 |
-                 +--------------------+
-                                      |
-                                      v
-                               Choice again
+        v
+remove those actions from the action space
+        |
+        +------------------------------+
+                                       |
+                                       v
+                         rescore every remaining action
+                                       |
+                                       v
+                        no score >= threshold -> stop
 ```
 
-The action space therefore shrinks monotonically.
+There is no target snippet count.
 
-There is no target evidence count.
+A round can materialize zero, one, or many ranges.
 
-## Why Stop must be an explicit Choice action
+## Why Noul, not Choice
 
-A categorical Choice distribution without Stop is purely relative. If there are
-N remaining actions, at least one action must receive probability near or above
-1/N even when every action is bad.
-
-Therefore "all actions have low probability" is not well-defined without an
-anchor.
-
-R12 includes a `stop` action whose meaning is:
-
-> the evidence already read is sufficient and no remaining range is likely to
-> add a distinct material fact worth its read cost.
-
-A round stops when either:
-
-1. `P(stop) >= max P(read_i)`; or
-2. the best read action is not meaningfully above the categorical uniform
-   prior.
-
-The second criterion reuses the existing Phase0 threshold multiplier:
+A Choice result is categorical:
 
 ```text
-best_read_lift = P(best_read) / (1 / (remaining_actions + 1))
-
-continue only if best_read_lift >= 1.1
+P(a1) + P(a2) + ... + P(an) + P(stop) = 1
 ```
 
-The value 1.1 is inherited from the current Phase0 Choice batch policy and is
-not tuned against R10/R12 references.
+Its probabilities describe competition between alternatives. With many useful
+actions they are forced to split a unit mass, so the value of one action
+depends on how many other actions exist.
+
+That is the wrong semantics for R12.
+
+R12 needs an independent question for each action:
+
+```text
+Noul(tile_i) =
+P(
+  reading tile_i NOW adds new material evidence
+  | Phase0 frontier, evidence already selected
+)
+```
+
+These scores do not sum to one. Multiple ranges can all receive high
+probability in the same round.
+
+For example:
+
+```text
+tile_03 = 0.91
+tile_08 = 0.84
+tile_17 = 0.79
+tile_22 = 0.76
+```
+
+All four should be read together if the threshold is 0.65.
+
+## Rejected R12-A design
+
+The first implementation used one Choice across all ranges plus Stop and read
+only the single best range each round.
+
+That design is retained only as a rejected research branch in the history. It
+does not match the intended semantics because:
+
+1. valuable actions compete for normalized probability mass;
+2. a file with ten simultaneously valuable ranges still exposes only one
+   winner;
+3. repeated single-read rounds create unnecessary model calls;
+4. "all remaining actions are low probability" is not meaningful for a
+   categorical distribution.
+
+The canonical R12 implementation is Noul multi-select.
 
 ## Equal action space
 
-Initial R12 action width:
+Initial action width is frozen to 32 source lines:
 
-- 32 source lines per action;
 - non-overlapping;
-- covers the complete file;
-- the final tile may be shorter.
+- complete coverage of the file;
+- final tile may be shorter.
 
-For a 3,000-line file this yields roughly 94 actions.
+Before a range is read, the action exposes only Phase0-derived state:
 
-Every action exposes only Phase0-derived metadata before it is read:
+- range;
+- mean Phase0 relevance;
+- max Phase0 relevance;
+- mean Phase0 uncertainty;
+- Phase0 observed fraction.
 
-- mean relevance;
-- max relevance;
-- mean uncertainty;
-- Phase0 observed fraction;
-- source range.
+The source text itself remains hidden until that ReadRange executes.
 
-Source text is disclosed only after System One chooses the action.
-
-This preserves the intended progressive-disclosure property.
+This preserves progressive disclosure.
 
 ## Evidence feedback
 
-After a tile is read, its literal source is added to the next Choice state.
+After all above-threshold ranges from one round are read, their literal source
+is added to the next scoring state.
 
-The next decision therefore asks for **marginal evidence value**, not independent
-topical relevance. A range should become less attractive when its facts are
-already covered by selected evidence.
+Every remaining tile is then rescored for **marginal evidence value**, not
+static task relevance.
 
-Phase0 itself is frozen during R12. Reading an evidence tile does not mutate the
-Phase0 posterior. This keeps the two phases separable:
+A previously attractive unread tile can therefore fall below threshold when
+the new evidence already establishes the same fact.
 
-- Phase0 estimates where evidence may exist;
-- R12 decides which full ranges are actually worth materializing.
+This is the main reason R12 must iterate rather than threshold the Phase0 field
+once.
+
+## Scoring request
+
+For each remaining action System One receives an independent Noul question:
+
+> How likely is reading this exact source range now to add new material
+> evidence needed for the goal, beyond evidence already materialized?
+
+High probability means the range is likely to add a distinct useful mechanism,
+state transition, dependency/contract, constraint, edge case, or
+implementation fact.
+
+Low probability means it is likely irrelevant, redundant, incidental, or
+merely confirmatory.
+
+The implementation batches Noul questions for transport efficiency, but the
+semantics remain independent per action.
+
+## Frozen baseline parameters
+
+First canonical R12 run:
+
+- tile width: 32 lines;
+- Noul threshold: 0.65;
+- Noul transport batch size: 16 actions;
+- read all actions at or above threshold;
+- rescore after every materialization round;
+- stop when no remaining action clears threshold;
+- 16 rounds is a safety cap only.
+
+The 0.65 threshold is inherited from the repository's existing evidence
+threshold and is not fitted against R10 data.
+
+Any run ending at the safety cap is a policy failure, not a valid stop.
 
 ## Controlled experiment
 
-The first R12 experiment reuses the canonical R08 Phase0 trajectories and CC
-references:
+Reuse the canonical R08 Phase0 trajectories and CC references:
 
-- Phase0/reference workflow: `36004833542`;
+- source workflow: `36004833542`;
 - subject:
   `BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`;
-- three R08 single-file tasks;
+- three single-file tasks;
 - two Phase0 repeats;
-- `sequential_exponential` and `multi_scale_gaussian`.
+- sequential and multi-scale posterior arms.
 
-This directly compares R12 against the R10 fixed-six baseline without rerunning
-Phase0.
+This makes R10 fixed-six evidence the direct baseline.
 
 ## Metrics
 
 ### Evidence quality
 
-- number of dynamically selected tiles;
-- selected source lines / source fraction;
-- mean CC relevance;
+- dynamically selected tile count;
+- selected source lines and source fraction;
+- mean hidden CC relevance;
 - high-line precision;
 - high-line recall;
 - weighted relevance-mass recall;
@@ -157,57 +206,60 @@ Phase0.
 
 ### Termination quality
 
-The most important new diagnostic is **stop regret**.
-
-At termination, evaluate every unselected tile with the hidden CC reference:
+At the first all-below-threshold round, inspect every remaining tile using the
+hidden CC field:
 
 - best remaining tile mean relevance;
-- best remaining tile high-line fraction;
-- number of remaining tiles whose mean relevance is >= 0.70;
-- premature-stop flag.
+- best remaining high-line fraction;
+- number of remaining tiles with mean CC relevance >= 0.70;
+- premature-stop rate.
 
-A selector that returns clean evidence but stops while an obviously valuable
-tile remains has not solved the phase.
+This is **stop regret**.
+
+If the Noul policy stops while strong hidden-reference tiles remain, the
+threshold/scoring semantics are not yet good enough.
+
+### Batch behavior
+
+Because R12 can read many actions per round, also record:
+
+- number selected per round;
+- probability distribution of selected versus rejected actions;
+- overlap/redundancy among same-round selected evidence;
+- how scores change after evidence feedback;
+- number of rescoring rounds.
 
 ### Cost
 
-- Choice rounds;
 - System One calls;
 - input/output tokens;
-- termination reason;
-- safety-cap rate.
-
-## Safety cap
-
-The implementation has a 32-round cap only to prevent a broken policy from
-creating an unbounded workflow.
-
-It is not considered a valid termination mechanism. Any run ending at
-`safety_cap` is evidence that the stopping policy failed.
+- selected source fraction;
+- evidence quality per token/read line.
 
 ## Success criteria
 
-R12 is promising if, compared with R10 fixed-six evidence:
+Compared with the R10 fixed-six baseline, R12 is promising if:
 
-1. evidence precision is not materially worse;
-2. variable evidence count improves recall/relevance mass when the task needs
-   more evidence;
-3. simple tasks naturally stop with fewer ranges;
+1. selected count varies naturally by task;
+2. precision stays comparable while recall/relevance mass increases where more
+   evidence is required;
+3. easy tasks can stop after few tiles;
 4. same-budget oracle gap narrows;
-5. premature-stop and safety-cap rates are low;
-6. selected ranges show declining marginal reference value near termination.
+5. premature-stop rate is low;
+6. safety-cap rate is near zero;
+7. later rounds select fewer/weaker marginal actions as evidence becomes
+   sufficient.
 
-## Next research variables
+## Later isolated variables
 
-Do not tune all of these at once.
-
-If the baseline works, later iterations can isolate:
+Only after the baseline is characterized:
 
 - 16 / 32 / 64-line action granularity;
-- stop-anchor wording;
-- 1.1 uniform-lift threshold;
-- one-read-per-round versus above-threshold batches;
-- compact summaries versus literal accumulated evidence;
-- Phase0 posterior updates from Phase1 reads.
+- Noul threshold;
+- static threshold versus calibrated threshold;
+- score all remaining actions versus Phase0-prefiltered action subsets;
+- literal evidence versus compact evidence summaries;
+- intra-round redundancy control;
+- feeding Phase1 observations back into the Phase0 posterior.
 
-R12 first establishes whether this phase shape is viable at all.
+R12 first tests whether independent Noul multi-select is the right phase shape.
