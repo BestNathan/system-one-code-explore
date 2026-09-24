@@ -2,92 +2,131 @@
 
 ## Status
 
-Next controlled research direction.
+Completed on the first controlled fixture. The estimator definitions are now
+frozen for holdout evaluation; do not tune them further on the websocket CC
+reference.
 
 ## Question
 
 Given a fixed set of sparse micro-block observations whose local System One
-relevance scores are already reasonably aligned with the CC reference, what
-estimator best reconstructs the whole-file relevance frontier?
+relevance scores are reasonably aligned with the CC reference, what estimator
+best reconstructs the whole-file relevance frontier?
 
-## Why this is the next variable
+## Controlled setup
 
-R06 isolated a clear gap:
+Held fixed:
+
+- `BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`;
+- websocket optimization query;
+- 3030-line websocket file;
+- 32 recorded 8-line probes;
+- probe order and action kinds;
+- all local Jev relevance scores;
+- validated CC full-read relevance field.
+
+Only the deterministic posterior estimator changed.
+
+Pinned fixtures:
+
+- `fixtures/research/r07-websocket-v5b-trajectory.json`
+- `fixtures/research/r07-websocket-cc-reference.json`
+
+Implementation:
+
+- `src/posterior_reconstruction.py`
+- `src/posterior_reconstruction_benchmark.py`
+
+Raw report:
+
+- `docs/experiments/r07-posterior-reconstruction-2026-09-24.md`
+
+## Result
+
+Local Jev sample scoring is already reasonably strong:
 
 ```text
-local sample scorer:
-  Pearson ≈ 0.755
-  MAE ≈ 0.168
-
-current whole-file reconstruction:
-  Pearson = 0.540
-  MAE = 0.230
+local score -> CC local relevance
+Pearson ≈ 0.755
+MAE     ≈ 0.171
 ```
 
-The current v5 update applies sequential exponential propagation around each
-observation. It is heuristic and path dependent.
+The historical sequential posterior loses much of this information:
 
-## Hypothesis
+```text
+32 probes:
+Pearson  = 0.540
+Spearman = 0.478
+MAE      = 0.230
+```
 
-A path-independent estimator that recomputes the whole field from all current
-observations should preserve more of the local scoring signal.
+A path-independent multi-scale Gaussian posterior on the same observations
+reconstructs:
 
-## Controlled experiment
+```text
+32 probes:
+Pearson  = 0.798
+Spearman = 0.785
+MAE      = 0.177
+```
 
-Keep fixed:
+Relative to the sequential baseline:
 
-- frozen subject revision;
-- query;
-- CC full-read reference field;
-- probe width;
-- corrected mixed/spatially-diverse probe policy;
-- recorded sparse observations and local System One scores.
+- MAE decreases about 23%;
+- RMSE decreases about 23%;
+- Pearson increases by 0.257 absolute;
+- Spearman increases by 0.307 absolute;
+- JS divergence decreases about 39%.
 
-Change only the posterior estimator.
+No extra source reads or model calls are used.
 
-Candidate estimators:
+## Interpretation
 
-1. **Sequential exponential update** — current baseline.
-2. **Kernel regression** — reconstruct every line from all observations.
-3. **Multi-scale kernel posterior** — combine local and broad spatial kernels.
-4. **Uncertainty-aware kernel posterior** — keep relevance and epistemic
-   uncertainty separate.
-5. **System One field update** — optionally ask the model to update or select
-   among candidate frontier transforms after deterministic estimators are
-   understood.
+The primary v5 information-loss layer was not local System One relevance
+judgment. It was the sequential heuristic that propagated sparse observations
+into a whole-file field.
 
-## Evaluation
+A posterior should therefore be treated as a first-class replaceable component:
 
-At every probe checkpoint compare the reconstructed line-level field with the
-same CC reference:
+```text
+observations
+      |
+      v
+PosteriorEstimator
+      |
+      +--> relevance[N]
+      +--> uncertainty[N]
+```
 
-- MAE;
-- RMSE;
-- Pearson;
-- Spearman;
-- top-K relevance recall;
-- high-relevance recall;
-- Jensen-Shannon divergence;
-- Wasserstein position distance;
-- uncertainty calibration;
-- compute/token cost.
+The estimator must be recomputable from durable observations rather than depend
+on mutation order.
 
-The important output is the convergence curve, not one final score.
+## Important limitation
 
-## Experimental discipline
+This experiment uses one file and one CC reference to compare estimator
+families.
 
-Do not choose kernel bandwidth or other estimator hyperparameters using the
-same CC reference and then report that tuned result as unbiased benchmark
-performance.
+Therefore multi-scale Gaussian is the current **candidate**, not a universal
+winner. Its definitions are now frozen before holdout evaluation.
 
-If the reference is used to explore hyperparameters, record that run explicitly
-as diagnostic only.
+In particular, do not tune:
 
-## Success criterion
+- k values;
+- prior weight;
+- minimum bandwidth;
+- maximum bandwidth;
+- local/broad blend ratio
 
-Find a reconstruction method where additional accurate observations generally
-improve the global relevance shape, rather than merely reduce uncertainty.
+against this same websocket reference and then present the tuned result as
+generalization evidence.
 
-A strong result would close a meaningful fraction of the gap between local
-sample-score correlation (~0.755) and current whole-field correlation (0.540)
-without increasing source-read budget.
+## Rejected idea
+
+Retire the assumption that a fixed sequential exponential update is an adequate
+probability-frontier posterior.
+
+Keep it only as a historical baseline.
+
+## Next direction
+
+R08: integrate the path-independent posterior into the online Phase0 feedback
+loop and validate the frozen estimators on holdout files/tasks.
