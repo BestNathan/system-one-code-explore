@@ -1,0 +1,486 @@
+name: Single-file Range vs Relevance Frontier v1b
+
+on:
+  push:
+    branches:
+      - experiment/single-file-frontier-v1b-20260924
+
+permissions:
+  contents: read
+
+env:
+  QUERY: Help me optimize the websocket connection implementation
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  FILE_PATH: crates/nession-server/src/server/handler.rs
+  TYPESAFE_MODEL: \${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: \${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  experiment:
+    name: Single-file Range vs Frontier v1b
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+        with:
+          path: harness
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: BestNathan/nession
+          ref: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run single-file controlled experiment
+        env:
+          TYPESAFE_API_KEY: \${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/range artifacts/frontier
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("harness/src").resolve()))
+
+          from localization_result import (
+              build_system_one_range_result,
+              build_system_one_relevance_frontier_result,
+          )
+          from system_one_code_locator import Trace
+          from system_one_range_runtime import (
+              SystemOneFileDecider,
+              canonical_file_results,
+              run_file_runtime,
+          )
+          from system_one_relevance_frontier import (
+              RelevanceFrontierDecider,
+              canonical_results as canonical_frontier_results,
+              run_frontier_file,
+          )
+
+          root = Path("subject")
+          query = os.environ["QUERY"]
+          model = os.environ["TYPESAFE_MODEL"]
+          endpoint = os.environ["TYPESAFE_API_URL"]
+          key = os.environ["TYPESAFE_API_KEY"]
+          file_path = os.environ["FILE_PATH"]
+          subject = {
+              "repository": os.environ["SUBJECT_REPOSITORY"],
+              "revision": os.environ["SUBJECT_SHA"],
+          }
+          candidate = {
+              "score": 0.90,
+              "payload": {"path": file_path, "extension": ".rs"},
+          }
+
+          range_params = {
+              "window_lines": 140,
+              "parallel_threshold": 0.65,
+              "max_jumps": 2,
+              "max_file_epochs": 32,
+          }
+
+          frontier_params = {
+              "max_rounds": 10,
+              "max_actions_per_round": 2,
+              "probe_lines": 128,
+              "target_region_lines": 64,
+              "final_window_lines": 24,
+              "refine_threshold": 0.78,
+              "candidate_threshold": 0.60,
+              "gradient_threshold": 0.14,
+              "volatility_threshold": 0.10,
+              "stable_delta": 0.06,
+              "stable_rounds": 2,
+              "max_frontier_leaves": 18,
+              "final_max_candidates": 16,
+          }
+
+          def source_coverage(state):
+              covered = sorted(
+                  (int(a), int(b)) for a, b in state.get("coverage", [])
+              )
+              merged = []
+              for left, right in covered:
+                  if not merged or left > merged[-1][1] + 1:
+                      merged.append([left, right])
+                  else:
+                      merged[-1][1] = max(merged[-1][1], right)
+              lines = sum(b - a + 1 for a, b in merged)
+              return lines / max(1, int(state["line_count"]))
+
+          def evidence_ranges(result):
+              return [
+                  (int(e["start_line"]), int(e["end_line"]))
+                  for item in result.get("files", [])
+                  for e in item.get("evidence", [])
+              ]
+
+          def overlap_ratio(left, right):
+              total = sum(b - a + 1 for a, b in left)
+              if not total:
+                  return 0.0
+              overlap = 0
+              for a, b in left:
+                  for c, d in right:
+                      overlap += max(0, min(b, d) - max(a, c) + 1)
+              return min(1.0, overlap / total)
+
+          def action_counts(state):
+              counts = {}
+              for snapshot in state.get("action_history", []):
+                  for action in snapshot.get("actions", []):
+                      kind = action.get("kind")
+                      counts[kind] = counts.get(kind, 0) + 1
+              return counts
+
+          range_trace = Trace("artifacts/range/trace.jsonl")
+          range_decider = SystemOneFileDecider(
+              key, range_trace, endpoint, model
+          )
+          started = time.perf_counter()
+          range_state, range_usage = run_file_runtime(
+              root, query, candidate, range_decider, range_trace,
+              **range_params,
+          )
+          range_ms = (time.perf_counter() - started) * 1000
+          range_files = canonical_file_results([range_state], 0.65)
+          range_engine = {
+              "query": query,
+              "model": model,
+              "subject": subject,
+              "file_states": [range_state],
+              "result_files": range_files,
+              "metrics": {
+                  **range_usage,
+                  "file_runtimes": 1,
+                  "reads_executed": range_state["read_count"],
+                  "valuable_files": len(range_files),
+                  "evidence_regions": sum(len(x["evidence"]) for x in range_files),
+                  "elapsed_ms": round(range_ms, 3),
+              },
+          }
+          range_canonical = build_system_one_range_result(
+              range_engine, model
+          )
+
+          frontier_trace = Trace("artifacts/frontier/trace.jsonl")
+          frontier_decider = RelevanceFrontierDecider(
+              key, frontier_trace, endpoint, model
+          )
+          started = time.perf_counter()
+          frontier_state, frontier_usage = run_frontier_file(
+              root, query, candidate, frontier_decider, frontier_trace,
+              **frontier_params,
+          )
+          frontier_ms = (time.perf_counter() - started) * 1000
+          frontier_files = canonical_frontier_results([frontier_state])
+          frontier_engine = {
+              "query": query,
+              "model": model,
+              "subject": subject,
+              "file_states": [frontier_state],
+              "result_files": frontier_files,
+              "metrics": {
+                  **frontier_usage,
+                  "file_runtimes": 1,
+                  "observations": len(frontier_state["observations"]),
+                  "reads_executed": len(frontier_state["observations"]),
+                  "valuable_files": len(frontier_files),
+                  "evidence_regions": sum(len(x["evidence"]) for x in frontier_files),
+                  "elapsed_ms": round(frontier_ms, 3),
+              },
+          }
+          frontier_canonical = build_system_one_relevance_frontier_result(
+              frontier_engine, model
+          )
+
+          report = {
+              "query": query,
+              "file": file_path,
+              "subject": subject,
+              "model": model,
+              "parameter_set": {
+                  "name": "precision_frontier_v1b",
+                  "frontier": frontier_params,
+                  "range_reference": range_params,
+              },
+              "range": {
+                  "metrics": range_engine["metrics"],
+                  "state": {
+                      "termination": range_state["termination"],
+                      "epochs": range_state["epoch"],
+                      "reads": range_state["read_count"],
+                      "source_coverage": source_coverage(range_state),
+                      "action_history": range_state.get("action_history", []),
+                  },
+                  "localization_result": range_canonical,
+              },
+              "frontier": {
+                  "metrics": frontier_engine["metrics"],
+                  "state": {
+                      "termination": frontier_state["termination"],
+                      "rounds": frontier_state["round"],
+                      "observations": len(frontier_state["observations"]),
+                      "frontier_coverage": frontier_state["frontier_coverage"],
+                      "source_coverage": frontier_state["source_coverage"],
+                      "action_counts": action_counts(frontier_state),
+                      "action_history": frontier_state.get("action_history", []),
+                  },
+                  "localization_result": frontier_canonical,
+              },
+          }
+
+          report["comparison"] = {
+              "elapsed_ratio_frontier_over_range": frontier_ms / max(1.0, range_ms),
+              "read_ratio_frontier_over_range": (
+                  len(frontier_state["observations"]) /
+                  max(1, range_state["read_count"])
+              ),
+              "input_token_ratio_frontier_over_range": (
+                  frontier_usage["input_tokens"] /
+                  max(1, range_usage["input_tokens"])
+              ),
+              "output_token_ratio_frontier_over_range": (
+                  frontier_usage["output_tokens"] /
+                  max(1, range_usage["output_tokens"])
+              ),
+              "frontier_evidence_line_overlap": overlap_ratio(
+                  evidence_ranges(frontier_canonical),
+                  evidence_ranges(range_canonical),
+              ),
+              "range_evidence_line_overlap": overlap_ratio(
+                  evidence_ranges(range_canonical),
+                  evidence_ranges(frontier_canonical),
+              ),
+          }
+
+          for name, data in (
+              ("range", range_engine),
+              ("frontier", frontier_engine),
+          ):
+              result = (
+                  range_canonical if name == "range"
+                  else frontier_canonical
+              )
+              data["localization_result"] = result
+              out = Path("artifacts") / name
+              (out / "result.json").write_text(
+                  json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+              )
+              (out / "localization-result.json").write_text(
+                  json.dumps(result, indent=2, ensure_ascii=False) + "\n"
+              )
+
+          Path("artifacts/report.json").write_text(
+              json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+          )
+          Path("artifacts/params.json").write_text(
+              json.dumps(report["parameter_set"], indent=2, ensure_ascii=False)
+              + "\n"
+          )
+
+          md = [
+              "# Single-file Range vs Relevance Frontier v1b",
+              "",
+              "Subject: " + subject["repository"] + "@" + subject["revision"],
+              "File: " + file_path,
+              "Query: " + query,
+              "",
+              "| Metric | Range | Frontier v1b |",
+              "| --- | ---: | ---: |",
+              "| Elapsed ms | " + str(round(range_ms, 1)) + " | " + str(round(frontier_ms, 1)) + " |",
+              "| Model calls | " + str(range_usage["model_calls"]) + " | " + str(frontier_usage["model_calls"]) + " |",
+              "| Input tokens | " + str(range_usage["input_tokens"]) + " | " + str(frontier_usage["input_tokens"]) + " |",
+              "| Output tokens | " + str(range_usage["output_tokens"]) + " | " + str(frontier_usage["output_tokens"]) + " |",
+              "| Reads / probes | " + str(range_state["read_count"]) + " | " + str(len(frontier_state["observations"])) + " |",
+              "| Source coverage | " + str(round(source_coverage(range_state) * 100, 1)) + "% | " + str(round(frontier_state["source_coverage"] * 100, 1)) + "% |",
+              "| Frontier coverage | - | " + str(round(frontier_state["frontier_coverage"] * 100, 1)) + "% |",
+              "| Evidence regions | " + str(range_engine["metrics"]["evidence_regions"]) + " | " + str(frontier_engine["metrics"]["evidence_regions"]) + " |",
+              "| Termination | " + range_state["termination"] + " | " + frontier_state["termination"] + " |",
+              "",
+              "Frontier action counts:",
+              json.dumps(action_counts(frontier_state), indent=2),
+              "",
+              "Frontier evidence covered by Range: "
+              + str(round(report["comparison"]["frontier_evidence_line_overlap"] * 100, 1))
+              + "%",
+              "Range evidence covered by Frontier: "
+              + str(round(report["comparison"]["range_evidence_line_overlap"] * 100, 1))
+              + "%",
+          ]
+          Path("artifacts/report.md").write_text("\n".join(md) + "\n")
+          print(json.dumps({
+              "range": report["range"]["metrics"],
+              "frontier": report["frontier"]["metrics"],
+              "frontier_state": report["frontier"]["state"],
+              "comparison": report["comparison"],
+          }, indent=2))
+          PY
+
+      - name: Compare canonical results
+        run: |
+          set -euo pipefail
+          python3 harness/src/compare_localization_results.py \
+            --left artifacts/range/localization-result.json \
+            --right artifacts/frontier/localization-result.json \
+            --output-json artifacts/localization-comparison.json \
+            --output-markdown artifacts/localization-comparison.md
+          cat artifacts/report.md >> "$GITHUB_STEP_SUMMARY"
+          cat artifacts/localization-comparison.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload experiment
+        uses: actions/upload-artifact@v4
+        with:
+          name: single-file-range-vs-frontier-v1b-\${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 90
+
+  blind-quality:
+    name: Blind quality review
+    needs: experiment
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+        with:
+          path: harness
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: BestNathan/nession
+          ref: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Download experiment
+        uses: actions/download-artifact@v4
+        with:
+          name: single-file-range-vs-frontier-v1b-\${{ github.run_id }}
+          path: artifacts
+
+      - name: Prepare anonymous candidates
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/quality/range artifacts/quality/frontier
+          python3 harness/src/localization_quality_evaluation.py prepare \
+            --input artifacts/range/localization-result.json \
+            --candidate-id candidate-a \
+            --output-candidate artifacts/quality/range/candidate.json \
+            --output-prompt artifacts/quality/range/prompt.txt
+          python3 harness/src/localization_quality_evaluation.py prepare \
+            --input artifacts/frontier/localization-result.json \
+            --candidate-id candidate-b \
+            --output-candidate artifacts/quality/frontier/candidate.json \
+            --output-prompt artifacts/quality/frontier/prompt.txt
+
+      - name: Evaluate range
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: \${{ vars.CLAUDE_MODEL }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json --verbose \
+            --model "$CLAUDE_MODEL" --effort high --max-turns 80 \
+            --permission-mode dontAsk --no-session-persistence \
+            --setting-sources '' --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' --disable-slash-commands \
+            --tools 'Bash,Read,Glob,Grep' \
+            --allowedTools 'Bash(*)' 'Read' 'Glob' 'Grep' \
+            --disallowedTools 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/quality/range/prompt.txt \
+            > ../artifacts/quality/range/evaluator.raw.jsonl
+
+      - name: Evaluate frontier
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: \${{ vars.CLAUDE_MODEL }}
+        run: |
+          set -euo pipefail
+          claude -p \
+            --output-format stream-json --verbose \
+            --model "$CLAUDE_MODEL" --effort high --max-turns 80 \
+            --permission-mode dontAsk --no-session-persistence \
+            --setting-sources '' --strict-mcp-config \
+            --mcp-config '{"mcpServers":{}}' --disable-slash-commands \
+            --tools 'Bash,Read,Glob,Grep' \
+            --allowedTools 'Bash(*)' 'Read' 'Glob' 'Grep' \
+            --disallowedTools 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*' \
+            --settings '{"disableAllHooks":true}' \
+            < ../artifacts/quality/frontier/prompt.txt \
+            > ../artifacts/quality/frontier/evaluator.raw.jsonl
+
+      - name: Finalize quality scorecards
+        run: |
+          set -euo pipefail
+          python3 harness/src/localization_quality_evaluation.py finalize \
+            --candidate artifacts/quality/range/candidate.json \
+            --raw-jsonl artifacts/quality/range/evaluator.raw.jsonl \
+            --subject-root subject \
+            --model "$CLAUDE_MODEL" \
+            --output-json artifacts/quality/range/scorecard.json \
+            --output-markdown artifacts/quality/range/report.md
+          python3 harness/src/localization_quality_evaluation.py finalize \
+            --candidate artifacts/quality/frontier/candidate.json \
+            --raw-jsonl artifacts/quality/frontier/evaluator.raw.jsonl \
+            --subject-root subject \
+            --model "$CLAUDE_MODEL" \
+            --output-json artifacts/quality/frontier/scorecard.json \
+            --output-markdown artifacts/quality/frontier/report.md
+          python3 harness/src/localization_quality_evaluation.py report \
+            --candidate-a artifacts/quality/range/scorecard.json \
+            --candidate-b artifacts/quality/frontier/scorecard.json \
+            --candidate-a-label "Range runtime" \
+            --candidate-b-label "Relevance frontier v1b" \
+            --output-json artifacts/quality/evaluation-report.json \
+            --output-markdown artifacts/quality/evaluation-report.md
+          cat artifacts/quality/evaluation-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload quality
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: single-file-range-vs-frontier-v1b-quality-\${{ github.run_id }}
+          path: artifacts/quality/
+          if-no-files-found: error
+          retention-days: 90
