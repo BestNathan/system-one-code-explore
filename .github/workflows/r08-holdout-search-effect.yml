@@ -1,0 +1,619 @@
+name: R08 holdout search effect
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/r08-holdout-search-effect.yml"
+      - "src/search_effect_benchmark.py"
+      - "tests/test_search_effect_benchmark.py"
+      - "docs/research/2026-09-24-r08-online-posterior-generalization.md"
+      - "docs/experiments/r08-holdout-search-effect-2026-09-24.md"
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  references:
+    name: Reference / ${{ matrix.case.id }}
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+            query: >-
+              Help me improve the agent-to-server reconnect lifecycle:
+              exponential backoff, registration after reconnect,
+              connected/sync-needed state transitions, and behavior of queued
+              outbound messages while disconnected.
+          - id: protocol_catalog_consistency
+            path: crates/nession-protocol-codegen/src/catalog.rs
+            query: >-
+              Help me make protocol contract generation safer: locate the
+              catalog code that defines unit identity and wire/request/response
+              mappings and the checks that prevent missing, duplicate, or
+              non-self-contained generated contracts.
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+            query: >-
+              I am debugging the server's agent command lifecycle. Locate the
+              integration-test code that exercises agent registration, command
+              request/response routing, disconnect or reconnect behavior, and
+              cleanup of pending work.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+      ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Require fixed System 2 configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_API_KEY"
+          test -n "$ANTHROPIC_BASE_URL"
+          test -n "$CLAUDE_MODEL"
+          case "$CLAUDE_MODEL" in
+            sonnet|opus|haiku|default)
+              echo "Use an explicit CLAUDE_MODEL in ds." >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Build full-read reference prompt
+        run: |
+          set -euo pipefail
+          mkdir -p "artifacts/reference/$CASE_ID"
+          python3 src/full_read_relevance_baseline.py prepare             --source "subject/$FILE_PATH"             --query "$QUERY"             --output-prompt "artifacts/reference/$CASE_ID/prompt.txt"             --output-manifest "artifacts/reference/$CASE_ID/prompt-manifest.json"
+
+      - name: Generate fixed full-read reference
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p             --output-format text             --model "$CLAUDE_MODEL"             --effort high             --max-turns 1             --permission-mode dontAsk             --no-session-persistence             --setting-sources ''             --strict-mcp-config             --mcp-config '{"mcpServers":{}}'             --disable-slash-commands             --tools ''             --disallowedTools 'Bash' 'Read' 'Glob' 'Grep' 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*'             --settings '{"disableAllHooks":true}'             < "artifacts/reference/$CASE_ID/prompt.txt"             > "artifacts/reference/$CASE_ID/reference.raw.txt"
+
+      - name: Normalize reference
+        run: |
+          set -euo pipefail
+          python3 src/full_read_relevance_baseline.py normalize             --source "subject/$FILE_PATH"             --query "$QUERY"             --raw-output "artifacts/reference/$CASE_ID/reference.raw.txt"             --output "artifacts/reference/$CASE_ID/reference.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path("artifacts/reference") / os.environ["CASE_ID"]
+          ref = json.loads((root / "reference.json").read_text())
+          meta = {
+              "case_id": os.environ["CASE_ID"],
+              "query": os.environ["QUERY"],
+              "path": os.environ["FILE_PATH"],
+              "subject_repository": os.environ["SUBJECT_REPOSITORY"],
+              "subject_sha": os.environ["SUBJECT_SHA"],
+              "reference_model": os.environ["CLAUDE_MODEL"],
+              "line_count": ref["line_count"],
+              "range_count": len(ref["ranges"]),
+          }
+          (root / "case.json").write_text(
+              json.dumps(meta, indent=2, ensure_ascii=False) + "\n"
+          )
+          PY
+
+      - name: Upload reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference/${{ matrix.case.id }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  online:
+    name: Online / ${{ matrix.case.id }} / repeat-${{ matrix.repeat }}
+    needs: references
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+            query: >-
+              Help me improve the agent-to-server reconnect lifecycle:
+              exponential backoff, registration after reconnect,
+              connected/sync-needed state transitions, and behavior of queued
+              outbound messages while disconnected.
+          - id: protocol_catalog_consistency
+            path: crates/nession-protocol-codegen/src/catalog.rs
+            query: >-
+              Help me make protocol contract generation safer: locate the
+              catalog code that defines unit identity and wire/request/response
+              mappings and the checks that prevent missing, duplicate, or
+              non-self-contained generated contracts.
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+            query: >-
+              I am debugging the server's agent command lifecycle. Locate the
+              integration-test code that exercises agent registration, command
+              request/response routing, disconnect or reconnect behavior, and
+              cleanup of pending work.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      REPEAT: ${{ matrix.repeat }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download fixed reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+
+      - name: Run sequential and frozen multi-scale policies
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p "artifacts/run/$CASE_ID/repeat-$REPEAT"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("src").resolve()))
+          from system_one_code_locator import Trace
+          from system_one_probability_frontier import (
+              ProbabilityFrontierDecider,
+              phase0_probability_frontier,
+          )
+
+          root = Path("subject")
+          source_path = os.environ["FILE_PATH"]
+          line_count = sum(
+              1 for _ in (root / source_path).open("r", encoding="utf-8")
+          )
+          sample_lines = 8
+          probe_budget = max(
+              8,
+              min(32, round(line_count * 0.085 / sample_lines)),
+          )
+          base = (
+              Path("artifacts/run")
+              / os.environ["CASE_ID"]
+              / f"repeat-{os.environ['REPEAT']}"
+          )
+
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ):
+              out = base / estimator
+              out.mkdir(parents=True, exist_ok=True)
+              trace = Trace(out / "trace.jsonl")
+              decider = ProbabilityFrontierDecider(
+                  os.environ["TYPESAFE_API_KEY"],
+                  trace,
+                  os.environ["TYPESAFE_API_URL"],
+                  os.environ["TYPESAFE_MODEL"],
+              )
+              started = time.perf_counter()
+              result, usage = phase0_probability_frontier(
+                  root,
+                  os.environ["QUERY"],
+                  source_path,
+                  line_count,
+                  decider,
+                  sample_lines=sample_lines,
+                  max_epochs=40,
+                  max_actions=16,
+                  max_batch=4,
+                  probability_threshold=None,
+                  max_total_probes=probe_budget,
+                  respect_stop=False,
+                  posterior_estimator=estimator,
+              )
+              result.update({
+                  "query": os.environ["QUERY"],
+                  "model": os.environ["TYPESAFE_MODEL"],
+                  "repeat": int(os.environ["REPEAT"]),
+                  "subject": {
+                      "repository": os.environ["SUBJECT_REPOSITORY"],
+                      "revision": os.environ["SUBJECT_SHA"],
+                      "path": source_path,
+                  },
+                  "usage": usage,
+                  "elapsed_ms": round(
+                      (time.perf_counter() - started) * 1000.0, 3
+                  ),
+                  "probe_budget": probe_budget,
+              })
+              (out / "run.json").write_text(
+                  json.dumps(result, indent=2, ensure_ascii=False) + "\n"
+              )
+
+          (base / "budget.json").write_text(
+              json.dumps({
+                  "line_count": line_count,
+                  "sample_lines": sample_lines,
+                  "target_source_fraction": 0.085,
+                  "probe_budget": probe_budget,
+              }, indent=2) + "\n"
+          )
+          PY
+
+      - name: Evaluate field fit and search effect
+        run: |
+          set -euo pipefail
+          BASE="artifacts/run/$CASE_ID/repeat-$REPEAT"
+          BUDGET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["probe_budget"])' "$BASE/budget.json")"
+          CHECKPOINTS="$(python3 - "$BUDGET" <<'PY'
+          import sys
+          n = int(sys.argv[1])
+          pts = [x for x in (4, 8, 12, 16, 24, 32) if x < n]
+          pts.append(n)
+          print(",".join(map(str, sorted(set(pts)))))
+          PY
+          )"
+
+          for estimator in sequential_exponential multi_scale_gaussian; do
+            python3 src/probability_frontier_benchmark.py               --reference artifacts/reference/reference.json               --run "$BASE/$estimator/run.json"               --checkpoints "$CHECKPOINTS"               --high-threshold 0.70               --output-json "$BASE/$estimator/convergence.json"               --output-markdown "$BASE/$estimator/convergence.md"
+
+            python3 src/search_effect_benchmark.py               --reference artifacts/reference/reference.json               --run "$BASE/$estimator/run.json"               --high-threshold 0.70               --output-json "$BASE/$estimator/search-effect.json"               --output-markdown "$BASE/$estimator/search-effect.md"
+          done
+
+      - name: Build paired summary
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          base = (
+              Path("artifacts/run")
+              / os.environ["CASE_ID"]
+              / f"repeat-{os.environ['REPEAT']}"
+          )
+          estimators = ["sequential_exponential", "multi_scale_gaussian"]
+          summary = {
+              "case_id": os.environ["CASE_ID"],
+              "repeat": int(os.environ["REPEAT"]),
+              "query": os.environ["QUERY"],
+              "path": os.environ["FILE_PATH"],
+              "subject_sha": os.environ["SUBJECT_SHA"],
+              "budget": json.loads((base / "budget.json").read_text()),
+              "estimators": {},
+          }
+
+          ranges = {}
+          for estimator in estimators:
+              run = json.loads((base / estimator / "run.json").read_text())
+              field = json.loads(
+                  (base / estimator / "convergence.json").read_text()
+              )
+              search = json.loads(
+                  (base / estimator / "search-effect.json").read_text()
+              )
+              summary["estimators"][estimator] = {
+                  "probes": run["probes"],
+                  "usage": run["usage"],
+                  "elapsed_ms": run["elapsed_ms"],
+                  "field_final": field["final"],
+                  "search_final": search["final"],
+                  "search": search["search"],
+              }
+              ranges[estimator] = {
+                  (int(s["start_line"]), int(s["end_line"]))
+                  for s in run["frontier"]["samples"]
+              }
+
+          left = ranges["sequential_exponential"]
+          right = ranges["multi_scale_gaussian"]
+          union = left | right
+          summary["trajectory"] = {
+              "exact_shared_ranges": len(left & right),
+              "exact_union_ranges": len(union),
+              "exact_jaccard": (
+                  len(left & right) / len(union) if union else 1.0
+              ),
+          }
+
+          (base / "summary.json").write_text(
+              json.dumps(summary, indent=2, ensure_ascii=False) + "\n"
+          )
+
+          seq = summary["estimators"]["sequential_exponential"]
+          multi = summary["estimators"]["multi_scale_gaussian"]
+          lines = [
+              f"# {summary['case_id']} repeat {summary['repeat']}",
+              "",
+              f"File: `{summary['path']}`",
+              f"Probe budget: {summary['budget']['probe_budget']}",
+              "",
+              "| metric | sequential | multi-scale |",
+              "| --- | ---: | ---: |",
+              f"| Pearson | {seq['field_final']['pearson']:.4f} | {multi['field_final']['pearson']:.4f} |",
+              f"| MAE | {seq['field_final']['mae']:.4f} | {multi['field_final']['mae']:.4f} |",
+              f"| final high recall | {seq['search_final']['high_line_recall']:.4f} | {multi['search_final']['high_line_recall']:.4f} |",
+              f"| high-recall AUC/probe | {seq['search']['high_recall_auc_per_probe']:.4f} | {multi['search']['high_recall_auc_per_probe']:.4f} |",
+              f"| weighted-recall AUC/probe | {seq['search']['weighted_recall_auc_per_probe']:.4f} | {multi['search']['weighted_recall_auc_per_probe']:.4f} |",
+              f"| first high hit | {seq['search']['first_high_hit_probe']} | {multi['search']['first_high_hit_probe']} |",
+              f"| useful probe rate | {seq['search']['useful_probe_rate']:.4f} | {multi['search']['useful_probe_rate']:.4f} |",
+              f"| input tokens | {seq['usage']['input_tokens']} | {multi['usage']['input_tokens']} |",
+              "",
+              f"Exact trajectory Jaccard: {summary['trajectory']['exact_jaccard']:.4f}",
+          ]
+          (base / "summary.md").write_text("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+
+      - name: Add paired summary
+        run: cat "artifacts/run/$CASE_ID/repeat-$REPEAT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload paired result
+        uses: actions/upload-artifact@v4
+        with:
+          name: r08-holdout-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
+          path: artifacts/run/${{ matrix.case.id }}/repeat-${{ matrix.repeat }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate holdout search effect
+    needs: online
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download all paired results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: r08-holdout-result-*
+          path: artifacts/all
+
+      - name: Aggregate paired holdouts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/aggregate
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          paths = sorted(Path("artifacts/all").glob("*/summary.json"))
+          rows = [json.loads(path.read_text()) for path in paths]
+          if not rows:
+              raise SystemExit("no holdout summaries found")
+
+          seq_name = "sequential_exponential"
+          multi_name = "multi_scale_gaussian"
+
+          def value(row, estimator, group, key):
+              return row["estimators"][estimator][group][key]
+
+          def mean(items):
+              return statistics.fmean(items) if items else 0.0
+
+          grouped = defaultdict(list)
+          for row in rows:
+              grouped[row["case_id"]].append(row)
+
+          per_case = []
+          win_counts = {
+              "high_recall_auc": 0,
+              "weighted_recall_auc": 0,
+              "final_high_recall": 0,
+              "pearson": 0,
+              "mae": 0,
+          }
+
+          for case_id, case_rows in sorted(grouped.items()):
+              record = {
+                  "case_id": case_id,
+                  "repeats": len(case_rows),
+                  "path": case_rows[0]["path"],
+                  "probe_budget": case_rows[0]["budget"]["probe_budget"],
+              }
+              metrics = {}
+              for estimator in (seq_name, multi_name):
+                  metrics[estimator] = {
+                      "pearson": mean([
+                          value(r, estimator, "field_final", "pearson")
+                          for r in case_rows
+                      ]),
+                      "mae": mean([
+                          value(r, estimator, "field_final", "mae")
+                          for r in case_rows
+                      ]),
+                      "final_high_recall": mean([
+                          value(r, estimator, "search_final", "high_line_recall")
+                          for r in case_rows
+                      ]),
+                      "high_recall_auc": mean([
+                          value(r, estimator, "search", "high_recall_auc_per_probe")
+                          for r in case_rows
+                      ]),
+                      "weighted_recall_auc": mean([
+                          value(r, estimator, "search", "weighted_recall_auc_per_probe")
+                          for r in case_rows
+                      ]),
+                      "useful_probe_rate": mean([
+                          value(r, estimator, "search", "useful_probe_rate")
+                          for r in case_rows
+                      ]),
+                      "input_tokens": mean([
+                          r["estimators"][estimator]["usage"]["input_tokens"]
+                          for r in case_rows
+                      ]),
+                  }
+              record["estimators"] = metrics
+              per_case.append(record)
+
+              if metrics[multi_name]["high_recall_auc"] > metrics[seq_name]["high_recall_auc"]:
+                  win_counts["high_recall_auc"] += 1
+              if metrics[multi_name]["weighted_recall_auc"] > metrics[seq_name]["weighted_recall_auc"]:
+                  win_counts["weighted_recall_auc"] += 1
+              if metrics[multi_name]["final_high_recall"] > metrics[seq_name]["final_high_recall"]:
+                  win_counts["final_high_recall"] += 1
+              if metrics[multi_name]["pearson"] > metrics[seq_name]["pearson"]:
+                  win_counts["pearson"] += 1
+              if metrics[multi_name]["mae"] < metrics[seq_name]["mae"]:
+                  win_counts["mae"] += 1
+
+          aggregate = {
+              "schema_version": 1,
+              "kind": "r08-holdout-search-effect-aggregate",
+              "subject": {
+                  "repository": "BestNathan/nession",
+                  "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+              },
+              "cases": len(per_case),
+              "paired_runs": len(rows),
+              "repeats_per_case": sorted({
+                  len(v) for v in grouped.values()
+              }),
+              "win_counts": win_counts,
+              "per_case": per_case,
+          }
+
+          aggregate["overall"] = {}
+          for estimator in (seq_name, multi_name):
+              aggregate["overall"][estimator] = {
+                  key: mean([
+                      case["estimators"][estimator][key]
+                      for case in per_case
+                  ])
+                  for key in (
+                      "pearson",
+                      "mae",
+                      "final_high_recall",
+                      "high_recall_auc",
+                      "weighted_recall_auc",
+                      "useful_probe_rate",
+                      "input_tokens",
+                  )
+              }
+
+          Path("artifacts/aggregate/aggregate.json").write_text(
+              json.dumps(aggregate, indent=2, ensure_ascii=False) + "\n"
+          )
+
+          md = [
+              "# R08 holdout search-effect aggregate",
+              "",
+              f"Cases: {aggregate['cases']}; paired runs: {aggregate['paired_runs']}",
+              "",
+              "| case | probes | seq Pearson | multi Pearson | seq high-AUC | multi high-AUC | seq weighted-AUC | multi weighted-AUC |",
+              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+          ]
+          for case in per_case:
+              s = case["estimators"][seq_name]
+              m = case["estimators"][multi_name]
+              md.append(
+                  f"| {case['case_id']} | {case['probe_budget']} | "
+                  f"{s['pearson']:.4f} | {m['pearson']:.4f} | "
+                  f"{s['high_recall_auc']:.4f} | {m['high_recall_auc']:.4f} | "
+                  f"{s['weighted_recall_auc']:.4f} | {m['weighted_recall_auc']:.4f} |"
+              )
+
+          s = aggregate["overall"][seq_name]
+          m = aggregate["overall"][multi_name]
+          md += [
+              "",
+              "## Overall mean across holdouts",
+              "",
+              "| metric | sequential | multi-scale | delta |",
+              "| --- | ---: | ---: | ---: |",
+              f"| Pearson | {s['pearson']:.4f} | {m['pearson']:.4f} | {m['pearson']-s['pearson']:+.4f} |",
+              f"| MAE | {s['mae']:.4f} | {m['mae']:.4f} | {m['mae']-s['mae']:+.4f} |",
+              f"| final high recall | {s['final_high_recall']:.4f} | {m['final_high_recall']:.4f} | {m['final_high_recall']-s['final_high_recall']:+.4f} |",
+              f"| high-recall AUC/probe | {s['high_recall_auc']:.4f} | {m['high_recall_auc']:.4f} | {m['high_recall_auc']-s['high_recall_auc']:+.4f} |",
+              f"| weighted-recall AUC/probe | {s['weighted_recall_auc']:.4f} | {m['weighted_recall_auc']:.4f} | {m['weighted_recall_auc']-s['weighted_recall_auc']:+.4f} |",
+              f"| useful probe rate | {s['useful_probe_rate']:.4f} | {m['useful_probe_rate']:.4f} | {m['useful_probe_rate']-s['useful_probe_rate']:+.4f} |",
+              f"| input tokens | {s['input_tokens']:.1f} | {m['input_tokens']:.1f} | {m['input_tokens']-s['input_tokens']:+.1f} |",
+              "",
+              "## Holdout win counts",
+              "",
+          ]
+          for key, count in win_counts.items():
+              md.append(f"- {key}: {count}/{len(per_case)}")
+          Path("artifacts/aggregate/aggregate.md").write_text(
+              "\n".join(md) + "\n"
+          )
+          print("\n".join(md))
+          PY
+          cat artifacts/aggregate/aggregate.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload aggregate
+        uses: actions/upload-artifact@v4
+        with:
+          name: r08-holdout-search-effect-aggregate-${{ github.run_id }}
+          path: artifacts/aggregate/
+          if-no-files-found: error
+          retention-days: 90
