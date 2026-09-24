@@ -1,14 +1,6 @@
 name: R08 online posterior A/B
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - src/posterior_reconstruction.py
-      - src/system_one_probability_frontier.py
-      - fixtures/research/r07-websocket-cc-reference.json
-      - .github/workflows/r08-online-posterior-ab.yml
   workflow_dispatch:
 
 permissions:
