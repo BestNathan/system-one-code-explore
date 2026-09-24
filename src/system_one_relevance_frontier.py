@@ -1484,6 +1484,9 @@ class OfflineChoiceRelevanceFrontierDecider(
 ):
     model = "offline-choice-relevance-frontier-fixture"
 
+    def __init__(self, trace):
+        self.trace = trace
+
     def score_frontier(self, goal, state):
         scores = {}
         for node in frontier_leaves(state):
