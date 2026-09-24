@@ -36,7 +36,7 @@ class FullReadComparisonTests(unittest.TestCase):
         )
         self.assertEqual(
             result["metrics"]["core_window_recall"],
-            0.0,
+            1.0,
         )
 
 
