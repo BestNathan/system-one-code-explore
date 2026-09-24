@@ -135,6 +135,65 @@ class LocalizationResultTest(unittest.TestCase):
             result["files"][0]["evidence"][0]["confidence"]["score"],
         )
 
+    def test_adaptive_zoom_builds_canonical_result_with_subject(self):
+        engine = {
+            "query": "find websocket",
+            "model": "jev-latest",
+            "subject": {
+                "repository": "BestNathan/nession",
+                "revision": "abc123",
+            },
+            "result_files": [{
+                "path": "src/ws.py",
+                "score": 0.89,
+                "phase1_score": 0.92,
+                "termination": "probability_frontier_converged",
+                "rounds": 4,
+                "evidence": [{
+                    "start_line": 200,
+                    "end_line": 231,
+                    "score": 0.89,
+                    "content": "200: websocket",
+                    "region_id": "r3.L.R",
+                    "depth": 2,
+                }],
+            }],
+            "metrics": {
+                "elapsed_ms": 700,
+                "model_calls": 6,
+                "input_tokens": 600,
+                "output_tokens": 60,
+                "reads_executed": 17,
+                "file_runtimes": 1,
+            },
+        }
+
+        result = MODULE.build_system_one_adaptive_zoom_result(engine)
+
+        self.assertEqual(
+            {
+                "repository": "BestNathan/nession",
+                "revision": "abc123",
+            },
+            result["subject"],
+        )
+        self.assertEqual(
+            "adaptive_semantic_zoom_search",
+            result["producer"]["algorithm"],
+        )
+        self.assertEqual(
+            "probability_frontier_converged",
+            result["files"][0]["provenance"]["termination"],
+        )
+        self.assertEqual(
+            "r3.L.R",
+            result["files"][0]["evidence"][0]["provenance"]["region_id"],
+        )
+        self.assertEqual(
+            17,
+            result["cost"]["stages"][0]["operations"]["reads_executed"],
+        )
+
     def test_claude_localization_draft_has_no_confidence(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)
