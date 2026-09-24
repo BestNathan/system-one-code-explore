@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "kind": "r14-anchor-semantic-closure-aggregate",
+  "canonical_run": 36041935061,
+  "runs": 8,
+  "cases": ["reconnect_lifecycle", "full_stack_command_lifecycle"],
+  "estimators": {
+    "multi_scale_gaussian": {
+      "source_fraction": 0.0251924422673198,
+      "mean_reference_relevance": 0.4270833333333333,
+      "high_line_precision": 0.5,
+      "high_line_recall": 0.07500000000000001,
+      "weighted_relevance_recall": 0.05280869790318404,
+      "closure_expansion_tiles": 1.0,
+      "mean_anchor_span_lines": 33.33333333333333,
+      "max_anchor_span_lines": 56.0,
+      "mean_anchor_growth_ratio": 1.0416666666666665,
+      "mean_final_completeness": 0.23833333333333334,
+      "mean_final_utility": 0.8316666666666667,
+      "mean_anchor_count": 1.25,
+      "mean_complete_anchor_count": 0.0,
+      "mean_unresolved_incomplete_count": 1.0,
+      "mean_low_utility_anchor_count": 0.25,
+      "premature_hidden_cc_rate": 1.0
+    },
+    "sequential_exponential": {
+      "source_fraction": 0.08792968170155015,
+      "mean_reference_relevance": 0.575625,
+      "high_line_precision": 0.6708333333333334,
+      "high_line_recall": 0.23020833333333332,
+      "weighted_relevance_recall": 0.15903097478448602,
+      "closure_expansion_tiles": 0.25,
+      "mean_anchor_span_lines": 37.2,
+      "max_anchor_span_lines": 80.0,
+      "mean_anchor_growth_ratio": 1.1625,
+      "mean_final_completeness": 0.30666666666666664,
+      "mean_final_utility": 0.8383333333333334,
+      "mean_anchor_count": 7.0,
+      "mean_complete_anchor_count": 0.25,
+      "mean_unresolved_incomplete_count": 2.25,
+      "mean_low_utility_anchor_count": 4.5,
+      "premature_hidden_cc_rate": 1.0
+    }
+  },
+  "diagnosis": {
+    "runaway_region_expansion": "substantially reduced",
+    "remaining_problem": "acquisition now under-covers high-value regions and standalone completeness scores disagree with directional before/after expansion signals",
+    "next_direction": "make frontier coverage a hard Phase0-derived obligation and use before/after continuation as the primary closure signal; evaluate final utility after closure instead of gating closure on pre-closure utility"
+  }
+}
