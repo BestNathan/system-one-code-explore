@@ -604,6 +604,94 @@ def build_system_one_result(engine_result, model=None):
 
 
 
+
+def build_system_one_relevance_frontier_result(engine_result, model=None):
+    """Build the canonical result from adaptive relevance-frontier search."""
+    files = []
+    for item in engine_result.get("result_files", []):
+        path = item["path"]
+        evidence = []
+        for index, region in enumerate(item.get("evidence", []), 1):
+            evidence.append({
+                "id": f"{path}#evidence-{index}",
+                "start_line": int(region["start_line"]),
+                "end_line": int(region["end_line"]),
+                "confidence": confidence(
+                    region["score"],
+                    "frontier_relevance_potential",
+                    "final System One relevance-frontier score",
+                ),
+                "reason": (
+                    "Fine-grained candidate retained by the final "
+                    "System One evidence Choice stage."
+                ),
+                "content": region.get("content", ""),
+                "provenance": {
+                    "frontier_node_id": region.get("frontier_node_id"),
+                    "score_history": region.get("score_history", []),
+                    "final_choice": region.get("final_choice"),
+                    "navigation": region.get("navigation"),
+                },
+            })
+
+        files.append({
+            "path": path,
+            "role": "relevant",
+            "confidence": confidence(
+                item["score"],
+                "derived_max_frontier_relevance",
+                "maximum retained relevance-frontier score for this file",
+            ),
+            "reason": (
+                "Adaptive relevance-frontier search retained at least one "
+                "fine-grained source range from this file."
+            ),
+            "evidence": evidence,
+            "provenance": {
+                "phase1_score": item.get("phase1_score"),
+                "termination": item.get("termination"),
+                "rounds": item.get("rounds", 0),
+                "frontier_coverage": item.get("frontier_coverage"),
+                "source_coverage": item.get("source_coverage"),
+            },
+        })
+
+    files.sort(
+        key=lambda item: (
+            -item["confidence"]["score"],
+            item["path"],
+        )
+    )
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": KIND,
+        "task": engine_result.get("query", ""),
+        "producer": {
+            "system": "system_one",
+            "model": model or engine_result.get("model"),
+            "confidence_semantics": (
+                "Scores are relevance potentials over frontier intervals, "
+                "not additive probabilities. Final evidence is retained by "
+                "a System One Choice stage over fine-grained candidates."
+            ),
+            "algorithm": "adaptive_relevance_frontier_search_v1",
+        },
+        "summary": {
+            "valuable_files": len(files),
+            "evidence_regions": sum(
+                len(item["evidence"]) for item in files
+            ),
+            "file_runtimes": (
+                engine_result.get("metrics") or {}
+            ).get("file_runtimes"),
+        },
+        "confidence": None,
+        "cost": system_one_cost(engine_result),
+        "files": files,
+    }
+    attach_subject(result, engine_result.get("subject"))
+    return validate(result)
+
 def build_system_one_adaptive_zoom_result(engine_result, model=None):
     """Build the canonical result from adaptive semantic zoom search."""
     files = []
