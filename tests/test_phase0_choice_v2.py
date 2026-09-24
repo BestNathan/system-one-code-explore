@@ -22,7 +22,7 @@ class Phase0ChoiceV2Tests(unittest.TestCase):
     def test_choice_action_space_can_expose_multiple_legal_actions(self):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "demo.rs"
-            path.write_text("\n".join("TARGET" if i in {500, 1500} else f"line {i}" for i in range(1, 2001)))
+            path.write_text("\n".join("TARGET" if i in {64, 1330} else f"line {i}" for i in range(1, 2001)))
             candidate = {
                 "id": "f1",
                 "score": 0.9,
