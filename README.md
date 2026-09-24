@@ -149,3 +149,27 @@ The long-term question is not whether a System One model can read code. It is:
 > How strong can a harness become when it progressively discloses state and legal actions, while a fast System One model only chooses how to advance the state machine?
 
 See [ROADMAP.md](ROADMAP.md) and [docs/research-summary.md](docs/research-summary.md).
+
+
+## Full-read Claude reference baseline
+
+The frontier experiments now have a separate reference-field benchmark.
+
+src/full_read_relevance_baseline.py builds a canonical overlapping grid
+(64-line windows, 32-line stride) and prepares a prompt in which Claude sees
+the complete target file before scoring every range. The resulting field is
+reference data, not ground truth.
+
+src/compare_to_full_read_baseline.py projects a localization result onto the
+reference field and reports weighted relevance recall, high-relevance window
+recall, core-window recall, relevance-weighted precision, and source coverage.
+
+The intended evaluation stack is:
+
+1. Full-read Claude reference field: what relevant content exists when the
+   whole file is available.
+2. System One exploration: how much of that field can be recovered with
+   bounded progressive decisions.
+3. Blind downstream quality: whether the selected evidence is actually useful.
+
+See docs/experiments/full-read-claude-baseline-2026-09-24.md.
