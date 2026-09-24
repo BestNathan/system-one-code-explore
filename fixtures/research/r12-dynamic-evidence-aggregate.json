@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "r12-dynamic-evidence-aggregate",
+  "canonical_run": 36036234247,
+  "source_phase0_run": 36004833542,
+  "runs": 12,
+  "policy": {
+    "scoring": "independent_noul_marginal_evidence_probability",
+    "tile_lines": 32,
+    "threshold": 0.65,
+    "selection": "read_all_actions_at_or_above_threshold",
+    "stopping": "all_remaining_below_threshold"
+  },
+  "estimators": {
+    "multi_scale_gaussian": {
+      "mean_selected_tiles": 16.166666666666668,
+      "mean_selected_lines": 517.3333333333334,
+      "mean_source_fraction": 0.30962385074423215,
+      "mean_reference_relevance": 0.4107242063492063,
+      "high_line_precision": 0.4761904761904762,
+      "high_line_recall": 0.3485548271752086,
+      "weighted_relevance_recall": 0.3189904154525629,
+      "oracle_ratio_precision": 0.4914212380141764,
+      "oracle_ratio_high_recall": 0.4761904761904762,
+      "premature_stop_rate": 1.0,
+      "mean_best_remaining_relevance": 0.8833333333333333,
+      "safety_cap_rate": 0.0,
+      "mean_model_calls": 5.5,
+      "mean_input_tokens": 27167.5,
+      "terminations": {
+        "all_remaining_below_threshold": 6
+      }
+    },
+    "sequential_exponential": {
+      "mean_selected_tiles": 13.0,
+      "mean_selected_lines": 416.0,
+      "mean_source_fraction": 0.23123177460666441,
+      "mean_reference_relevance": 0.6455973443017053,
+      "high_line_precision": 0.7731481481481483,
+      "high_line_recall": 0.28218282346709045,
+      "weighted_relevance_recall": 0.2538945977495053,
+      "oracle_ratio_precision": 0.7266209019468768,
+      "oracle_ratio_high_recall": 0.7731481481481483,
+      "premature_stop_rate": 1.0,
+      "mean_best_remaining_relevance": 0.9333333333333332,
+      "safety_cap_rate": 0.0,
+      "mean_model_calls": 7.833333333333333,
+      "mean_input_tokens": 45202.333333333336,
+      "terminations": {
+        "all_remaining_below_threshold": 6
+      }
+    }
+  },
+  "fixed_six_baseline": {
+    "multi_scale_gaussian": {
+      "mean_reference_relevance": 0.6441145833333334,
+      "high_line_precision": 0.5946180555555556,
+      "high_line_recall": 0.10862675473447225,
+      "weighted_relevance_recall": 0.10544735023754707
+    },
+    "sequential_exponential": {
+      "mean_reference_relevance": 0.6824739583333334,
+      "high_line_precision": 0.665798611111111,
+      "high_line_recall": 0.12893925473447224,
+      "weighted_relevance_recall": 0.11216848856209675
+    }
+  }
+}
