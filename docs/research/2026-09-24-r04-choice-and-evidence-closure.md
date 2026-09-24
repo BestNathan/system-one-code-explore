@@ -1,5 +1,7 @@
 # R04 — Choice Policy and Evidence Closure
 
+**Implementation lineage:** PR #5 → PR #6 → PR #8; the cumulative implementation and retained tests landed on `main` through PR #10.
+
 ## Question
 
 How should System One be used for action selection and final evidence

@@ -1,5 +1,7 @@
 # R05 — Sparse Phase0 Sensing
 
+**Implementation lineage:** the sparse Phase0 iteration was developed through PR #8; its cumulative implementation, tests, and raw report landed on `main` through PR #10.
+
 ## Question
 
 Can Phase0 avoid scanning large files while still building enough state for

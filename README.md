@@ -2,11 +2,11 @@
 
 A research runtime for using **System One models as fast policies over progressively disclosed code-exploration state and action spaces**.
 
-This repository continues the code-localization research originally developed in `BestNathan/narness-engineering`. The project is intentionally broader than a locator: the goal is to evolve from adaptive line-range search into a reusable **System One code exploration runtime**.
+This repository continues the code-localization research originally developed in `BestNathan/narness-engineering`. The implementation is intentionally experimental; the durable artifact is the research path captured under `docs/research/`.
 
 ## Core idea
 
-System One is not treated as a small ReAct agent. The harness owns state, action-space construction, effects, budgets, traces, and lifecycle. The model performs fast local decisions:
+System One is not treated as a small ReAct agent. The harness owns state, legal actions, effects, budgets, traces, and lifecycle. The model performs fast local decisions inside that bounded state machine.
 
 ```text
 State
@@ -15,110 +15,72 @@ Harness builds a bounded ActionSpace
   ↓
 System One policy / utility decisions
   ↓
-Effect
-  ↓
-Observation
-  ↓
-State transition
+Effect → Observation → State transition
   ↺
 ```
 
-The current implementation uses two phases:
+## Current research architecture
 
-1. **Repository filtering** — score directories and files to select candidate files.
-2. **Independent FileRuntime exploration** — generate geometric `ReadRange` and `StopFile` actions, let System One choose stop/continue and score concrete reads, then update coverage and observations.
-
-Navigation and final evidence scoring are intentionally separated.
-
-## Current algorithm
-
-For an unread file, the harness exposes head / middle / tail probes. After observations exist, it exposes:
-
-- `expand_before` and `expand_after` around ranges selected in the previous epoch;
-- midpoint probes over the largest unread gaps;
-- `StopFile`.
-
-System One answers:
-
-- a **Choice**: `StopFile` or `ContinueFile`;
-- **Noul utility scores** for concrete `ReadRange` actions.
-
-When the control decision contradicts the best concrete read, a second explicit reconciliation Choice resolves:
-
-- stop + high-utility read;
-- continue + no high-utility read.
-
-This removed the previous unconditional low-score `fallback_top1` tail that tended to scan large files almost exhaustively.
-
-## Latest end-to-end benchmark
-
-Task:
-
-`Help me optimize the websocket connection implementation`
-
-Frozen subject:
-
-`BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`
-
-Successful cross-trace run: `35890516881`.
-
-| Metric | System One | Claude Code-style System 2 |
-| --- | ---: | ---: |
-| Runtime | 22.743s | 96.347s |
-| Model calls / turns | 96 calls | 40 turns |
-| Reads / tool calls | 96 reads | 38 tool calls |
-| Input tokens | 724,127 | 75,469 |
-| Cache-read input | — | 624,384 |
-| Output tokens | 17,427 | 21,045 |
-| Blind quality | 71/100 | 83/100 |
-| Evaluator can proceed | yes | yes |
-
-The System 2 side used Claude Code as the harness with `deepseek-flash` as the configured model in that run.
-
-Overlap on the same frozen source revision:
-
-- shared files: 8;
-- union files: 17;
-- file Jaccard: 47.1%;
-- Claude evidence covered by System One: **66.7% of regions / 69.9% of lines**.
-
-Three repeated System One runs on the same frozen task/revision after Stop reconciliation used 94, 86, and 96 reads respectively, showing stable convergence rather than one lucky stop.
-
-## What the benchmark says
-
-The current runtime is already useful: the blind evaluator marked the System One result `can_proceed=true`. The main gap is no longer stopping. It is **state-space expansion and evidence shaping**.
-
-The evaluator specifically exposed missing cross-file dependencies such as `MessageRouter.ts`, `command_broker.rs`, and `client_registry.rs`, even when observations contained clues pointing toward them.
-
-The next architectural step is therefore:
+The active line of research is no longer the original head/middle/tail range runtime. Phase0 now treats code exploration as sparse sensing plus whole-file posterior reconstruction:
 
 ```text
-Observation
-   ↓
-discover new state / dependency
-   ↓
-progressively disclose new actions
-   ↓
-ReadRange(...)
-FollowFile(...)
-FollowSymbol(...)
-InspectCaller(...)
-InspectCallee(...)
+durable sparse observations
+        ↓
+PosteriorEstimator
+        ├── relevance[N]
+        └── uncertainty[N]
+        ↓
+System One Choice over diverse legal probes
+        ↓
+new observations
+        ↓
+posterior recompute
 ```
+
+Key properties:
+
+- sparse micro-probes rather than coarse full-region reads;
+- a file-length relevance and uncertainty frontier;
+- Choice probabilities consumed as a policy distribution, including multi-probe batches;
+- posterior reconstruction is replaceable and recomputable from durable observations;
+- reference evaluation uses a fixed full-read System 2 relevance field rather than treating final overlap as ground truth.
+
+## Current status
+
+The canonical research log is `docs/research/README.md`. The current iteration is **R08 — Online Posterior Feedback and Holdout Generalization**.
+
+R07 isolated posterior reconstruction from probe selection and showed that path-independent reconstruction preserved substantially more of the sparse local relevance signal than the historical sequential propagation baseline.
+
+R08 then integrated the posterior into the online feedback loop. On the frozen websocket fixture, the multi-scale posterior improved the final frontier at the same 32 × 8-line read budget and materially changed the probe trajectory. The active phase is now holdout generalization with estimator parameters frozen before new references are inspected.
+
+See:
+
+- `docs/research/2026-09-24-r07-posterior-reconstruction.md`
+- `docs/research/2026-09-24-r08-online-posterior-generalization.md`
+- `docs/experiments/r08-online-posterior-ab-2026-09-24.md`
+
+## Historical baseline
+
+The earlier adaptive range runtime remains useful as a historical control and regression baseline. It established that a fast System One model can drive bounded code reads and terminate without a free-form ReAct loop, but later experiments showed that coarse region state and sequential frontier propagation lose too much information.
+
+The old range-runtime benchmark and raw reports are intentionally retained under `docs/experiments/`; they should not be read as the current algorithm.
 
 ## Repository layout
 
-- `src/system_one_range_runtime.py` — current per-file adaptive range runtime.
-- `src/system_one_code_locator.py` — shared System One API and earlier locator primitives.
-- `src/localization_result.py` — canonical localization result contract.
-- `src/localization_quality_evaluation.py` — blind downstream-quality evaluator.
-- `src/compare_localization_results.py` — symmetric file/range comparison.
-- `src/claude_*.py` — System 2 reference tracing and confidence normalization.
-- `tests/` — deterministic regression tests.
-- `fixtures/` — offline fixture repository.
-- `docs/` — design notes and historical pilot reports.
-- `ROADMAP.md` — next research milestones.
-- `docs/setup.md` — Actions environments, secrets, and benchmark setup.
+- `src/system_one_probability_frontier.py` — online sparse-probe probability-frontier runtime.
+- `src/posterior_reconstruction.py` — replaceable posterior estimators.
+- `src/posterior_reconstruction_benchmark.py` — controlled estimator comparison.
+- `src/posterior_synthetic_benchmark.py` — model-free estimator geometry sanity checks.
+- `src/system_one_sparse_phase0.py` — retained sparse Phase0 predecessor.
+- `src/system_one_relevance_frontier.py` — retained relevance-frontier predecessor.
+- `src/system_one_range_runtime.py` — historical adaptive range baseline.
+- `src/full_read_relevance_baseline.py` — full-read System 2 reference-field construction.
+- `src/compare_to_full_read_baseline.py` — frontier/reference comparison.
+- `tests/` — deterministic regression tests, including historical algorithm invariants.
+- `fixtures/research/` — pinned research trajectories and references.
+- `docs/research/` — canonical research history and decisions.
+- `docs/experiments/` — raw experiment reports.
+- `ROADMAP.md` — current and longer-term research milestones.
 
 ## Running offline tests
 
@@ -126,63 +88,32 @@ InspectCallee(...)
 python3 -m unittest discover -s tests -v
 ```
 
-## Running the System One range runtime
+## Research discipline
 
-```bash
-export TYPESAFE_API_KEY=...
-export TYPESAFE_API_URL=https://api.typesafe.ai/v1/systemone
-
-python3 src/system_one_range_runtime.py \
-  /path/to/repository \
-  "Help me optimize the websocket connection implementation" \
-  --window-lines 140 \
-  --parallel-threshold 0.65 \
-  --evidence-threshold 0.65 \
-  --max-jumps 2 \
-  --max-file-epochs 32
-```
-
-## Research direction
-
-The long-term question is not whether a System One model can read code. It is:
+The long-term question is:
 
 > How strong can a harness become when it progressively discloses state and legal actions, while a fast System One model only chooses how to advance the state machine?
 
-The project is currently in an intentionally unstable research phase. Research
-iterations may land directly on `main`; preserving a clean API is less
-important than preserving the reasoning and evidence behind each iteration.
+During the research phase:
 
-The durable research history lives in
-[docs/research/README.md](docs/research/README.md). Every meaningful research
-iteration should record its question, hypothesis, experiment path, result,
-rejected ideas, and next direction there.
+- implementation may change or be replaced entirely;
+- rejected algorithms may remain as regression baselines;
+- every meaningful iteration should preserve its question, controlled setup, evidence, result, rejected ideas, and next direction in `docs/research/`;
+- raw workflow artifacts are not the durable source of truth; important evidence should be pinned in the repository when practical;
+- holdout references must not be used to retune a frozen estimator during the same evaluation round.
 
-Raw experiment reports remain under `docs/experiments/`.
+See `docs/research/README.md`, `docs/research-summary.md`, and `ROADMAP.md`.
 
-See [ROADMAP.md](ROADMAP.md),
-[docs/research/README.md](docs/research/README.md), and
-[docs/research-summary.md](docs/research-summary.md).
+## Full-read System 2 reference baseline
 
+`src/full_read_relevance_baseline.py` builds a canonical overlapping grid and prepares a prompt in which the reference model sees the complete target file before scoring every range. The resulting field is reference data, not ground truth.
 
-## Full-read Claude reference baseline
-
-The frontier experiments now have a separate reference-field benchmark.
-
-src/full_read_relevance_baseline.py builds a canonical overlapping grid
-(64-line windows, 32-line stride) and prepares a prompt in which Claude sees
-the complete target file before scoring every range. The resulting field is
-reference data, not ground truth.
-
-src/compare_to_full_read_baseline.py projects a localization result onto the
-reference field and reports weighted relevance recall, high-relevance window
-recall, core-window recall, relevance-weighted precision, and source coverage.
+`src/compare_to_full_read_baseline.py` projects a candidate frontier/localization result onto that field and reports distribution- and coverage-level metrics.
 
 The intended evaluation stack is:
 
-1. Full-read Claude reference field: what relevant content exists when the
-   whole file is available.
-2. System One exploration: how much of that field can be recovered with
-   bounded progressive decisions.
-3. Blind downstream quality: whether the selected evidence is actually useful.
+1. full-read System 2 reference field: what relevant content is visible with the complete file;
+2. System One sparse exploration: how efficiently that field can be reconstructed;
+3. blind downstream quality: whether selected evidence is useful for engineering work.
 
-See docs/experiments/full-read-claude-baseline-2026-09-24.md.
+See `docs/experiments/full-read-claude-baseline-2026-09-24.md`.

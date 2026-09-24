@@ -2,113 +2,86 @@
 
 ## Research objective
 
-Evolve the current adaptive range locator into a general **System One Code Exploration Runtime** based on progressive state-space disclosure.
+Build a general **System One Code Exploration Runtime** in which the harness owns state, legal actions, effects, budgets, and durability while a fast model supplies bounded policy decisions.
 
-## M0 — Extract and freeze the validated baseline
+## Completed research path
 
-Status: completed in the bootstrap tree.
+- **R01 — Range runtime baseline:** bounded adaptive reads and stopping behavior.
+- **R02 — Adaptive relevance frontier:** useful experiment, but coarse region scores were the wrong state abstraction.
+- **R03 — Full-read System 2 reference:** fixed distribution-level evaluation target.
+- **R04 — Choice and evidence closure:** Choice works as a policy distribution; isolated fragment keep/drop does not.
+- **R05 — Sparse Phase0:** sparse sensing is viable; collapsing samples into a few coarse scores is not.
+- **R06 — Whole-file probability frontier:** represent relevance and uncertainty at file length.
+- **R07 — Posterior reconstruction:** separate durable observations from a replaceable, path-independent posterior estimator.
+- **R08 Phase A/B — Online posterior feedback:** posterior choice changes the online sampling path and improves the websocket fixture.
 
-- preserve the per-file range runtime;
-- preserve Stop/Read reconciliation;
-- preserve canonical result identity;
-- preserve the Claude Code-style cross-trace;
-- preserve blind downstream-quality evaluation;
-- keep historical pilots as evidence, not as production architecture.
+Canonical details live in `docs/research/README.md`.
 
-## M1 — Observation-driven cross-file actions
+## Current milestone — R08 Phase C holdout generalization
 
-Primary target.
+Estimator parameters are frozen before holdout references are inspected.
 
-Introduce a runtime-level effect such as:
+Evaluate multiple files/tasks with materially different relevance geometry:
 
-```text
-FollowFile(path, reason, discovered_from)
-```
+- localized implementation hotspot;
+- separated multi-peak implementation;
+- long mostly irrelevant tail/test region;
+- distant relevant regions in the same file.
 
-Design constraints:
+For each holdout:
 
-- the harness validates that the path exists but does not interpret source semantics;
-- a System One observation may propose or score a newly disclosed file action;
-- a scheduler owns the active set of FileRuntimes;
-- each discovered file records provenance from the observation that exposed it;
-- branching must be bounded by explicit global and per-runtime budgets.
+1. create a fresh full-read System 2 reference;
+2. run the same frozen estimator variants;
+3. compare convergence curves and source-read budgets;
+4. report per-file and aggregate metrics;
+5. record failures instead of retuning against the same holdout set.
 
-Target experiment: recover known misses such as `MessageRouter.ts` without lowering the global Phase 1 file threshold.
+Exit criteria:
 
-## M2 — Evidence shaping
+- improved average MAE/RMSE;
+- improved ranking/correlation on most holdouts rather than one fixture;
+- no systematic uncertainty collapse;
+- fewer probes to reach a target frontier quality;
+- deterministic reconstruction for a fixed observation set.
 
-Replace retained fixed-size observation windows with a post-navigation evidence-shaping stage.
+## After R08
 
-Research:
+If the posterior generalizes, promote it from a research candidate into the default frontier component and then resume broader exploration-runtime work. If it fails, open a new research iteration with an explicit train/validation split rather than tuning against R08 holdouts.
 
-- shrink a useful 140-line observation to representative subranges;
-- generate task-specific reasons;
-- classify files as primary / supporting / context;
-- measure precision, redundancy, and downstream actionability separately.
+Longer-term runtime milestones remain:
 
-Success criterion: raise blind quality without increasing navigation cost materially.
+### Observation-driven cross-file actions
 
-## M3 — Progressive graph actions
+Progressively disclose grounded actions such as `FollowFile`, `FollowSymbol`, `InspectCaller`, and `InspectCallee` from observations rather than eagerly building a complete semantic graph.
 
-Generalize the action vocabulary:
+### Evidence shaping
 
-- `FollowFile`
-- `FollowSymbol`
-- `InspectCaller`
-- `InspectCallee`
-- `InspectStateHolder`
+Separate navigation from final evidence presentation: shrink useful observations, classify primary/supporting context, and measure precision, redundancy, and downstream actionability.
 
-The harness should progressively expose actions from grounded observations rather than eagerly constructing a complete semantic graph.
+### Context and cost efficiency
 
-## M4 — Context and cost efficiency
+Reduce repeated state transmission with deltas, stable observation references, cache-friendly prefixes, compact histories, and bounded batching. Track monetary cost as well as latency and tokens.
 
-The current System One runtime is latency-efficient but input-token heavy.
+### Durable scheduler
 
-Investigate:
+Move exploration behind a scheduler/effect abstraction supporting pause/resume, event logging, replay, explicit resource budgets, bounded concurrency, priority, and forkable branches.
 
-- state deltas instead of full repeated DecisionView payloads;
-- stable observation references;
-- prefix/cache reuse;
-- compact exploration histories;
-- observation summarization that remains replayable;
-- model-call batching without collapsing independent decisions.
+### System One / System 2 hybrid
 
-Track provider monetary cost in addition to latency and tokens.
-
-## M5 — Durable scheduler
-
-Move FileRuntime execution behind a scheduler/effect abstraction.
-
-Desired properties:
-
-- pause/resume;
-- durable event log;
-- replay;
-- per-task resource budgets;
-- bounded concurrency;
-- priority scheduling;
-- forkable exploration branches.
-
-## M6 — System One / System 2 hybrid
-
-Use the two model classes for different jobs:
-
-- System One: fast action selection inside a disclosed state space;
-- System 2: create or reshape state/action spaces when the runtime cannot progress.
-
-The research goal is to minimize System 2 involvement while preserving completeness.
+Use System One for fast decisions inside disclosed state spaces and System 2 only when the runtime must create or reshape the state/action space.
 
 ## Evaluation discipline
 
-Every algorithm change should be evaluated on:
+Every algorithm change should record:
 
-1. frozen subject revision;
-2. verbatim task;
-3. navigation cost;
-4. termination behavior;
-5. symmetric overlap;
-6. blind downstream-quality score;
+1. frozen subject revision and verbatim task;
+2. model/runtime configuration;
+3. source-read and model-call budgets;
+4. frontier convergence and uncertainty behavior;
+5. fixed-reference metrics where applicable;
+6. blind downstream-quality impact where applicable;
 7. omissions and failure modes;
-8. repeated-run variance.
+8. repeated-run variance;
+9. whether parameters were frozen before evaluation.
 
-Do not use Claude overlap alone as ground truth.
+Do not treat Claude overlap alone as ground truth, and do not retune a candidate on the same holdout evidence used to claim generalization.

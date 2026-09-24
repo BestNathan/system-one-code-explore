@@ -2,48 +2,38 @@
 
 ## Current result
 
-The validated System One code locator demonstrates that a fast System One model can act as a policy over a bounded, progressively disclosed action space instead of running a ReAct loop.
+The project has moved beyond the original adaptive range locator into a sparse-observation probability-frontier runtime.
 
-On the frozen Nession WebSocket task, the successful end-to-end run completed in 22.743 seconds and received 71/100 from a blind downstream-quality evaluator. The Claude Code-style System 2 reference completed in 96.347 seconds and received 83/100. Both were judged usable for downstream engineering work.
+The current architecture keeps durable micro-probe observations, reconstructs a file-length relevance/uncertainty posterior from those observations, and lets System One Choice select among a bounded set of legal probes. Posterior reconstruction is now a first-class replaceable component rather than an implicit sequence of local mutations.
 
-System One covered 69.9% of the lines retained by the System 2 reference while following a substantially different exploration path.
+## What R07 established
 
-## Cost interpretation
+R07 held the websocket observations and probe order fixed and changed only the posterior estimator. The historical sequential posterior lost a large part of the local relevance signal; a path-independent multi-scale Gaussian reconstruction recovered substantially more of it without additional source reads or model calls.
 
-The present advantage is clearly latency, not yet proven monetary cost.
+The important conclusion is architectural: **posterior reconstruction, not local System One scoring, was the dominant information-loss layer on that controlled fixture**.
 
-System One used many shallow decisions: 96 calls and 724,127 input tokens in the successful run. The System 2 reference used 40 turns, 38 tool calls, 75,469 non-cache input tokens, and 624,384 cache-read input tokens.
+See `docs/research/2026-09-24-r07-posterior-reconstruction.md`.
 
-Future work must reduce repeated state/context transmission and record actual System One provider cost.
+## What R08 established
 
-## Stop reconciliation
+R08 integrated the posterior into the online feedback loop, so the reconstructed frontier can change which probes System One selects next.
 
-The earlier range runtime often continued after all concrete read utilities had collapsed, because it executed an unconditional best remaining read. Large files therefore approached full coverage.
+On the same frozen websocket task and the same 32 × 8-line source-read budget, the multi-scale arm improved the final reference-field metrics over the sequential arm and produced a substantially different probe trajectory. This shows that the posterior affects exploration policy, not only the final visualization.
 
-The current runtime treats disagreement between the control decision and concrete read utility as an explicit second decision.
+The project is now in **R08 Phase C: holdout generalization**. Estimator parameters are frozen before fresh files/tasks and full-read references are evaluated.
 
-After this change, repeated runs on the same frozen task/revision used 94, 86, and 96 reads. Large files terminated through `model_stop` rather than budget exhaustion.
+See `docs/research/2026-09-24-r08-online-posterior-generalization.md`.
 
-## Blind evaluation
+## Historical baseline
 
-The blind evaluator scores:
+The earlier range runtime remains a useful historical control. It established that System One can act as a fast policy over bounded reads and terminate without a free-form ReAct loop. Later frontier experiments superseded its state representation as the active Phase0 design.
 
-- completeness;
-- relevance precision;
-- evidence grounding;
-- redundancy efficiency;
-- downstream actionability;
-- organization/prioritization;
-- risk/uncertainty coverage.
-
-It is allowed to inspect the frozen source repository. Candidates are anonymized so the evaluator is not asked which system it prefers.
-
-The evaluator identified the major remaining gap as cross-file discovery and evidence organization, not inability to stop.
+The older latency/quality benchmark, Stop reconciliation work, and blind evaluation remain valid historical evidence; they are not the current algorithm.
 
 ## Research thesis
 
-The emerging thesis is:
+> System One models are most useful as fast policies inside a harness that owns state, legal actions, effects, progressive disclosure, and durable observations.
 
-> System One models are most useful as fast policies inside a harness that owns state, legal actions, effects, and progressive disclosure.
+The current question is narrower and testable: can a frozen sparse-observation posterior generalize across different code files and relevance shapes without using holdout references for tuning?
 
-The next test is whether observation-driven state expansion can recover cross-file causal structure without turning the model back into a free-form ReAct agent.
+Canonical history: `docs/research/README.md`.

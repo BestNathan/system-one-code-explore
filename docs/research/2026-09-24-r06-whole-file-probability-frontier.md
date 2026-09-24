@@ -1,5 +1,7 @@
 # R06 — Whole-file Probability Frontier
 
+**Implementation lineage:** PR #10 is the merged whole-file probability-frontier implementation; it also carried forward the still-valid tests and research artifacts from PRs #5, #6, and #8.
+
 ## Question
 
 Can sparse System One observations reconstruct the complete relevance
