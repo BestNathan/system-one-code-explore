@@ -38,7 +38,8 @@ that changes our understanding should be linked from a research record.
 | R05 | [Sparse Phase0 sensing](2026-09-24-r05-sparse-phase0.md) | superseded | Sparse reads are correct, but collapsing them into four coarse region scores destroys the global relevance shape. |
 | R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | baseline | Phase0 should reconstruct a file-length relevance distribution from sparse observations. |
 | R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | completed | Path-independent posterior reconstruction recovers much more of the local System One signal than sequential propagation. |
-| R08 | [Online posterior feedback and holdout generalization](2026-09-24-r08-online-posterior-generalization.md) | current | Online A/B confirms the posterior changes probe trajectories and improves the websocket frontier; holdout generalization is now the remaining question. |
+| R08 | [Online posterior feedback and holdout generalization](2026-09-24-r08-online-posterior-generalization.md) | completed | Single-fixture relevance gains did not generalize to search; support-derived uncertainty collapsed in sparse unread regions and degraded probe selection. |
+| R09 | [Uncertainty calibration and search policy](2026-09-24-r09-uncertainty-calibration-search-policy.md) | current | Keep multi-scale relevance fixed, decouple exploration uncertainty from adaptive-kernel support, and validate search on fresh holdouts. |
 
 ## Current research architecture
 
@@ -49,7 +50,12 @@ durable sparse observations
 PosteriorEstimator
         |
         +--> relevance[N]
-        +--> uncertainty[N]
+        |
+        +--> interpolation support
+        |
+ObservationGeometry
+        |
+        +--> coverage / exploration uncertainty[N]
         |
         v
 System One Choice over diverse legal probes
