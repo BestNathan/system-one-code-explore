@@ -79,11 +79,15 @@ class PosteriorReconstructionTests(unittest.TestCase):
 
     def test_coverage_guard_preserves_uncertainty_in_sparse_unread_regions(self):
         samples = [{"start_line": 10, "end_line": 17, "score": 0.9}]
-        plain = multi_scale_gaussian(samples, 1000)
         guarded = multi_scale_gaussian_coverage_guard(samples, 1000)
-        # Adaptive support alone becomes spuriously confident far away because
-        # its bandwidth expands with observation distance.
-        self.assertLess(plain["uncertainty"][899], 0.5)
+        self.assertLess(
+            guarded["uncertainty"][17],
+            guarded["uncertainty"][199],
+        )
+        self.assertLess(
+            guarded["uncertainty"][199],
+            guarded["uncertainty"][899],
+        )
         self.assertGreater(guarded["uncertainty"][899], 0.99)
 
     def test_reconstruct_exposes_coverage_guard_estimator(self):
