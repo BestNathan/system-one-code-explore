@@ -16,12 +16,12 @@ permissions:
 env:
   SUBJECT_REPOSITORY: BestNathan/nession
   SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-  TYPESAFE_MODEL: \${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
-  TYPESAFE_API_URL: \${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
 
 jobs:
   reference:
-    name: Reference / \${{ matrix.case.id }}
+    name: Reference / ${{ matrix.case.id }}
     runs-on: ubuntu-24.04
     environment: ds
     timeout-minutes: 120
@@ -51,17 +51,17 @@ jobs:
               dispatch, client-supplied path handling, git invocation and error
               mapping.
     env:
-      CASE_ID: \${{ matrix.case.id }}
-      FILE_PATH: \${{ matrix.case.path }}
-      GOAL: \${{ matrix.case.goal }}
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Checkout frozen subject
         uses: actions/checkout@v4
         with:
-          repository: \${{ env.SUBJECT_REPOSITORY }}
-          ref: \${{ env.SUBJECT_SHA }}
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
           path: subject
           fetch-depth: 1
           persist-credentials: false
@@ -90,10 +90,10 @@ jobs:
 
       - name: Generate and normalize CC reference
         env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_AUTH_TOKEN: \${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_BASE_URL: \${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
-          ANTHROPIC_MODEL: \${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
           CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "1"
         run: |
           set -euo pipefail
@@ -129,12 +129,12 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: r11-reference-\${{ matrix.case.id }}
-          path: artifacts/reference/\${{ matrix.case.id }}/
+          name: r11-reference-${{ matrix.case.id }}
+          path: artifacts/reference/${{ matrix.case.id }}/
           retention-days: 90
 
   score:
-    name: Prompt calibration / \${{ matrix.case.id }}
+    name: Prompt calibration / ${{ matrix.case.id }}
     needs: reference
     runs-on: ubuntu-24.04
     environment: typesafe
@@ -165,17 +165,17 @@ jobs:
               dispatch, client-supplied path handling, git invocation and error
               mapping.
     env:
-      CASE_ID: \${{ matrix.case.id }}
-      FILE_PATH: \${{ matrix.case.path }}
-      GOAL: \${{ matrix.case.goal }}
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Checkout frozen subject
         uses: actions/checkout@v4
         with:
-          repository: \${{ env.SUBJECT_REPOSITORY }}
-          ref: \${{ env.SUBJECT_SHA }}
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
           path: subject
           fetch-depth: 1
           persist-credentials: false
@@ -187,12 +187,12 @@ jobs:
       - name: Download CC benchmark
         uses: actions/download-artifact@v4
         with:
-          name: r11-reference-\${{ matrix.case.id }}
+          name: r11-reference-${{ matrix.case.id }}
           path: artifacts/reference
 
       - name: Score prompt family
         env:
-          TYPESAFE_API_KEY: \${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
         run: |
           set -euo pipefail
           test -n "$TYPESAFE_API_KEY"
@@ -208,7 +208,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: r11-prompt-result-\${{ matrix.case.id }}
+          name: r11-prompt-result-${{ matrix.case.id }}
           path: artifacts/out/
           retention-days: 90
 
@@ -271,6 +271,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: r11-prompt-calibration-aggregate-\${{ github.run_id }}
+          name: r11-prompt-calibration-aggregate-${{ github.run_id }}
           path: aggregate.json
           retention-days: 90
