@@ -2,11 +2,6 @@ name: R08 online posterior A/B
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - experiments/R08_ONLINE_AB_TRIGGER.md
 
 permissions:
   contents: read
