@@ -189,18 +189,41 @@ def generate_probe_actions(
     return candidates
 
 
-def select_choice_batch(probabilities, action_ids, *, threshold=0.08, max_batch=4):
-    """Use the complete Choice distribution, not only its argmax."""
+def select_choice_batch(
+    probabilities,
+    action_ids,
+    *,
+    threshold=None,
+    threshold_multiplier=1.1,
+    max_batch=4,
+    stop_id="stop",
+):
+    """Use the complete Choice distribution, not only its argmax.
+
+    By default the threshold is slightly above a uniform categorical prior,
+    making it stable as the number of candidate probes changes.
+    """
+    if not action_ids:
+        return []
+    if threshold is None:
+        threshold = float(threshold_multiplier) / (len(action_ids) + 1)
+
     selected = [
         (aid, float(probabilities.get(aid, 0.0)))
         for aid in action_ids
         if float(probabilities.get(aid, 0.0)) >= float(threshold)
     ]
     selected.sort(key=lambda row: (-row[1], row[0]))
-    if not selected and action_ids:
-        best = max(action_ids, key=lambda aid: float(probabilities.get(aid, 0.0)))
-        selected = [(best, float(probabilities.get(best, 0.0)))]
-    return [aid for aid, _ in selected[: max(1, int(max_batch))]]
+    if selected:
+        return [aid for aid, _ in selected[: max(1, int(max_batch))]]
+
+    # If stop itself clears the same threshold, allow an empty batch.
+    if float(probabilities.get(stop_id, 0.0)) >= float(threshold):
+        return []
+
+    # Otherwise make progress with the highest-probability legal probe.
+    best = max(action_ids, key=lambda aid: float(probabilities.get(aid, 0.0)))
+    return [best]
 
 
 class ProbabilityFrontierDecider(ClosureChoiceRelevanceFrontierDecider):
@@ -211,7 +234,7 @@ class ProbabilityFrontierDecider(ClosureChoiceRelevanceFrontierDecider):
         frontier,
         actions,
         *,
-        probability_threshold=0.08,
+        probability_threshold=None,
         max_batch=4,
     ):
         by_id = {a["id"]: a for a in actions}
@@ -338,7 +361,7 @@ def phase0_probability_frontier(
     max_epochs=8,
     max_actions=16,
     max_batch=4,
-    probability_threshold=0.08,
+    probability_threshold=None,
     max_total_probes=24,
 ):
     """Build a whole-file relevance probability frontier."""
