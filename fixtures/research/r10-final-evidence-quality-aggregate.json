@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "r10-final-evidence-quality-aggregate",
+  "source_run": 36026211113,
+  "phase0_source_run": 36004833542,
+  "runs": 12,
+  "estimators": {
+    "multi_scale_gaussian": {
+      "mean_reference_relevance": 0.6441145833333334,
+      "high_line_precision": 0.5946180555555556,
+      "high_line_recall": 0.10862675473447225,
+      "weighted_relevance_recall": 0.10544735023754707,
+      "oracle_ratio_high_recall": 0.5946180555555556,
+      "oracle_ratio_precision": 0.6998379754811653
+    },
+    "sequential_exponential": {
+      "mean_reference_relevance": 0.6824739583333334,
+      "high_line_precision": 0.665798611111111,
+      "high_line_recall": 0.12893925473447224,
+      "weighted_relevance_recall": 0.11216848856209675,
+      "oracle_ratio_high_recall": 0.665798611111111,
+      "oracle_ratio_precision": 0.7407677226313831
+    }
+  }
+}
