@@ -215,3 +215,19 @@ evaluation round.
 
 If a parameter is changed after inspecting holdout results, start a new
 research iteration with a new train/validation split and record that decision.
+
+## Phase C pre-registration — holdout search effect
+
+Before generating any new holdout reference, the first Phase C suite is frozen
+in `docs/experiments/r08-holdout-search-effect-2026-09-24.md`.
+
+This round evaluates three previously unused real-code file/task pairs, repeats
+both online estimator arms twice, normalizes the source-read budget to about
+8.5% of each file, and adds probe-order search metrics. The primary question is
+now stricter than posterior fit:
+
+> does a better probability frontier cause System One to find high-value source
+> earlier and recover more relevance mass under the same sparse-read budget?
+
+No R07 estimator parameters or current action-generation rules may be changed
+after the holdout references are generated.
