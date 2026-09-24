@@ -1755,3 +1755,183 @@ def run_frontier_file_phase0_choice(
         evidence=len(state["evidence"]),
     )
     return state, usage
+
+
+def run_frontier_file_phase0_choice_v2(
+    root,
+    goal,
+    candidate,
+    decider,
+    trace,
+    *,
+    max_rounds=10,
+    max_actions_per_choice=6,
+    probe_lines=112,
+    target_region_lines=48,
+    final_window_lines=32,
+    refine_threshold=0.72,
+    candidate_threshold=0.55,
+    gradient_threshold=0.15,
+    volatility_threshold=0.10,
+    stable_delta=0.06,
+    stable_rounds=2,
+    max_frontier_leaves=24,
+    final_max_candidates=24,
+):
+    """Phase 0 coarse field + Choice policy + periodic value refresh.
+
+    Phase 0 establishes the only initial relevance distribution. Phase 1 then
+    lets Choice select one action from a larger harness-generated action set.
+    After each executed action the value field is refreshed before the next
+    policy epoch. This deliberately separates policy (Choice) from value
+    estimation (Noul) instead of asking independent Noul questions to decide
+    the next action.
+    """
+    usage = empty_usage()
+    state = new_file_state(root, candidate, max_frontier_leaves)
+    if state is None:
+        return None, usage
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_v2_started",
+        path=state["path"],
+        line_count=state["line_count"],
+        initial_frontier=frontier_summary(state),
+    )
+
+    current = phase0_coarse_scan(
+        root,
+        goal,
+        state,
+        decider,
+        trace,
+        probe_lines,
+    )
+    merge_usage(usage, current)
+    state["coarse_coverage"] = 1.0
+
+    if not state.get("phase0", {}).get("all_regions_observed"):
+        raise RuntimeError("phase0 coarse bootstrap invariant failed")
+
+    for round_number in range(1, max_rounds + 1):
+        state["round"] = round_number
+        actions = generate_actions(
+            state,
+            max_actions=max_actions_per_choice,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        actions.append({
+            "kind": "stop_frontier",
+            "node_id": "file",
+            "priority": 0.0,
+            "reason": (
+                "finalize when current evidence is sufficient and every "
+                "remaining legal action has lower expected information gain"
+            ),
+            "side": None,
+            "source": None,
+        })
+
+        policy, current = decider.choose_next_action(
+            goal,
+            state,
+            actions,
+        )
+        merge_usage(usage, current)
+
+        chosen = policy["action"]
+        if chosen["kind"] == "stop_frontier":
+            state["termination"] = "model_stop"
+            state["policy_stop"] = policy
+            trace.emit(
+                "relevance_frontier_phase0_choice_v2_stop",
+                path=state["path"],
+                round=round_number,
+                policy=policy,
+                frontier=frontier_summary(state),
+            )
+            break
+
+        result = execute_action(
+            root,
+            state,
+            chosen,
+            probe_lines,
+        )
+        if result is None:
+            state["termination"] = "frontier_exhausted"
+            break
+
+        # Value refresh happens after execution, so the next Choice epoch sees
+        # the new observation and an updated relevance field.
+        rescored, current = decider.score_frontier(goal, state)
+        merge_usage(usage, current)
+        apply_scores(state, rescored)
+
+        stability = update_stability(
+            state,
+            candidate_threshold,
+            stable_delta,
+        )
+        snapshot = {
+            "round": round_number,
+            "policy": policy,
+            "executed": [{
+                "kind": chosen["kind"],
+                "source_node_id": chosen["node_id"],
+                "target_node_id": result["target_node_id"],
+                "range": [
+                    result["observation"]["start_line"],
+                    result["observation"]["end_line"],
+                ],
+            }],
+            "frontier": frontier_summary(state),
+            "stability": stability,
+        }
+        state["action_history"].append(snapshot)
+        trace.emit(
+            "relevance_frontier_phase0_choice_v2_round_completed",
+            path=state["path"],
+            **snapshot,
+        )
+
+    else:
+        state["termination"] = "round_budget_exhausted"
+
+    candidates = fine_candidates(
+        state,
+        candidate_threshold=candidate_threshold,
+        final_window_lines=final_window_lines,
+        max_candidates=final_max_candidates,
+    )
+    selected, current = decider.finalize_choices(
+        goal,
+        state,
+        candidates,
+    )
+    merge_usage(usage, current)
+
+    state["final_candidates"] = candidates
+    state["evidence"] = merge_selected_candidates(selected)
+    state["frontier_coverage"] = observed_frontier_coverage(state)
+    state["source_coverage"] = (
+        unique_source_coverage(state) / max(1, state["line_count"])
+    )
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_v2_completed",
+        path=state["path"],
+        termination=state["termination"],
+        rounds=state["round"],
+        phase0=state.get("phase0"),
+        coarse_coverage=state.get("coarse_coverage"),
+        observations=len(state["observations"]),
+        frontier_coverage=state["frontier_coverage"],
+        source_coverage=state["source_coverage"],
+        final_candidates=len(candidates),
+        evidence=len(state["evidence"]),
+    )
+    return state, usage
