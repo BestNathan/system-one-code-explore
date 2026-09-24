@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "r13-multi-objective-semantic-closure-aggregate",
+  "canonical_run": 36041221078,
+  "runs": 12,
+  "estimators": {
+    "multi_scale_gaussian": {
+      "source_fraction": 0.4829423226903982,
+      "mean_reference_relevance": 0.6114609819891405,
+      "high_line_precision": 0.5972222222222222,
+      "high_line_recall": 0.5437500000000001,
+      "weighted_relevance_recall": 0.5028336187031467,
+      "phase0_high_frontier_coverage": 0.3333333333333333,
+      "mean_final_region_lines": 666.0,
+      "closure_expansion_tiles": 2.1666666666666665,
+      "mean_final_system1_completeness": 0.215,
+      "mean_selected_tiles": 25.666666666666668,
+      "mean_selected_lines": 815.3333333333334,
+      "premature_hidden_cc_rate": 0.6666666666666666,
+      "mean_model_calls": 20.166666666666668,
+      "mean_input_tokens": 172704.33333333334
+    },
+    "sequential_exponential": {
+      "source_fraction": 0.6153334134439803,
+      "mean_reference_relevance": 0.6914517227298812,
+      "high_line_precision": 0.6203042328042329,
+      "high_line_recall": 0.6673611111111111,
+      "weighted_relevance_recall": 0.6728154541149106,
+      "phase0_high_frontier_coverage": 0.6666666666666666,
+      "mean_final_region_lines": 661.3428571428572,
+      "closure_expansion_tiles": 4.833333333333333,
+      "mean_final_system1_completeness": 0.19323214285714285,
+      "mean_selected_tiles": 36.166666666666664,
+      "mean_selected_lines": 1148.6666666666667,
+      "premature_hidden_cc_rate": 0.6666666666666666,
+      "mean_model_calls": 33.333333333333336,
+      "mean_input_tokens": 403422.3333333333
+    }
+  }
+}
