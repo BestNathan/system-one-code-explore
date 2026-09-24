@@ -9,7 +9,7 @@ from pathlib import Path
 from full_read_relevance_baseline import extract_json, numbered_source, ROLES
 
 
-def micro_targets(line_count, target_lines=8, stride_lines=16):
+def micro_targets(line_count, target_lines=8, stride_lines=8):
     out = []
     start = 1
     index = 1
@@ -228,7 +228,7 @@ def main(argv=None):
     p.add_argument("--source", required=True)
     p.add_argument("--query", required=True)
     p.add_argument("--target-lines", type=int, default=8)
-    p.add_argument("--stride-lines", type=int, default=16)
+    p.add_argument("--stride-lines", type=int, default=8)
     p.add_argument("--output-prompt", required=True)
     p.add_argument("--output-manifest")
     p.set_defaults(func=prepare)
