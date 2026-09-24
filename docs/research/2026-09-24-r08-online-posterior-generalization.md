@@ -234,67 +234,114 @@ after the holdout references are generated.
 
 
 ## Phase C result — field fit did not generalize to search
+## Phase C result — field fit did not generalize to search
 
-The pre-registered holdout suite completed on online run `35991332346`.
-References were generated on executor run `35990577401` and then pinned under
-`fixtures/research/`.
+The canonical new-repository rerun completed successfully as workflow run
+`36004833542` at harness commit
+`3b8a8a5273b6fe9ec91ea7e5753d91add46ec9df`.
 
-Across three holdouts x two repeats, the frozen multi-scale estimator improved
-mean Pearson only because one holdout was reference-degenerate, while the
-search metrics moved in the opposite direction:
+This run supersedes the earlier migration-era
+`narness-engineering#35990577401 -> system-one-code-explore#35991332346`
+execution. After `ds` was configured in the new repository, references and
+online searches could be executed in one repository/run.
 
-- final high-line recall: 0.0977 sequential vs 0.0741 multi-scale;
-- high-recall AUC/probe: 0.0431 vs 0.0321;
-- weighted-recall AUC/probe: 0.0458 vs 0.0413;
-- useful-probe rate: 0.5605 vs 0.4824;
-- multi-scale won high-recall AUC on 0/3 holdouts.
+Across three holdouts x two repeats:
 
-The two discriminative holdouts both reproduced the same negative search
-direction in both repeats.
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| mean Pearson | 0.1099 | **0.3178** |
+| mean MAE | 0.2189 | **0.2086** |
+| final high-line recall | **0.1138** | 0.0885 |
+| high-recall AUC / probe | **0.0529** | 0.0417 |
+| weighted-recall AUC / probe | **0.0470** | 0.0444 |
+| useful-probe rate | **0.6680** | 0.5690 |
+| mean input tokens | **85,702** | 92,235 |
 
-Raw/aggregate details are in:
+Holdout win counts for multi-scale:
 
-- `docs/experiments/r08-holdout-search-effect-2026-09-24.md`;
-- `fixtures/research/r08-holdout-search-effect-summary.json`.
+- Pearson: **3/3**;
+- MAE: **2/3**;
+- high-recall AUC: **0/3**;
+- final high-line recall: **0/3**;
+- weighted-recall AUC: **1/3**.
 
-### Structural diagnosis
+This is the central R08 result:
 
-The failure is an uncertainty-semantics error.
+> better relevance-field reconstruction did not generalize to better active
+> search.
 
-The multi-scale relevance estimator uses adaptive Gaussian bandwidth. Its
-current "uncertainty" is derived from Gaussian support. Because bandwidth grows
-in sparse areas, support can remain high far from every observation. The
-resulting uncertainty is therefore not epistemic coverage uncertainty.
+The reconnect holdout is the strongest repeated example. Sequential beats
+multi-scale on high-recall AUC in both repeats:
 
-On the reconnect holdout:
+- repeat 1: 0.0581 vs 0.0456;
+- repeat 2: 0.0614 vs 0.0364.
 
-- sequential corr(uncertainty, nearest-observation distance): about +0.879;
-- multi-scale: about -0.408;
-- 99.1% of unread high-relevance lines ended with multi-scale uncertainty <=
-  0.10.
+The full-stack holdout also favors sequential search on the two-repeat
+aggregate while multi-scale has much higher field correlation.
 
-On full-stack the corresponding values are +0.879 vs -0.167 and 78.3%.
+The catalog holdout remains in the aggregate but is reference-degenerate: all
+canonical windows are high/core, so high-recall search is effectively source
+coverage and cannot discriminate policies.
 
-That field is then consumed directly by the `uncertainty` action family, so
-the posterior can improve relevance interpolation while simultaneously making
-the search policy worse.
+Full evidence:
+
+- `docs/experiments/r08-holdout-search-effect-results-2026-09-24.md`;
+- `fixtures/research/r08-holdout-search-effect-aggregate.json`;
+- `fixtures/research/r08-frontier-uncertainty-diagnostic.json`.
+
+### Structural diagnosis: one uncertainty is serving two incompatible roles
+
+At the final budget only about **8.52%** of source has been directly observed.
+
+Across all six paired runs:
+
+| diagnostic | sequential | multi-scale |
+| --- | ---: | ---: |
+| unobserved uncertainty after 4 probes | 0.862 | **0.368** |
+| unobserved uncertainty at final budget | 0.484 | **0.086** |
+| observed uncertainty at final budget | 0.192 | 0.081 |
+| unobserved / observed uncertainty ratio | 2.53x | **1.05x** |
+
+The multi-scale posterior therefore almost loses the distinction between
+"observed" and "unobserved" source.
+
+That is expected from its current math:
+
+```text
+sparse region
+   -> adaptive bandwidth grows
+   -> distant samples still provide Gaussian support
+   -> support-derived uncertainty decreases
+```
+
+For interpolation this can be useful. For active search it is the wrong
+semantics.
+
+The runtime currently feeds this same field into both posterior reconstruction
+and the `uncertainty` acquisition family. Consequently a line can be unread
+but look highly certain merely because broad kernels interpolate through it.
+
+Sequential exponential reconstruction has worse global fit, but its local
+decay preserves a much stronger novelty signal. That conservative behavior is
+why it can search better.
 
 ## R08 conclusion
 
-The Phase B statement must be narrowed:
+R08 closes with two simultaneous findings:
 
-> multi-scale posterior reconstruction improved the websocket fixture's
-> reconstructed relevance field and changed its trajectory.
+1. path-independent multi-scale reconstruction remains a better relevance
+   estimator on most holdouts;
+2. its current support-derived uncertainty is not a valid exploration
+   uncertainty and degrades sparse active search.
 
-It is **not** established that the current multi-scale
-relevance+uncertainty posterior improves search generally.
+The architecture must therefore split:
 
-R08 therefore closes with a negative generalization result and one concrete
-architectural requirement:
+```text
+relevance_posterior(x)
+epistemic_uncertainty_or_novelty(x)
+```
 
-> relevance posterior and exploration uncertainty must be modeled as separate
-> state.
-
-R09 will change only uncertainty semantics while keeping the multi-scale
-relevance reconstruction fixed, and will validate search behavior on fresh
-holdouts.
+R09 should hold multi-scale relevance reconstruction fixed, change only the
+exploration-uncertainty semantics, and validate on a **fresh holdout split**.
+The R08 holdouts are now diagnosis data and must not be reused to claim R09
+generalization.
