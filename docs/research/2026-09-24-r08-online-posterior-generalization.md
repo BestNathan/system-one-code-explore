@@ -103,6 +103,48 @@ Because the posterior changes Choice state, trajectories are expected to
 diverge. Compare convergence and read efficiency rather than expecting matched
 probe locations.
 
+## Synthetic estimator-bias sanity check
+
+Before real holdouts are available, a model-free sanity benchmark was added:
+
+- `src/posterior_synthetic_benchmark.py`
+- `docs/experiments/r08-posterior-synthetic-sanity-2026-09-24.md`
+
+Five 1024-line truth fields were tested with the same deterministic 32-probe
+stratified geometry:
+
+- broad smooth peak;
+- separated multi-peak;
+- plateau;
+- narrow spike;
+- two separated steps.
+
+The exact synthetic truth supplies probe scores, so this isolates posterior
+geometry without model noise.
+
+The sequential baseline performed poorly on multi-modal and discontinuous
+fields, while frozen adaptive Gaussian estimators remained strong. For example:
+
+```text
+multi-peak Pearson:
+  sequential = 0.098
+  k2         = 0.989
+
+two-step Pearson:
+  sequential = 0.080
+  k2         = 0.916
+
+narrow-spike Pearson:
+  sequential = -0.025
+  k2         = 0.880
+```
+
+This is not real-code generalization evidence and must not replace Phase C.
+It does strengthen the conclusion that sequential mutation has a structural
+reconstruction weakness rather than only a websocket-specific weakness.
+
+No estimator parameters were changed as a result.
+
 ## Phase C — Holdout generalization
 
 Freeze all R07 estimator parameters before generating new references.
