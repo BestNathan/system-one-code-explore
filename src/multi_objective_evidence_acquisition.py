@@ -729,6 +729,17 @@ def run(
         termination = "safety_cap"
 
     final_regions = merge_regions(selected)
+    final_assessments = []
+    if final_regions:
+        final_assessments, current = decider.assess_regions(
+            goal,
+            phase0_run["subject"]["path"],
+            final_regions,
+            remaining,
+            source_lines,
+        )
+        merge_usage(usage, current)
+
     return {
         "schema_version": 1,
         "kind": "r13-multi-objective-evidence-acquisition",
@@ -766,6 +777,14 @@ def run(
             for item in final_regions
         ],
         "remaining_actions": remaining,
+        "final_assessments": [
+            {
+                key: value
+                for key, value in item.items()
+                if key not in {"before", "after"}
+            }
+            for item in final_assessments
+        ],
         "history": history,
         "usage": usage,
     }
