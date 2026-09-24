@@ -1,0 +1,276 @@
+name: R11 System One relevance prompt calibration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/relevance_prompt_benchmark.py"
+      - ".github/workflows/r11-system-one-prompt-calibration.yml"
+      - "docs/research/2026-09-25-r11-system-one-prompt-calibration.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: \${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: \${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  reference:
+    name: Reference / \${{ matrix.case.id }}
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case:
+          - id: command_broker_ownership
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Help me harden agent command routing across reconnects: locate
+              connection-generation ownership, pending request registration and
+              response matching, superseded connection behavior, timeout and
+              disconnect cleanup.
+          - id: extension_registry_integrity
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Help me make extension composition fail safely: locate descriptor
+              validation, duplicate wire/protocol conflict detection, route
+              derivation, manifest construction, and runtime dispatch.
+          - id: git_agent_security
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Help me review the git agent security boundary: locate session
+              working-directory resolution, typed request decoding, command
+              dispatch, client-supplied path handling, git invocation and error
+              mapping.
+    env:
+      CASE_ID: \${{ matrix.case.id }}
+      FILE_PATH: \${{ matrix.case.path }}
+      GOAL: \${{ matrix.case.goal }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: \${{ env.SUBJECT_REPOSITORY }}
+          ref: \${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Prepare full-read benchmark
+        run: |
+          mkdir -p "artifacts/reference/$CASE_ID"
+          python3 src/full_read_relevance_baseline.py prepare \
+            --source "subject/$FILE_PATH" \
+            --query "$GOAL" \
+            --window-lines 64 \
+            --stride-lines 32 \
+            --output-prompt "artifacts/reference/$CASE_ID/prompt.txt" \
+            --output-manifest "artifacts/reference/$CASE_ID/prompt-manifest.json"
+
+      - name: Generate and normalize CC reference
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: \${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: \${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: \${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+          CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "1"
+        run: |
+          set -euo pipefail
+          ROOT="artifacts/reference/$CASE_ID"
+          rm -f "$ROOT/reference.json"
+          for attempt in 1 2 3; do
+            claude -p \
+              --output-format text \
+              --max-turns 4 \
+              --permission-mode dontAsk \
+              --no-session-persistence \
+              --setting-sources '' \
+              --strict-mcp-config \
+              --mcp-config '{"mcpServers":{}}' \
+              --disable-slash-commands \
+              --tools '' \
+              --settings '{"disableAllHooks":true}' \
+              < "$ROOT/prompt.txt" \
+              > "$ROOT/output-attempt-$attempt.txt" || true
+            if python3 src/full_read_relevance_baseline.py normalize \
+              --source "subject/$FILE_PATH" \
+              --query "$GOAL" \
+              --window-lines 64 \
+              --stride-lines 32 \
+              --raw-output "$ROOT/output-attempt-$attempt.txt" \
+              --output "$ROOT/reference.json"; then
+              echo "$attempt" > "$ROOT/accepted-attempt.txt"
+              break
+            fi
+            rm -f "$ROOT/reference.json"
+          done
+          test -s "$ROOT/reference.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11-reference-\${{ matrix.case.id }}
+          path: artifacts/reference/\${{ matrix.case.id }}/
+          retention-days: 90
+
+  score:
+    name: Prompt calibration / \${{ matrix.case.id }}
+    needs: reference
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        case:
+          - id: command_broker_ownership
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Help me harden agent command routing across reconnects: locate
+              connection-generation ownership, pending request registration and
+              response matching, superseded connection behavior, timeout and
+              disconnect cleanup.
+          - id: extension_registry_integrity
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Help me make extension composition fail safely: locate descriptor
+              validation, duplicate wire/protocol conflict detection, route
+              derivation, manifest construction, and runtime dispatch.
+          - id: git_agent_security
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Help me review the git agent security boundary: locate session
+              working-directory resolution, typed request decoding, command
+              dispatch, client-supplied path handling, git invocation and error
+              mapping.
+    env:
+      CASE_ID: \${{ matrix.case.id }}
+      FILE_PATH: \${{ matrix.case.path }}
+      GOAL: \${{ matrix.case.goal }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: \${{ env.SUBJECT_REPOSITORY }}
+          ref: \${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download CC benchmark
+        uses: actions/download-artifact@v4
+        with:
+          name: r11-reference-\${{ matrix.case.id }}
+          path: artifacts/reference
+
+      - name: Score prompt family
+        env:
+          TYPESAFE_API_KEY: \${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/relevance_prompt_benchmark.py \
+            --reference artifacts/reference/reference.json \
+            --source "subject/$FILE_PATH" \
+            --goal "$GOAL" \
+            --file-path "$FILE_PATH" \
+            --per-bucket 10 \
+            --trace-file artifacts/out/trace.jsonl \
+            --output artifacts/out/result.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11-prompt-result-\${{ matrix.case.id }}
+          path: artifacts/out/
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R11 prompt calibration
+    needs: score
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r11-prompt-result-*
+          path: artifacts/all
+
+      - name: Aggregate prompt metrics
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from pathlib import Path
+
+          rows = [
+              json.loads(p.read_text())
+              for p in sorted(Path("artifacts/all").glob("*/result.json"))
+          ]
+          names = sorted(rows[0]["prompts"])
+          metrics = (
+              "pearson",
+              "spearman",
+              "high_vs_rest_auc",
+              "precision_at_high_count",
+              "brier_high_label",
+              "mean_high_probability",
+              "mean_low_probability",
+              "high_low_separation",
+          )
+
+          out = {
+              "schema_version": 1,
+              "kind": "r11-system-one-prompt-calibration-aggregate",
+              "cases": len(rows),
+              "prompts": {},
+          }
+          for name in names:
+              out["prompts"][name] = {}
+              for metric in metrics:
+                  values = [
+                      row["prompts"][name]["metrics"].get(metric)
+                      for row in rows
+                  ]
+                  values = [x for x in values if x is not None]
+                  out["prompts"][name][metric] = (
+                      statistics.fmean(values) if values else None
+                  )
+          Path("aggregate.json").write_text(
+              json.dumps(out, indent=2) + "\n"
+          )
+          print(json.dumps(out, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11-prompt-calibration-aggregate-\${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
