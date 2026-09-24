@@ -77,3 +77,33 @@ clear false positives. Therefore a downstream evidence-selection/closure stage
 remains useful even after Phase0 search improves.
 
 See `docs/experiments/r10-final-evidence-results-2026-09-25.md`.
+
+
+## Result
+
+Completed in workflow run `36026211113`.
+
+Across 12 evidence artifacts (3 tasks x 2 repeats x 2 Phase0 estimators), each final evidence set was limited to six non-overlapping 32-line snippets / 192 source lines.
+
+Aggregate:
+
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| mean CC relevance | **0.6825** | 0.6441 |
+| high-line precision | **0.6658** | 0.5946 |
+| high-line recall | **0.1289** | 0.1086 |
+| weighted relevance recall | **0.1122** | 0.1054 |
+| same-budget oracle precision ratio | **0.7408** | 0.6998 |
+| same-budget oracle high-recall ratio | **0.6658** | 0.5946 |
+
+The evidence is meaningfully enriched relative to raw source coverage, but still substantially below the same-budget oracle. The main qualitative failure is that several high System One probe scores expand into locally plausible but reference-low snippets, consuming one of only six final evidence slots.
+
+The strongest reconnect example makes the gap concrete. Sequential retained four high-reference windows around the actual connection/registration loop before spending two slots on weak regions; multi-scale retained four useful windows but also spent two slots on clearly low-reference regions.
+
+Conclusion:
+
+> current Phase0 observations are good enough to form a useful compact evidence set, but evidence selection quality is still dominated by false-positive local scores and incomplete search coverage.
+
+This supports a next downstream stage that can re-rank/expand evidence, but it does not justify treating top Phase0 probes as final evidence without another selection step.
+
+Pinned aggregate: `fixtures/research/r10-final-evidence-quality-aggregate.json`.
