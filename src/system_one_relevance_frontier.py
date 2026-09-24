@@ -879,6 +879,7 @@ def fine_candidates(
                     "score": current_score(node),
                     "content": content,
                     "frontier_node_id": node["id"],
+                    "observation_id": oid,
                     "score_history": [
                         float(value)
                         for value in node["score_history"]
