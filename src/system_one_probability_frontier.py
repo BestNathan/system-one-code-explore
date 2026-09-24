@@ -134,28 +134,38 @@ def generate_probe_actions(
     sample_lines=8,
     max_actions=16,
 ):
-    """Generate a diverse geometry-only action set.
+    """Generate a spatially diverse, mixed-policy probe action set.
 
-    Sources:
-    - stratified random positions across the entire file;
-    - high-uncertainty positions;
-    - high-gradient positions;
-    - neighborhoods around current relevance peaks.
+    Every epoch reserves capacity for multiple proposal families so one family
+    cannot starve the others:
+    - stratified random exploration;
+    - high epistemic uncertainty;
+    - high relevance gradient;
+    - current relevance peaks.
 
-    Randomness is deterministic for reproducible experiments.
+    Candidate ranges are also separated in source space. Choice should compare
+    meaningfully different places, not several 8-line windows around one line.
     """
     n = frontier["line_count"]
-    rng = random.Random(int(hashlib.sha256(f"{path}:{epoch}".encode()).hexdigest()[:16], 16))
+    rng = random.Random(
+        int(hashlib.sha256(f"{path}:{epoch}".encode()).hexdigest()[:16], 16)
+    )
     candidates = []
     seen = set()
+    min_center_gap = max(sample_lines * 3, 24)
 
     def add(kind, center):
         left, right = _micro_range(center, n, sample_lines)
         if _overlaps_observed(frontier, left, right):
-            return
+            return False
         key = (left, right)
         if key in seen:
-            return
+            return False
+        candidate_center = (left + right) // 2
+        for item in candidates:
+            existing_center = (item["start_line"] + item["end_line"]) // 2
+            if abs(candidate_center - existing_center) < min_center_gap:
+                return False
         seen.add(key)
         candidates.append({
             "id": f"p{len(candidates)+1}",
@@ -163,41 +173,79 @@ def generate_probe_actions(
             "start_line": left,
             "end_line": right,
         })
+        return True
 
-    # Stratified random coverage.
-    strata = min(8, max(1, max_actions // 2))
+    if max_actions <= 0:
+        return []
+
+    # Explicit quotas guarantee policy diversity. Remainders go to random
+    # exploration because broad coverage is the safest fallback.
+    random_quota = max(1, round(max_actions * 0.375))
+    uncertainty_quota = max(1, round(max_actions * 0.25))
+    gradient_quota = max(1, round(max_actions * 0.1875))
+    peak_quota = max(1, max_actions - random_quota - uncertainty_quota - gradient_quota)
+
+    # 1) Stratified random coverage across the whole file.
+    strata = random_quota
+    random_added = 0
     for s in range(strata):
         a = 1 + (n * s) // strata
         b = max(a, (n * (s + 1)) // strata)
-        add("random_stratified", rng.randint(a, b))
+        for _ in range(6):
+            if add("random_stratified", rng.randint(a, b)):
+                random_added += 1
+                break
 
-    # High-uncertainty candidates.
-    ranked_u = sorted(
-        range(1, n + 1),
-        key=lambda line: (-frontier["uncertainty"][line - 1], rng.random()),
+    # 2) High uncertainty, with randomized tie breaking.
+    uncertainty_order = list(range(1, n + 1))
+    tie = {line: rng.random() for line in uncertainty_order}
+    uncertainty_order.sort(
+        key=lambda line: (-frontier["uncertainty"][line - 1], tie[line])
     )
-    for line in ranked_u[: max_actions]:
-        add("uncertainty", line)
-        if len(candidates) >= max_actions:
-            return candidates
+    uncertainty_added = 0
+    for line in uncertainty_order:
+        if add("uncertainty", line):
+            uncertainty_added += 1
+            if uncertainty_added >= uncertainty_quota:
+                break
 
-    # High-gradient candidates.
-    gradients = []
+    # 3) High relevance-gradient boundaries.
     p = frontier["relevance"]
-    for line in range(2, n):
-        gradients.append((abs(p[line] - p[line - 2]), line))
-    for _, line in sorted(gradients, reverse=True)[: max_actions]:
-        add("gradient", line)
-        if len(candidates) >= max_actions:
-            return candidates
+    gradients = [
+        (abs(p[line] - p[line - 2]), tie.get(line, rng.random()), line)
+        for line in range(2, n)
+    ]
+    gradient_added = 0
+    for _, _, line in sorted(gradients, key=lambda row: (-row[0], row[1])):
+        if add("gradient", line):
+            gradient_added += 1
+            if gradient_added >= gradient_quota:
+                break
 
-    # Current peaks.
-    for line in sorted(range(1, n + 1), key=lambda x: p[x - 1], reverse=True):
-        add("peak_neighbor", line)
-        if len(candidates) >= max_actions:
-            break
-    return candidates
+    # 4) Neighborhoods around current relevance peaks.
+    peak_order = list(range(1, n + 1))
+    peak_order.sort(
+        key=lambda line: (
+            -frontier["relevance"][line - 1],
+            -frontier["uncertainty"][line - 1],
+            tie.get(line, rng.random()),
+        )
+    )
+    peak_added = 0
+    for line in peak_order:
+        if add("peak_neighbor", line):
+            peak_added += 1
+            if peak_added >= peak_quota:
+                break
 
+    # If geometry/observed masks prevented a quota from filling, top up with
+    # globally random unobserved positions while preserving spatial diversity.
+    attempts = 0
+    while len(candidates) < max_actions and attempts < max_actions * 40:
+        add("random_fill", rng.randint(1, n))
+        attempts += 1
+
+    return candidates[:max_actions]
 
 def select_choice_batch(
     probabilities,
