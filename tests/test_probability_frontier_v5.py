@@ -1,9 +1,11 @@
 import unittest
 
 from system_one_probability_frontier import (
+    append_probability_sample,
     generate_probe_actions,
     new_probability_frontier,
     quantize,
+    rebuild_probability_frontier,
     select_choice_batch,
     update_probability_frontier,
 )
@@ -24,6 +26,63 @@ class ProbabilityFrontierV5Tests(unittest.TestCase):
         self.assertGreater(f["relevance"][102], 0.65)
         self.assertAlmostEqual(f["relevance"][2500], 0.5, places=6)
         self.assertAlmostEqual(f["uncertainty"][2500], 1.0, places=6)
+
+    def test_pluggable_sequential_posterior_matches_legacy_updates(self):
+        samples = [
+            (100, 107, 0.9),
+            (500, 507, 0.2),
+            (250, 257, 0.7),
+        ]
+        legacy = new_probability_frontier(800)
+        plugin = new_probability_frontier(800)
+
+        for left, right, score in samples:
+            update_probability_frontier(
+                legacy,
+                left,
+                right,
+                score,
+            )
+            append_probability_sample(
+                plugin,
+                left,
+                right,
+                score,
+            )
+            rebuild_probability_frontier(
+                plugin,
+                estimator="sequential_exponential",
+                sample_lines=8,
+            )
+
+        self.assertEqual(legacy["relevance"], plugin["relevance"])
+        self.assertEqual(legacy["uncertainty"], plugin["uncertainty"])
+        self.assertEqual(legacy["observed"], plugin["observed"])
+
+    def test_online_frontier_can_switch_to_multiscale_posterior(self):
+        frontier = new_probability_frontier(800)
+        for left, right, score in [
+            (100, 107, 0.9),
+            (500, 507, 0.2),
+            (250, 257, 0.7),
+        ]:
+            append_probability_sample(
+                frontier,
+                left,
+                right,
+                score,
+            )
+        rebuild_probability_frontier(
+            frontier,
+            estimator="multi_scale_gaussian",
+            sample_lines=8,
+        )
+        self.assertEqual(
+            frontier["posterior_estimator"],
+            "multi_scale_gaussian_k2_k4",
+        )
+        self.assertEqual(len(frontier["relevance"]), 800)
+        self.assertEqual(len(frontier["uncertainty"]), 800)
 
     def test_action_generation_is_diverse_and_reproducible(self):
         f = new_probability_frontier(3000)
