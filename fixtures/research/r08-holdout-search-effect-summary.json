@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "kind": "r08-holdout-search-effect-durable-summary",
+  "reference_executor": {
+    "repository": "BestNathan/narness-engineering",
+    "run_id": 35990577401
+  },
+  "online_executor": {
+    "repository": "BestNathan/system-one-code-explore",
+    "run_id": 35991332346
+  },
+  "references": {
+    "reconnect_lifecycle": {
+      "line_count": 2858,
+      "range_count": 89,
+      "high_range_count": 20,
+      "core_range_count": 18,
+      "range_relevance_min": 0.05,
+      "range_relevance_max": 1.0,
+      "range_relevance_mean": 0.36011235955056176,
+      "degenerate_all_high": false
+    },
+    "protocol_catalog_consistency": {
+      "line_count": 1678,
+      "range_count": 52,
+      "high_range_count": 52,
+      "core_range_count": 52,
+      "range_relevance_min": 0.74,
+      "range_relevance_max": 0.95,
+      "range_relevance_mean": 0.7896153846153846,
+      "degenerate_all_high": true
+    },
+    "full_stack_command_lifecycle": {
+      "line_count": 1584,
+      "range_count": 49,
+      "high_range_count": 6,
+      "core_range_count": 5,
+      "range_relevance_min": 0.4,
+      "range_relevance_max": 0.85,
+      "range_relevance_mean": 0.5928571428571429,
+      "degenerate_all_high": false
+    }
+  },
+  "aggregate": {
+    "schema_version": 1,
+    "kind": "r08-holdout-search-effect-aggregate",
+    "subject": {
+      "repository": "BestNathan/nession",
+      "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df"
+    },
+    "cases": 3,
+    "paired_runs": 6,
+    "repeats_per_case": [2],
+    "win_counts": {
+      "high_recall_auc": 0,
+      "weighted_recall_auc": 1,
+      "final_high_recall": 0,
+      "pearson": 1,
+      "mae": 1
+    },
+    "per_case": [
+      {
+        "case_id": "full_stack_command_lifecycle",
+        "repeats": 2,
+        "path": "crates/nession-server/tests/integration/full_stack.rs",
+        "probe_budget": 17,
+        "estimators": {
+          "sequential_exponential": {
+            "pearson": 0.22999488892739628,
+            "mae": 0.19307973103856402,
+            "final_high_recall": 0.090625,
+            "high_recall_auc": 0.0335475,
+            "weighted_recall_auc": 0.0451985,
+            "useful_probe_rate": 0.264706,
+            "input_tokens": 52073.0
+          },
+          "multi_scale_gaussian": {
+            "pearson": 0.2123928174596809,
+            "mae": 0.22690322250299005,
+            "final_high_recall": 0.05,
+            "high_recall_auc": 0.015625,
+            "weighted_recall_auc": 0.042594499999999993,
+            "useful_probe_rate": 0.147059,
+            "input_tokens": 56531.5
+          }
+        }
+      },
+      {
+        "case_id": "protocol_catalog_consistency",
+        "repeats": 2,
+        "path": "crates/nession-protocol-codegen/src/catalog.rs",
+        "probe_budget": 18,
+        "estimators": {
+          "sequential_exponential": {
+            "pearson": -0.4726662889230739,
+            "mae": 0.17117752898832947,
+            "final_high_recall": 0.085816,
+            "high_recall_auc": 0.045292,
+            "weighted_recall_auc": 0.045449500000000004,
+            "useful_probe_rate": 1.0,
+            "input_tokens": 52933.0
+          },
+          "multi_scale_gaussian": {
+            "pearson": 0.0014117830271750706,
+            "mae": 0.11624843489282624,
+            "final_high_recall": 0.085816,
+            "high_recall_auc": 0.045292,
+            "weighted_recall_auc": 0.0459615,
+            "useful_probe_rate": 1.0,
+            "input_tokens": 57784.5
+          }
+        }
+      },
+      {
+        "case_id": "reconnect_lifecycle",
+        "repeats": 2,
+        "path": "crates/nession-agent/src/connection/server_client.rs",
+        "probe_budget": 30,
+        "estimators": {
+          "sequential_exponential": {
+            "pearson": 0.48728183395249014,
+            "mae": 0.2697503611373251,
+            "final_high_recall": 0.11658650000000001,
+            "high_recall_auc": 0.0504405,
+            "weighted_recall_auc": 0.046864,
+            "useful_probe_rate": 0.41666650000000005,
+            "input_tokens": 138943.5
+          },
+          "multi_scale_gaussian": {
+            "pearson": 0.4311118150454808,
+            "mae": 0.28578608050879406,
+            "final_high_recall": 0.086538,
+            "high_recall_auc": 0.035417000000000004,
+            "weighted_recall_auc": 0.0352795,
+            "useful_probe_rate": 0.3,
+            "input_tokens": 155744.5
+          }
+        }
+      }
+    ],
+    "overall": {
+      "sequential_exponential": {
+        "pearson": 0.08153681131893752,
+        "mae": 0.2113358737214062,
+        "final_high_recall": 0.09767583333333334,
+        "high_recall_auc": 0.04309333333333334,
+        "weighted_recall_auc": 0.04583733333333334,
+        "useful_probe_rate": 0.5604575,
+        "input_tokens": 81316.5
+      },
+      "multi_scale_gaussian": {
+        "pearson": 0.21497213851077893,
+        "mae": 0.20964591263487012,
+        "final_high_recall": 0.074118,
+        "high_recall_auc": 0.03211133333333333,
+        "weighted_recall_auc": 0.041278499999999996,
+        "useful_probe_rate": 0.482353,
+        "input_tokens": 90020.16666666667
+      }
+    }
+  },
+  "uncertainty_diagnostics": {
+    "protocol_catalog_consistency": {
+      "sequential_exponential": {
+        "mean_uncertainty": 0.431906,
+        "uncertainty_vs_nearest_observation_distance_pearson": 0.862637,
+        "missed_high_uncertainty_le_0_10_fraction": 0.0,
+        "missed_high_mean_absolute_error": 0.1752495,
+        "uncertainty_probe_count_mean": 11.0,
+        "uncertainty_probe_high_hit_rate": 1.0,
+        "uncertainty_probe_mean_reference_relevance": 0.7858125
+      },
+      "multi_scale_gaussian": {
+        "mean_uncertainty": 0.09314049999999999,
+        "uncertainty_vs_nearest_observation_distance_pearson": -0.0894865,
+        "missed_high_uncertainty_le_0_10_fraction": 0.7001305,
+        "missed_high_mean_absolute_error": 0.1146865,
+        "uncertainty_probe_count_mean": 12.0,
+        "uncertainty_probe_high_hit_rate": 1.0,
+        "uncertainty_probe_mean_reference_relevance": 0.801823
+      }
+    },
+    "reconnect_lifecycle": {
+      "sequential_exponential": {
+        "mean_uncertainty": 0.4523045,
+        "uncertainty_vs_nearest_observation_distance_pearson": 0.8792965,
+        "missed_high_uncertainty_le_0_10_fraction": 0.0,
+        "missed_high_mean_absolute_error": 0.4261545,
+        "uncertainty_probe_count_mean": 16.5,
+        "uncertainty_probe_high_hit_rate": 0.2727272727272727,
+        "uncertainty_probe_mean_reference_relevance": 0.39318
+      },
+      "multi_scale_gaussian": {
+        "mean_uncertainty": 0.07374900000000001,
+        "uncertainty_vs_nearest_observation_distance_pearson": -0.408281,
+        "missed_high_uncertainty_le_0_10_fraction": 0.9907895,
+        "missed_high_mean_absolute_error": 0.5601385000000001,
+        "uncertainty_probe_count_mean": 13.0,
+        "uncertainty_probe_high_hit_rate": 0.15384615384615385,
+        "uncertainty_probe_mean_reference_relevance": 0.302619
+      }
+    },
+    "full_stack_command_lifecycle": {
+      "sequential_exponential": {
+        "mean_uncertainty": 0.448856,
+        "uncertainty_vs_nearest_observation_distance_pearson": 0.8786864999999999,
+        "missed_high_uncertainty_le_0_10_fraction": 0.0,
+        "missed_high_mean_absolute_error": 0.3082975,
+        "uncertainty_probe_count_mean": 8.0,
+        "uncertainty_probe_high_hit_rate": 0.3125,
+        "uncertainty_probe_mean_reference_relevance": 0.675781
+      },
+      "multi_scale_gaussian": {
+        "mean_uncertainty": 0.09464800000000001,
+        "uncertainty_vs_nearest_observation_distance_pearson": -0.16739500000000002,
+        "missed_high_uncertainty_le_0_10_fraction": 0.7826035,
+        "missed_high_mean_absolute_error": 0.3558365,
+        "uncertainty_probe_count_mean": 7.0,
+        "uncertainty_probe_high_hit_rate": 0.0,
+        "uncertainty_probe_mean_reference_relevance": 0.5429685
+      }
+    }
+  }
+}
