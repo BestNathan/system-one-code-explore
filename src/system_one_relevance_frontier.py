@@ -1939,3 +1939,336 @@ def run_frontier_file_phase0_choice_v2(
         evidence=len(state["evidence"]),
     )
     return state, usage
+
+
+class ClosureChoiceRelevanceFrontierDecider(
+    ChoiceRelevanceFrontierDecider
+):
+    """Group-aware final Choice stage that preserves observation continuity."""
+
+    def finalize_group_choices(self, goal, state, candidates):
+        if not candidates:
+            return [], empty_usage()
+
+        groups = {}
+        for item in candidates:
+            key = (
+                item["frontier_node_id"],
+                item.get("observation_id"),
+            )
+            groups.setdefault(key, []).append(item)
+
+        grouped = []
+        for index, (key, items) in enumerate(
+            sorted(
+                groups.items(),
+                key=lambda pair: (
+                    min(item["start_line"] for item in pair[1]),
+                    max(item["end_line"] for item in pair[1]),
+                ),
+            )
+        ):
+            items = sorted(items, key=lambda item: item["start_line"])
+            grouped.append({
+                "id": (
+                    f"group:{state['path']}:{key[0]}:"
+                    f"{key[1] or 'unknown'}"
+                ),
+                "frontier_node_id": key[0],
+                "observation_id": key[1],
+                "start_line": items[0]["start_line"],
+                "end_line": items[-1]["end_line"],
+                "score": max(item["score"] for item in items),
+                "content": "\n".join(
+                    item["content"] for item in items
+                ),
+                "fragment_ids": [item["id"] for item in items],
+                "fragment_count": len(items),
+                "score_history": items[0]["score_history"],
+                "navigation": items[0]["navigation"],
+            })
+
+        state_view = {
+            "goal": goal,
+            "phase": "relevance_frontier_evidence_closure",
+            "file": state["path"],
+            "frontier": frontier_summary(state),
+            "groups": [
+                {
+                    "id": group["id"],
+                    "range": [
+                        group["start_line"],
+                        group["end_line"],
+                    ],
+                    "frontier_score": group["score"],
+                    "frontier_node_id": group["frontier_node_id"],
+                    "fragment_count": group["fragment_count"],
+                    "content": sanitize_source(group["content"]),
+                }
+                for group in grouped
+            ],
+            "instruction": (
+                "Resolve final evidence at the GROUP level. A group contains "
+                "contiguous fine-grained fragments from the same observed "
+                "source span. Judge the complete group, not each fragment in "
+                "isolation. Prefer keeping a group when the combined span "
+                "contains materially useful evidence even if individual "
+                "fragments are weak or incomplete."
+            ),
+        }
+
+        questions = {}
+        for index, group in enumerate(grouped):
+            questions[f"group_{index}"] = {
+                "type": "choice",
+                "instructions": {
+                    "goal": goal,
+                    "group_id": group["id"],
+                    "range": [
+                        group["start_line"],
+                        group["end_line"],
+                    ],
+                    "question": (
+                        "Should this COMPLETE evidence group be retained in the "
+                        "final localization result?"
+                    ),
+                },
+                "criteria": {
+                    "keep": (
+                        "Retain the complete group because its combined "
+                        "evidence is materially useful or provides necessary "
+                        "context."
+                    ),
+                    "drop": (
+                        "Drop the whole group because the combined span is "
+                        "incidental, redundant, or not materially useful."
+                    ),
+                },
+            }
+
+        response, usage = self.send(
+            "relevance_frontier_evidence_group_choice",
+            state_view,
+            questions,
+        )
+        answers = response.get("answers", {})
+        selected = []
+        for index, group in enumerate(grouped):
+            answer = answers.get(f"group_{index}", {})
+            if answer.get("type") != "choice":
+                raise RuntimeError(
+                    f"unexpected evidence-group choice answer: {answer!r}"
+                )
+            if answer.get("choice") != "keep":
+                continue
+            selected.append({
+                **group,
+                "final_choice": {
+                    "choice": "keep",
+                    "confidence": float(
+                        answer.get("confidence", 0.0) or 0.0
+                    ),
+                    "probabilities": answer.get("probabilities", {}),
+                },
+            })
+        return selected, usage
+
+
+class OfflineClosureChoiceRelevanceFrontierDecider(
+    ClosureChoiceRelevanceFrontierDecider
+):
+    model = "offline-closure-choice-relevance-frontier-fixture"
+
+    def __init__(self, trace):
+        self.trace = trace
+
+    def score_frontier(self, goal, state):
+        scores = {}
+        for node in frontier_leaves(state):
+            if not node["observation_ids"]:
+                continue
+            text = " ".join(
+                state["observation_by_id"][oid]["content"]
+                for oid in node["observation_ids"]
+            )
+            scores[node["id"]] = 0.9 if "TARGET" in text else 0.55
+        return scores, empty_usage()
+
+    def finalize_group_choices(self, goal, state, candidates):
+        groups = {}
+        for item in candidates:
+            key = (item["frontier_node_id"], item.get("observation_id"))
+            groups.setdefault(key, []).append(item)
+        selected = []
+        for key, items in groups.items():
+            if max(item["score"] for item in items) < 0.7:
+                continue
+            items = sorted(items, key=lambda item: item["start_line"])
+            selected.append({
+                "id": f"group:{key[0]}:{key[1]}",
+                "frontier_node_id": key[0],
+                "observation_id": key[1],
+                "start_line": items[0]["start_line"],
+                "end_line": items[-1]["end_line"],
+                "score": max(item["score"] for item in items),
+                "content": "\n".join(item["content"] for item in items),
+                "fragment_ids": [item["id"] for item in items],
+                "fragment_count": len(items),
+                "score_history": items[0]["score_history"],
+                "navigation": items[0]["navigation"],
+                "final_choice": {
+                    "choice": "keep",
+                    "confidence": 1.0,
+                    "probabilities": {"keep": 1.0, "drop": 0.0},
+                },
+            })
+        return selected, empty_usage()
+
+
+def run_frontier_file_phase0_choice_closure_v3(
+    root,
+    goal,
+    candidate,
+    decider,
+    trace,
+    *,
+    max_rounds=10,
+    max_actions_per_choice=6,
+    probe_lines=112,
+    target_region_lines=48,
+    final_window_lines=32,
+    refine_threshold=0.72,
+    candidate_threshold=0.55,
+    gradient_threshold=0.15,
+    volatility_threshold=0.10,
+    stable_delta=0.06,
+    stable_rounds=2,
+    max_frontier_leaves=24,
+    final_max_candidates=24,
+):
+    usage = empty_usage()
+    state = new_file_state(root, candidate, max_frontier_leaves)
+    if state is None:
+        return None, usage
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_closure_v3_started",
+        path=state["path"],
+        line_count=state["line_count"],
+        initial_frontier=frontier_summary(state),
+    )
+
+    current = phase0_coarse_scan(
+        root,
+        goal,
+        state,
+        decider,
+        trace,
+        probe_lines,
+    )
+    merge_usage(usage, current)
+    state["coarse_coverage"] = 1.0
+
+    if not state.get("phase0", {}).get("all_regions_observed"):
+        raise RuntimeError("phase0 coarse bootstrap invariant failed")
+
+    for round_number in range(1, max_rounds + 1):
+        state["round"] = round_number
+        actions = generate_actions(
+            state,
+            max_actions=max_actions_per_choice,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        actions.append({
+            "kind": "stop_frontier",
+            "node_id": "file",
+            "priority": 0.0,
+            "reason": (
+                "finalize when current evidence is sufficient and remaining "
+                "actions have lower expected information gain"
+            ),
+            "side": None,
+            "source": None,
+        })
+
+        policy, current = decider.choose_next_action(
+            goal,
+            state,
+            actions,
+        )
+        merge_usage(usage, current)
+
+        chosen = policy["action"]
+        if chosen["kind"] == "stop_frontier":
+            state["termination"] = "model_stop"
+            state["policy_stop"] = policy
+            break
+
+        result = execute_action(
+            root,
+            state,
+            chosen,
+            probe_lines,
+        )
+        if result is None:
+            state["termination"] = "frontier_exhausted"
+            break
+
+        rescored, current = decider.score_frontier(goal, state)
+        merge_usage(usage, current)
+        apply_scores(state, rescored)
+
+        state["action_history"].append({
+            "round": round_number,
+            "policy": policy,
+            "executed": [{
+                "kind": chosen["kind"],
+                "source_node_id": chosen["node_id"],
+                "target_node_id": result["target_node_id"],
+                "range": [
+                    result["observation"]["start_line"],
+                    result["observation"]["end_line"],
+                ],
+            }],
+        })
+
+    else:
+        state["termination"] = "round_budget_exhausted"
+
+    candidates = fine_candidates(
+        state,
+        candidate_threshold=candidate_threshold,
+        final_window_lines=final_window_lines,
+        max_candidates=final_max_candidates,
+    )
+    selected, current = decider.finalize_group_choices(
+        goal,
+        state,
+        candidates,
+    )
+    merge_usage(usage, current)
+
+    state["final_candidates"] = candidates
+    state["evidence"] = merge_selected_candidates(selected)
+    state["frontier_coverage"] = observed_frontier_coverage(state)
+    state["source_coverage"] = (
+        unique_source_coverage(state) / max(1, state["line_count"])
+    )
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_closure_v3_completed",
+        path=state["path"],
+        termination=state["termination"],
+        rounds=state["round"],
+        phase0=state.get("phase0"),
+        coarse_coverage=state.get("coarse_coverage"),
+        observations=len(state["observations"]),
+        frontier_coverage=state["frontier_coverage"],
+        source_coverage=state["source_coverage"],
+        final_candidates=len(candidates),
+        evidence=len(state["evidence"]),
+    )
+    return state, usage
