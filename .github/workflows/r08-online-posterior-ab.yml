@@ -1,0 +1,216 @@
+name: R08 online posterior A/B
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/posterior_reconstruction.py
+      - src/system_one_probability_frontier.py
+      - fixtures/research/r07-websocket-cc-reference.json
+      - .github/workflows/r08-online-posterior-ab.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QUERY: Help me optimize the websocket connection implementation
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  FILE_PATH: crates/nession-agent/src/server/websocket.rs
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  online-ab:
+    name: Sequential vs multi-scale online Phase0
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: BestNathan/nession
+          ref: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run online posterior A/B
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/r08
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("src").resolve()))
+
+          from system_one_code_locator import Trace
+          from system_one_probability_frontier import (
+              ProbabilityFrontierDecider,
+              phase0_probability_frontier,
+          )
+
+          root = Path("subject")
+          source_path = os.environ["FILE_PATH"]
+          line_count = sum(
+              1 for _ in (root / source_path).open("r", encoding="utf-8")
+          )
+
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ):
+              out = Path("artifacts/r08") / estimator
+              out.mkdir(parents=True, exist_ok=True)
+              trace = Trace(out / "trace.jsonl")
+              decider = ProbabilityFrontierDecider(
+                  os.environ["TYPESAFE_API_KEY"],
+                  trace,
+                  os.environ["TYPESAFE_API_URL"],
+                  os.environ["TYPESAFE_MODEL"],
+              )
+
+              started = time.perf_counter()
+              result, usage = phase0_probability_frontier(
+                  root,
+                  os.environ["QUERY"],
+                  source_path,
+                  line_count,
+                  decider,
+                  sample_lines=8,
+                  max_epochs=40,
+                  max_actions=16,
+                  max_batch=4,
+                  probability_threshold=None,
+                  max_total_probes=32,
+                  respect_stop=False,
+                  posterior_estimator=estimator,
+              )
+              result["query"] = os.environ["QUERY"]
+              result["model"] = os.environ["TYPESAFE_MODEL"]
+              result["subject"] = {
+                  "repository": os.environ["SUBJECT_REPOSITORY"],
+                  "revision": os.environ["SUBJECT_SHA"],
+                  "path": source_path,
+              }
+              result["usage"] = usage
+              result["elapsed_ms"] = round(
+                  (time.perf_counter() - started) * 1000.0,
+                  3,
+              )
+              (out / "run.json").write_text(
+                  json.dumps(result, indent=2, ensure_ascii=False) + "\n",
+                  encoding="utf-8",
+              )
+              print(estimator, {
+                  "probes": result["probes"],
+                  "usage": usage,
+                  "elapsed_ms": result["elapsed_ms"],
+              })
+          PY
+
+      - name: Evaluate both online trajectories
+        run: |
+          set -euo pipefail
+          for estimator in sequential_exponential multi_scale_gaussian; do
+            python3 src/probability_frontier_benchmark.py               --reference fixtures/research/r07-websocket-cc-reference.json               --run "artifacts/r08/$estimator/run.json"               --checkpoints 4,8,12,16,24,32               --high-threshold 0.70               --output-json "artifacts/r08/$estimator/convergence.json"               --output-markdown "artifacts/r08/$estimator/convergence.md"
+          done
+
+      - name: Build A/B summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+
+          names = [
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ]
+          reports = {
+              name: json.load(
+                  open(f"artifacts/r08/{name}/convergence.json")
+              )
+              for name in names
+          }
+          runs = {
+              name: json.load(
+                  open(f"artifacts/r08/{name}/run.json")
+              )
+              for name in names
+          }
+
+          print("# R08 online posterior A/B")
+          print("")
+          print("| estimator | probes | unique lines | MAE | Pearson | Spearman | JS | calls | input tokens |")
+          print("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+          for name in names:
+              final = reports[name]["final"]
+              run = runs[name]
+              print(
+                  f"| {name} | {run['probes']} | "
+                  f"{final['sampled_source_lines']} | "
+                  f"{final['mae']:.4f} | "
+                  f"{final['pearson']:.4f} | "
+                  f"{final['spearman']:.4f} | "
+                  f"{final['js_divergence']:.4f} | "
+                  f"{run['usage']['model_calls']} | "
+                  f"{run['usage']['input_tokens']} |"
+              )
+
+          print("")
+          print("## Checkpoint Pearson")
+          print("")
+          print("| probes | sequential | multi-scale |")
+          print("| ---: | ---: | ---: |")
+          left = reports["sequential_exponential"]["checkpoints"]
+          right = reports["multi_scale_gaussian"]["checkpoints"]
+          for a, b in zip(left, right):
+              print(
+                  f"| {a['probes']} | {a['pearson']:.4f} | "
+                  f"{b['pearson']:.4f} |"
+              )
+
+          print("")
+          print("## Probe trajectories")
+          print("")
+          for name in names:
+              print(f"### {name}")
+              print("")
+              for row in runs[name]["history"]:
+                  if row["epoch"] == 0:
+                      actions = row["actions"]
+                  else:
+                      actions = row["policy"].get(
+                          "selected_actions",
+                          [],
+                      )
+                  ranges = ", ".join(
+                      f"{a['start_line']}-{a['end_line']}"
+                      for a in actions
+                  )
+                  print(f"- epoch {row['epoch']}: {ranges}")
+              print("")
+          PY
+
+      - name: Upload R08 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: r08-online-posterior-ab-${{ github.run_id }}
+          path: artifacts/r08/
+          if-no-files-found: error
+          retention-days: 90
