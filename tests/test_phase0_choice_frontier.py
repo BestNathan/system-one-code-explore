@@ -32,7 +32,7 @@ class Phase0ChoiceTests(unittest.TestCase):
             candidate = {
                 "id": "f1",
                 "score": 0.9,
-                "payload": {"path": "demo.rs"},
+                "payload": {"path": "demo.rs", "extension": ".rs"},
             }
             state = new_file_state(root, candidate, 24)
             trace = DummyTrace()
@@ -63,7 +63,7 @@ class Phase0ChoiceTests(unittest.TestCase):
             candidate = {
                 "id": "f1",
                 "score": 0.9,
-                "payload": {"path": "demo.rs"},
+                "payload": {"path": "demo.rs", "extension": ".rs"},
             }
             state = new_file_state(root, candidate, 24)
             trace = DummyTrace()
