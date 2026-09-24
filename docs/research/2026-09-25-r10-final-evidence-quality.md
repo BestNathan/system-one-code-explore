@@ -2,7 +2,7 @@
 
 ## Status
 
-Current parallel research iteration.
+Completed for the first fixed evidence-selection policy.
 
 ## Question
 
@@ -58,3 +58,22 @@ The artifact also contains the literal final source snippets for qualitative ins
 R10 is parallel to R09, not a replacement.
 
 If final evidence is precise but low recall, the next stage should expand/follow good evidence. If precision is poor, Phase0 search/scoring is still the dominant problem. If both are strong, the next experiment should feed only these snippets into a downstream System 2 task and measure answer/edit quality directly.
+
+
+## Result
+
+Workflow run `36026211113` completed all 12 evidence jobs and the aggregate.
+
+Across all cases, sequential final evidence had mean CC relevance 0.6825 and
+66.6% high-line precision; multi-scale had 0.6441 and 59.5%.
+
+The catalog case is reference-degenerate. On the two discriminative holdouts,
+sequential selected evidence averaged 0.6237 CC relevance with 49.9% high-line
+precision, versus 0.5544 / 39.2% for multi-scale.
+
+The literal snippets confirm that Phase0 frequently lands on excellent concrete
+evidence, including reconnect state flags and lifecycle tests, but also retains
+clear false positives. Therefore a downstream evidence-selection/closure stage
+remains useful even after Phase0 search improves.
+
+See `docs/experiments/r10-final-evidence-results-2026-09-25.md`.
