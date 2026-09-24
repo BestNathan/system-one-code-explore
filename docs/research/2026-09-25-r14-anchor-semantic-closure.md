@@ -140,3 +140,65 @@ The most important R14 criterion is:
 
 A later hidden System2 audit is still required before treating System One's
 self-reported completeness as ground truth.
+
+
+## Canonical diagnostic result
+
+Canonical workflow: `36041935061`.
+
+R14 was intentionally evaluated only on the two discriminative holdouts
+(reconnect and full-stack), excluding the known degenerate catalog case.
+
+Anchor-centered closure substantially reduced runaway expansion:
+
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| source fraction | 8.8% | 2.5% |
+| high-line precision | 0.671 | 0.500 |
+| high-line recall | 0.230 | 0.075 |
+| mean anchor span | 37 lines | 33 lines |
+| max anchor span | 80 lines | 56 lines |
+| mean anchor growth | 1.16x | 1.04x |
+
+So binding closure to anchors fixed the giant-region pathology.
+
+However it overcorrected. Hidden-reference premature-stop rate returned to
+100%. Representative cases show two new issues.
+
+### Standalone completeness is internally inconsistent
+
+For reconnect/sequential, one anchor expanded from a 32-line seed to six tiles.
+Directional expansion probability eventually fell below threshold:
+
+- need-before about 0.43;
+- need-after about 0.31.
+
+Yet the standalone completeness score remained only about 0.58.
+
+This means "is the fragment complete?" is less operationally reliable than the
+two directional questions "do I still need source before/after?".
+
+### Utility must not gate closure before the fragment is complete
+
+In full-stack/sequential, selected source averaged hidden CC relevance about
+0.84, yet post-read System One utility fell below 0.65 and anchors were marked
+low-utility before closure could finish.
+
+A truncated fragment can look low-utility precisely because the code needed to
+understand it is outside the current range. Therefore utility before closure is
+not a safe stopping gate.
+
+### R14 conclusion
+
+R14 establishes two stronger design rules:
+
+1. semantic closure must be anchor-local;
+2. closure should be driven by directional continuation needs, not a separate
+   scalar completeness score.
+
+The next runtime should also move coverage out of model discretion: high-value
+Phase0 frontier regions should create explicit coverage obligations, while
+System One decides representative source and local closure.
+
+Pinned aggregate:
+`fixtures/research/r14-anchor-semantic-closure-aggregate.json`.
