@@ -15,6 +15,7 @@ import random
 
 from system_one_code_locator import empty_usage, merge_usage, read_range, sanitize_source
 from system_one_relevance_frontier import ClosureChoiceRelevanceFrontierDecider
+from posterior_reconstruction import reconstruct as reconstruct_posterior
 
 HEX = "0123456789abcdef"
 
@@ -112,6 +113,47 @@ def update_probability_frontier(
         "end_line": right,
         "score": score,
     })
+
+
+def append_probability_sample(frontier, start_line, end_line, score):
+    """Append durable evidence without choosing a posterior implementation."""
+    n = int(frontier["line_count"])
+    left = max(1, int(start_line))
+    right = min(n, int(end_line))
+    score = min(1.0, max(0.0, float(score)))
+
+    frontier["samples"].append({
+        "start_line": left,
+        "end_line": right,
+        "score": score,
+    })
+    for line in range(left, right + 1):
+        frontier["observed"][line - 1] = True
+
+
+def rebuild_probability_frontier(
+    frontier,
+    *,
+    estimator,
+    sample_lines,
+):
+    """Recompute relevance/uncertainty from durable observations.
+
+    Path-independent estimators no longer depend on the order in which the
+    current field happened to be mutated. The sequential estimator remains
+    available as a historical baseline and deterministically replays the same
+    sample order.
+    """
+    posterior = reconstruct_posterior(
+        estimator,
+        frontier["samples"],
+        int(frontier["line_count"]),
+        sample_lines=int(sample_lines),
+    )
+    frontier["relevance"] = list(posterior["relevance"])
+    frontier["uncertainty"] = list(posterior["uncertainty"])
+    frontier["posterior_estimator"] = posterior["name"]
+    return posterior
 
 
 def _micro_range(center, line_count, width):
@@ -422,6 +464,7 @@ def phase0_probability_frontier(
     probability_threshold=None,
     max_total_probes=24,
     respect_stop=True,
+    posterior_estimator="sequential_exponential",
 ):
     """Build a whole-file relevance probability frontier."""
     frontier = new_probability_frontier(line_count)
@@ -442,11 +485,16 @@ def phase0_probability_frontier(
     scores, current = decider.score_probe_observations(goal, path, frontier, observations)
     merge_usage(usage, current)
     for action, observation, score in zip(bootstrap, observations, scores):
-        update_probability_frontier(
+        append_probability_sample(
             frontier,
             observation["start_line"],
             observation["end_line"],
             score,
+        )
+        rebuild_probability_frontier(
+            frontier,
+            estimator=posterior_estimator,
+            sample_lines=sample_lines,
         )
         total_probes += 1
         snapshots.append(snapshot_frontier(frontier, total_probes, usage))
@@ -492,11 +540,16 @@ def phase0_probability_frontier(
         )
         merge_usage(usage, current)
         for action, observation, score in zip(policy["selected_actions"], observations, scores):
-            update_probability_frontier(
+            append_probability_sample(
                 frontier,
                 observation["start_line"],
                 observation["end_line"],
                 score,
+            )
+            rebuild_probability_frontier(
+                frontier,
+                estimator=posterior_estimator,
+                sample_lines=sample_lines,
             )
             total_probes += 1
             snapshots.append(snapshot_frontier(frontier, total_probes, usage))
@@ -514,4 +567,5 @@ def phase0_probability_frontier(
         "probes": total_probes,
         "sample_lines": sample_lines,
         "respect_stop": bool(respect_stop),
+        "posterior_estimator": posterior_estimator,
     }, usage
