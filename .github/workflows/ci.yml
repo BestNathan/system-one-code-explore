@@ -17,3 +17,7 @@ jobs:
           python-version: "3.13"
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -v
+      - name: Replay R07 posterior benchmark
+        run: |
+          python3 src/posterior_reconstruction_benchmark.py             --trajectory fixtures/research/r07-websocket-v5b-trajectory.json             --reference fixtures/research/r07-websocket-cc-reference.json             --output-json /tmp/r07-posterior.json             --output-markdown /tmp/r07-posterior.md
+          cat /tmp/r07-posterior.md >> "$GITHUB_STEP_SUMMARY"
