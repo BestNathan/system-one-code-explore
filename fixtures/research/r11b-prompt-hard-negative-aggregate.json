@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "r11b-system-one-prompt-hard-negative-aggregate",
+  "run_id": 36027079823,
+  "cases": 6,
+  "benchmark_status": "diagnostic-only",
+  "benchmark_warning": "Narrow goals successfully create same-file hard negatives, but projecting overlapping 64-line CC window scores down to 8-line TARGET labels creates fine-grained label leakage. R11C replaces these labels with direct full-read teacher micro-block scores.",
+  "case_geometry": {
+    "broker_pending_timeout": {"high":10,"mid":10,"low":4},
+    "broker_stale_generation": {"high":10,"mid":10,"low":1},
+    "extension_duplicate_routes": {"high":10,"mid":10,"low":8},
+    "extension_runtime_dispatch": {"high":6,"mid":8,"low":10},
+    "git_cwd_security": {"high":10,"mid":10,"low":8},
+    "git_typed_decode": {"high":10,"mid":10,"low":0}
+  },
+  "prompts": {
+    "generic_relevance": {
+      "pearson": 0.5618286956707406,
+      "spearman": 0.6444164965439886,
+      "high_vs_rest_auc": 0.7664305755972421,
+      "precision_at_high_count": 0.6222222222222222,
+      "brier_high_label": 0.18519176587301586,
+      "mean_high_probability": 0.4313888888888889,
+      "mean_mid_probability": 0.24966666666666668,
+      "mean_low_probability": 0.07869999999999999,
+      "high_low_separation": 0.3411666666666667
+    },
+    "material_evidence": {
+      "pearson": 0.48407710024220596,
+      "spearman": 0.5906841063757954,
+      "high_vs_rest_auc": 0.737962962962963,
+      "precision_at_high_count": 0.5944444444444444,
+      "brier_high_label": 0.20389400793650791,
+      "mean_high_probability": 0.38516666666666666,
+      "mean_mid_probability": 0.246375,
+      "mean_low_probability": 0.08349999999999999,
+      "high_low_separation": 0.2831
+    },
+    "mechanism_match": {
+      "pearson": 0.48657795363509143,
+      "spearman": 0.5777859137495084,
+      "high_vs_rest_auc": 0.7240616482283149,
+      "precision_at_high_count": 0.5777777777777777,
+      "brier_high_label": 0.2043675992063492,
+      "mean_high_probability": 0.3878888888888889,
+      "mean_mid_probability": 0.23925,
+      "mean_low_probability": 0.06955,
+      "high_low_separation": 0.30391666666666667
+    },
+    "minimal_evidence_keep": {
+      "pearson": 0.4726396348159884,
+      "spearman": 0.5988339029451772,
+      "high_vs_rest_auc": 0.7386928811928812,
+      "precision_at_high_count": 0.5499999999999999,
+      "brier_high_label": 0.21116944444444444,
+      "mean_high_probability": 0.34694444444444444,
+      "mean_mid_probability": 0.235375,
+      "mean_low_probability": 0.09345,
+      "high_low_separation": 0.24728333333333335
+    },
+    "counterfactual_answer_impact": {
+      "pearson": 0.42148870390674115,
+      "spearman": 0.5066240494303947,
+      "high_vs_rest_auc": 0.6793542568542569,
+      "precision_at_high_count": 0.5166666666666666,
+      "brier_high_label": 0.2146039880952381,
+      "mean_high_probability": 0.37655555555555553,
+      "mean_mid_probability": 0.30091666666666667,
+      "mean_low_probability": 0.13655,
+      "high_low_separation": 0.23991666666666664
+    }
+  }
+}
