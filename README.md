@@ -148,7 +148,20 @@ The long-term question is not whether a System One model can read code. It is:
 
 > How strong can a harness become when it progressively discloses state and legal actions, while a fast System One model only chooses how to advance the state machine?
 
-See [ROADMAP.md](ROADMAP.md) and [docs/research-summary.md](docs/research-summary.md).
+The project is currently in an intentionally unstable research phase. Research
+iterations may land directly on `main`; preserving a clean API is less
+important than preserving the reasoning and evidence behind each iteration.
+
+The durable research history lives in
+[docs/research/README.md](docs/research/README.md). Every meaningful research
+iteration should record its question, hypothesis, experiment path, result,
+rejected ideas, and next direction there.
+
+Raw experiment reports remain under `docs/experiments/`.
+
+See [ROADMAP.md](ROADMAP.md),
+[docs/research/README.md](docs/research/README.md), and
+[docs/research-summary.md](docs/research-summary.md).
 
 
 ## Full-read Claude reference baseline
