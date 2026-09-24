@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "kind": "r10-final-evidence-quality-aggregate",
+  "source_run": 36004833542,
+  "r10_run": 36026211113,
+  "runs": 12,
+  "estimators": {
+    "multi_scale_gaussian": {
+      "mean_reference_relevance": 0.6441145833333334,
+      "high_line_precision": 0.5946180555555556,
+      "high_line_recall": 0.10862675473447225,
+      "weighted_relevance_recall": 0.10544735023754707,
+      "oracle_ratio_high_recall": 0.5946180555555556,
+      "oracle_ratio_precision": 0.6998379754811653
+    },
+    "sequential_exponential": {
+      "mean_reference_relevance": 0.6824739583333334,
+      "high_line_precision": 0.665798611111111,
+      "high_line_recall": 0.12893925473447224,
+      "weighted_relevance_recall": 0.11216848856209675,
+      "oracle_ratio_high_recall": 0.665798611111111,
+      "oracle_ratio_precision": 0.7407677226313831
+    }
+  },
+  "discriminative_holdouts_only": {
+    "excluded": "protocol_catalog_consistency because the reference is all-high/core",
+    "sequential_exponential": {
+      "mean_reference_relevance": 0.6236588542,
+      "high_line_precision": 0.4986979167,
+      "high_line_recall": 0.1361979167,
+      "weighted_relevance_recall": 0.1115077565,
+      "oracle_ratio_mean_reference_relevance": 0.68556,
+      "oracle_ratio_high_recall": 0.4986979167
+    },
+    "multi_scale_gaussian": {
+      "mean_reference_relevance": 0.5544010417,
+      "high_line_precision": 0.3919270833,
+      "high_line_recall": 0.1057291667,
+      "weighted_relevance_recall": 0.099763815,
+      "oracle_ratio_mean_reference_relevance": 0.6117,
+      "oracle_ratio_high_recall": 0.3919270833
+    }
+  },
+  "per_case_two_repeat_mean": {
+    "full_stack_command_lifecycle": {
+      "sequential_exponential": {
+        "mean_reference_relevance": 0.6772,
+        "high_line_precision": 0.4167,
+        "high_line_recall": 0.1562,
+        "weighted_relevance_recall": 0.1286
+      },
+      "multi_scale_gaussian": {
+        "mean_reference_relevance": 0.6549,
+        "high_line_precision": 0.3125,
+        "high_line_recall": 0.1172,
+        "weighted_relevance_recall": 0.1243
+      }
+    },
+    "protocol_catalog_consistency": {
+      "reference_degenerate_all_high": true,
+      "sequential_exponential": {
+        "mean_reference_relevance": 0.8001,
+        "high_line_precision": 1.0,
+        "high_line_recall": 0.1144,
+        "weighted_relevance_recall": 0.1135
+      },
+      "multi_scale_gaussian": {
+        "mean_reference_relevance": 0.8235,
+        "high_line_precision": 1.0,
+        "high_line_recall": 0.1144,
+        "weighted_relevance_recall": 0.1168
+      }
+    },
+    "reconnect_lifecycle": {
+      "sequential_exponential": {
+        "mean_reference_relevance": 0.5701,
+        "high_line_precision": 0.5807,
+        "high_line_recall": 0.1161,
+        "weighted_relevance_recall": 0.0945
+      },
+      "multi_scale_gaussian": {
+        "mean_reference_relevance": 0.4539,
+        "high_line_precision": 0.4714,
+        "high_line_recall": 0.0943,
+        "weighted_relevance_recall": 0.0752
+      }
+    }
+  }
+}
