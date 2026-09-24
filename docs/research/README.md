@@ -36,27 +36,34 @@ that changes our understanding should be linked from a research record.
 | R03 | [Full-read System 2 reference field](2026-09-24-r03-full-read-system2-reference.md) | active benchmark | A fixed CC full-read relevance field gives us a distribution-level target instead of only final evidence overlap. |
 | R04 | [Choice policy and evidence closure](2026-09-24-r04-choice-and-evidence-closure.md) | retained partially | Choice is appropriate for policy selection; isolated fine-fragment keep/drop is not. |
 | R05 | [Sparse Phase0 sensing](2026-09-24-r05-sparse-phase0.md) | superseded | Sparse reads are correct, but collapsing them into four coarse region scores destroys the global relevance shape. |
-| R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | current baseline | Phase0 should reconstruct a file-length relevance distribution from sparse observations. |
-| R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | next | The current bottleneck is samples -> whole-file frontier reconstruction, not local System One scoring. |
+| R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | baseline | Phase0 should reconstruct a file-length relevance distribution from sparse observations. |
+| R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | completed | Path-independent posterior reconstruction recovers much more of the local System One signal than sequential propagation. |
+| R08 | [Online posterior feedback and holdout generalization](2026-09-24-r08-online-posterior-generalization.md) | current | Test whether better offline posterior reconstruction improves active probing and generalizes beyond the websocket fixture. |
 
 ## Current research architecture
 
 ```text
-CC full-read System 2
+durable sparse observations
         |
         v
-reference relevance field over the whole file
-        ^
+PosteriorEstimator
         |
-compare every Phase0 checkpoint
-        |
-System One sparse observations
+        +--> relevance[N]
+        +--> uncertainty[N]
         |
         v
-whole-file probability frontier
+System One Choice over diverse legal probes
         |
         v
-probe policy / posterior reconstruction research
+new observations
+        |
+        +--------------------------+
+                                   |
+                                   v
+                            posterior recompute
+
+evaluation:
+  every checkpoint -> fixed System 2 full-read relevance field
 ```
 
 ## Repository workflow
@@ -67,5 +74,8 @@ During the research phase:
 - pull requests are not required for research iterations;
 - unstable APIs and implementation churn are acceptable;
 - `docs/research/` is the durable record of decisions and learning;
-- external benchmark/reference artifacts should be pinned by repository,
+- benchmark fixtures that define a research conclusion should be copied into
+  this repository when practical, rather than depend indefinitely on external
+  workflow artifacts;
+- external benchmark/reference provenance should still be pinned by repository,
   revision, workflow run, and model/runtime configuration.
