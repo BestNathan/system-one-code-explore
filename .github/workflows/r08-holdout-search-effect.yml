@@ -2,6 +2,15 @@ name: R08 holdout search effect
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/r08-holdout-search-effect.yml"
+      - "src/search_effect_benchmark.py"
+      - "tests/test_search_effect_benchmark.py"
+      - "docs/research/2026-09-24-r08-online-posterior-generalization.md"
+      - "docs/experiments/r08-holdout-search-effect-2026-09-24.md"
   pull_request:
     branches:
       - main
@@ -23,6 +32,7 @@ env:
 
 jobs:
   references:
+    if: github.event_name != 'pull_request'
     name: Reference / ${{ matrix.case.id }}
     runs-on: ubuntu-24.04
     environment: ds
