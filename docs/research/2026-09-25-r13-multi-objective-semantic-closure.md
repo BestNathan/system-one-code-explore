@@ -224,3 +224,42 @@ simply lowering the global acquisition threshold.
 
 H4: if high-frontier coverage still collapses, the problem is upstream
 calibration of Phase0 or the coverage prompt, not semantic closure.
+
+
+## Canonical result
+
+Canonical workflow: `36041221078`.
+
+R13 increased coverage and recall substantially versus R12, but at high source
+and token cost.
+
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| source fraction | 61.5% | 48.3% |
+| mean CC relevance | 0.691 | 0.611 |
+| high-line precision | 0.620 | 0.597 |
+| high-line recall | 0.667 | 0.544 |
+| weighted relevance recall | 0.673 | 0.503 |
+| mean final region lines | 661 | 666 |
+| mean final System1 completeness | 0.193 | 0.215 |
+| mean input tokens | 403k | 173k |
+
+The three-objective split reduced R12's immediate post-evidence collapse, but
+merged-region semantic closure produced a new failure: adjacent acquired tiles
+formed large mixed regions and completeness stayed low while the runtime kept
+expanding.
+
+Representative failures:
+
+- reconnect/sequential grew a merged region to lines 1-1024 with final
+  completeness around 0.16;
+- full-stack/multi grew a region from 385 to 1120 with final completeness
+  around 0.28.
+
+Conclusion:
+
+> semantic completeness must attach to a specific evidence anchor/local code
+> unit, not to a merged region containing many constructs.
+
+Pinned aggregate:
+`fixtures/research/r13-multi-objective-semantic-closure-aggregate.json`.
