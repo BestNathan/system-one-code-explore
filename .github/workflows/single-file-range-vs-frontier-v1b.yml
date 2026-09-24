@@ -13,8 +13,8 @@ env:
   SUBJECT_REPOSITORY: BestNathan/nession
   SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
   FILE_PATH: crates/nession-server/src/server/handler.rs
-  TYPESAFE_MODEL: \${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
-  TYPESAFE_API_URL: \${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
 
 jobs:
   experiment:
@@ -45,7 +45,7 @@ jobs:
 
       - name: Run single-file controlled experiment
         env:
-          TYPESAFE_API_KEY: \${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || vars.TYPESAFE_API_KEY }}
         run: |
           set -euo pipefail
           test -n "$TYPESAFE_API_KEY"
@@ -350,7 +350,7 @@ jobs:
       - name: Upload experiment
         uses: actions/upload-artifact@v4
         with:
-          name: single-file-range-vs-frontier-v1b-\${{ github.run_id }}
+          name: single-file-range-vs-frontier-v1b-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 90
@@ -392,7 +392,7 @@ jobs:
       - name: Download experiment
         uses: actions/download-artifact@v4
         with:
-          name: single-file-range-vs-frontier-v1b-\${{ github.run_id }}
+          name: single-file-range-vs-frontier-v1b-${{ github.run_id }}
           path: artifacts
 
       - name: Prepare anonymous candidates
@@ -413,8 +413,8 @@ jobs:
       - name: Evaluate range
         working-directory: subject
         env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_MODEL: \${{ vars.CLAUDE_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
         run: |
           set -euo pipefail
           claude -p \
@@ -433,8 +433,8 @@ jobs:
       - name: Evaluate frontier
         working-directory: subject
         env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_MODEL: \${{ vars.CLAUDE_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
         run: |
           set -euo pipefail
           claude -p \
@@ -480,7 +480,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: single-file-range-vs-frontier-v1b-quality-\${{ github.run_id }}
+          name: single-file-range-vs-frontier-v1b-quality-${{ github.run_id }}
           path: artifacts/quality/
           if-no-files-found: error
           retention-days: 90
