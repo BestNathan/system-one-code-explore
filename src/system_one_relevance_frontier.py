@@ -1412,6 +1412,23 @@ class ChoiceRelevanceFrontierDecider(RelevanceFrontierDecider):
             action_id = f"a{index + 1}"
             action_by_id[action_id] = action
 
+        action_views = []
+        for action_id, action in action_by_id.items():
+            node = state["nodes"].get(action["node_id"])
+            action_views.append({
+                "id": action_id,
+                "kind": action["kind"],
+                "node_id": action["node_id"],
+                "range": (
+                    [node["start_line"], node["end_line"]]
+                    if node is not None
+                    else [1, state["line_count"]]
+                ),
+                "priority_hint": action["priority"],
+                "reason": action["reason"],
+                "source": action.get("source"),
+            })
+
         questions = {
             "next_action": {
                 "type": "choice",
@@ -1428,21 +1445,7 @@ class ChoiceRelevanceFrontierDecider(RelevanceFrontierDecider):
                         "expansion. Choose stop only when current evidence is "
                         "already sufficient."
                     ),
-                    "actions": [
-                        {
-                            "id": action_id,
-                            "kind": action["kind"],
-                            "node_id": action["node_id"],
-                            "range": [
-                                state["nodes"][action["node_id"]]["start_line"],
-                                state["nodes"][action["node_id"]]["end_line"],
-                            ],
-                            "priority_hint": action["priority"],
-                            "reason": action["reason"],
-                            "source": action.get("source"),
-                        }
-                        for action_id, action in action_by_id.items()
-                    ],
+                    "actions": action_views,
                 },
                 "criteria": {
                     action_id: (
