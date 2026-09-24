@@ -1527,37 +1527,71 @@ class OfflineChoiceRelevanceFrontierDecider(
         }, scores, empty_usage()
 
 
-def phase0_coarse_scan(root, goal, state, decider, trace, probe_lines):
+def coarse_sample_ranges(node, sample_lines):
+    start = int(node["start_line"])
+    end = int(node["end_line"])
+    width = max(1, min(int(sample_lines), end - start + 1))
+    middle = max(start, (start + end - width + 1) // 2)
+    ranges = [
+        ("coarse_head", start, min(end, start + width - 1)),
+        ("coarse_middle", middle, min(end, middle + width - 1)),
+        ("coarse_tail", max(start, end - width + 1), end),
+    ]
+    out = []
+    seen = set()
+    for kind, left, right in ranges:
+        key = (left, right)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((kind, left, right))
+    return out
+
+
+def phase0_coarse_scan(
+    root,
+    goal,
+    state,
+    decider,
+    trace,
+    probe_lines,
+):
     coarse = [
         node for node in frontier_leaves(state)
         if node["depth"] == 0
     ]
     executed = []
     for node in coarse:
-        action = make_probe_action(
-            node,
-            "coarse_probe",
-            100.0,
-            "phase0: establish the initial full-file coarse relevance field",
-        )
-        result = execute_action(
-            root,
-            state,
-            action,
-            probe_lines,
-        )
-        if result is not None:
-            executed.append(result)
+        for kind, start, end in coarse_sample_ranges(node, probe_lines):
+            observation = read_range(
+                root,
+                {
+                    "path": state["path"],
+                    "start_line": start,
+                    "end_line": end,
+                },
+            )
+            item = append_observation(
+                state,
+                node,
+                observation,
+                kind,
+            )
+            executed.append({
+                "node_id": node["id"],
+                "kind": kind,
+                "observation": item,
+            })
 
-    if len(executed) != len(coarse):
-        raise RuntimeError(
-            "phase0 coarse scan failed to observe every depth-0 region"
-        )
+    if not executed:
+        raise RuntimeError("phase0 coarse scan produced no observations")
 
     scores, usage = decider.score_frontier(goal, state)
     apply_scores(state, scores)
     state["phase0"] = {
         "kind": "coarse_scan",
+        "sampling": "head_middle_tail",
+        "sample_lines": int(probe_lines),
         "regions": [
             {
                 "id": node["id"],
@@ -1566,13 +1600,16 @@ def phase0_coarse_scan(root, goal, state, decider, trace, probe_lines):
             }
             for node in coarse
         ],
-        "all_regions_observed": True,
+        "all_regions_observed": all(
+            node["observation_ids"] for node in coarse
+        ),
         "reads": len(executed),
     }
     trace.emit(
         "relevance_frontier_phase0_completed",
         path=state["path"],
         regions=state["phase0"]["regions"],
+        sampling=state["phase0"]["sampling"],
         reads=len(executed),
     )
     return usage
