@@ -21,7 +21,7 @@ env:
 
 jobs:
   evidence:
-    name: Evidence / \${{ matrix.case.id }} / r\${{ matrix.repeat }} / \${{ matrix.estimator }}
+    name: Evidence / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -39,18 +39,18 @@ jobs:
           - id: full_stack_command_lifecycle
             path: crates/nession-server/tests/integration/full_stack.rs
     env:
-      CASE_ID: \${{ matrix.case.id }}
-      FILE_PATH: \${{ matrix.case.path }}
-      REPEAT: \${{ matrix.repeat }}
-      ESTIMATOR: \${{ matrix.estimator }}
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      REPEAT: ${{ matrix.repeat }}
+      ESTIMATOR: ${{ matrix.estimator }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Checkout frozen subject
         uses: actions/checkout@v4
         with:
-          repository: \${{ env.SUBJECT_REPOSITORY }}
-          ref: \${{ env.SUBJECT_SHA }}
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
           path: subject
           fetch-depth: 1
           persist-credentials: false
@@ -58,18 +58,18 @@ jobs:
       - name: Download canonical R08 reference
         uses: actions/download-artifact@v4
         with:
-          name: r08-holdout-reference-\${{ matrix.case.id }}
+          name: r08-holdout-reference-${{ matrix.case.id }}
           path: artifacts/reference
-          github-token: \${{ github.token }}
-          run-id: \${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
 
       - name: Download canonical R08 Phase0 trajectory
         uses: actions/download-artifact@v4
         with:
-          name: r08-holdout-result-\${{ matrix.case.id }}-repeat-\${{ matrix.repeat }}
+          name: r08-holdout-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
           path: artifacts/run
-          github-token: \${{ github.token }}
-          run-id: \${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
 
       - uses: actions/setup-python@v5
         with:
@@ -92,7 +92,7 @@ jobs:
       - name: Upload evidence result
         uses: actions/upload-artifact@v4
         with:
-          name: r10-evidence-\${{ matrix.case.id }}-r\${{ matrix.repeat }}-\${{ matrix.estimator }}
+          name: r10-evidence-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}
           path: artifacts/out/
           if-no-files-found: error
           retention-days: 90
@@ -165,6 +165,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: r10-final-evidence-aggregate-\${{ github.run_id }}
+          name: r10-final-evidence-aggregate-${{ github.run_id }}
           path: aggregate.json
           retention-days: 90
