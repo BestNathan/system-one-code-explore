@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "r08-frontier-uncertainty-diagnostic",
+  "source_run": 36004833542,
+  "paired_runs": 6,
+  "mean_source_coverage_final": 0.0852166138562937,
+  "sequential_exponential": {
+    "mean_unobserved_uncertainty_after_4_probes": 0.8623324383345294,
+    "mean_unobserved_uncertainty_final": 0.483994399327397,
+    "mean_observed_uncertainty_final": 0.19155695786866014,
+    "unobserved_to_observed_ratio_final": 2.526635501832648
+  },
+  "multi_scale_gaussian": {
+    "mean_unobserved_uncertainty_after_4_probes": 0.36815041951804,
+    "mean_unobserved_uncertainty_final": 0.08568213149825499,
+    "mean_observed_uncertainty_final": 0.08144430309540093,
+    "unobserved_to_observed_ratio_final": 1.052034719944661
+  },
+  "runs": [
+    {"case":"protocol_catalog_consistency","repeat":1,"sequential_unobserved_final":0.4519354973518474,"multi_scale_unobserved_final":0.0889059846768505},
+    {"case":"protocol_catalog_consistency","repeat":2,"sequential_unobserved_final":0.44465000080256056,"multi_scale_unobserved_final":0.09022247996771939},
+    {"case":"reconnect_lifecycle","repeat":1,"sequential_unobserved_final":0.5035075580851017,"multi_scale_unobserved_final":0.07193414809357755},
+    {"case":"reconnect_lifecycle","repeat":2,"sequential_unobserved_final":0.5088133287458568,"multi_scale_unobserved_final":0.06820470291680872},
+    {"case":"full_stack_command_lifecycle","repeat":1,"sequential_unobserved_final":0.4881579719081344,"multi_scale_unobserved_final":0.09328600505272686},
+    {"case":"full_stack_command_lifecycle","repeat":2,"sequential_unobserved_final":0.506902039070881,"multi_scale_unobserved_final":0.10153946828184691}
+  ]
+}
