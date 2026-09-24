@@ -16,7 +16,7 @@ R11C fixes the teacher, not the student prompt.
 For each narrow-goal case:
 
 - target width: 8 lines;
-- target stride: 16 lines;
+- target stride: 8 lines (non-overlapping exhaustive coverage);
 - System 2 sees the COMPLETE file;
 - System 2 sees every exact TARGET id/range;
 - it scores each exact TARGET itself;
@@ -69,3 +69,17 @@ R11C may select a prompt candidate only.
 
 The selected prompt must be frozen and tested later on unseen files/goals
 before it is promoted into Phase0.
+
+
+## Exhaustive-coverage correction
+
+An initial execution used 8-line targets with stride 16. That left half of the
+source uncovered and, on the sparse `extension_runtime_dispatch` goal, could
+miss the exact dispatch implementation between sampled blocks.
+
+That execution is superseded.
+
+The canonical R11C design uses **8-line targets with stride 8**, tiling the
+entire file without gaps. This matches the intended "score all code fragments"
+benchmark and prevents sparse mechanisms from disappearing due to sampling
+alignment.
