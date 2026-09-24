@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "r12-noul-phase0-coupling-diagnostic",
+  "canonical_run": 36036234247,
+  "observation": "First-round Noul probability is strongly coupled to Phase0 mean relevance, while second-round probabilities collapse after evidence feedback.",
+  "first_round_noul_vs_phase0_mean_relevance_pearson": {
+    "catalog_r1_multi": 0.957,
+    "catalog_r1_sequential": 0.883,
+    "catalog_r2_multi": 0.909,
+    "catalog_r2_sequential": 0.818,
+    "fullstack_r1_multi": 0.977,
+    "fullstack_r1_sequential": 0.863,
+    "fullstack_r2_multi": 0.941,
+    "fullstack_r2_sequential": 0.904,
+    "reconnect_r1_multi": 0.950,
+    "reconnect_r1_sequential": 0.951,
+    "reconnect_r2_multi": 0.928,
+    "reconnect_r2_sequential": 0.934
+  },
+  "representative_runs": {
+    "reconnect_r1_sequential": {
+      "round_1_selected": 9,
+      "round_1_max_noul": 0.69,
+      "round_2_selected": 0,
+      "round_2_max_noul": 0.58,
+      "hidden_best_remaining_cc_mean": 0.95,
+      "hidden_remaining_high_tiles": 22
+    },
+    "fullstack_r1_multi": {
+      "round_1_selected": 7,
+      "round_1_max_noul": 0.69,
+      "round_2_selected": 0,
+      "round_2_max_noul": 0.54,
+      "hidden_best_remaining_cc_mean": 0.88,
+      "hidden_remaining_high_tiles": 10
+    },
+    "reconnect_r1_multi": {
+      "round_1_selected": 0,
+      "round_1_max_noul": 0.57,
+      "hidden_best_remaining_cc_mean": 0.95,
+      "hidden_remaining_high_tiles": 30
+    },
+    "catalog_r1_multi": {
+      "round_1_selected": 48,
+      "round_1_max_noul": 0.75,
+      "round_2_selected": 0,
+      "round_2_max_noul": 0.50,
+      "hidden_best_remaining_cc_mean": 0.80,
+      "hidden_remaining_high_tiles": 5
+    }
+  }
+}
