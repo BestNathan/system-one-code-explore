@@ -138,158 +138,51 @@ that change starts a new research iteration with a new evaluation split.
 
 
 ## Execution provenance
+## Canonical execution
 
-References were generated once and then pinned into this repository:
+The experiment was rerun after the new
+`BestNathan/system-one-code-explore` repository's `ds` environment was
+configured.
 
-- reference executor: `BestNathan/narness-engineering` workflow run `35990577401`;
-- online paired search run: `BestNathan/system-one-code-explore` workflow run `35991332346`;
-- durable machine-readable summary:
-  `fixtures/research/r08-holdout-search-effect-summary.json`;
-- pinned references:
-  - `fixtures/research/r08-holdout-reconnect_lifecycle-reference.json`;
-  - `fixtures/research/r08-holdout-protocol_catalog_consistency-reference.json`;
-  - `fixtures/research/r08-holdout-full_stack_command_lifecycle-reference.json`.
+Canonical execution:
 
-The reference executor used the existing `ds` environment and
-`deepseek-flash` through Claude Code. Once normalized, the references were
-copied into `fixtures/research/`; the online experiment consumed only those
-frozen fixtures.
+- workflow run: `36004833542`;
+- harness commit: `3b8a8a5273b6fe9ec91ea7e5753d91add46ec9df`;
+- reference runtime: Claude Code through the repository-local `ds` environment;
+- reference model: `deepseek-flash`;
+- online model: `jev-latest`;
+- all 3 reference jobs, all 6 paired online jobs, and aggregate job succeeded.
 
-## Aggregate result
+The workflow uses up to three generate/normalize attempts for a reference but
+accepts only a canonical 64-line / 32-line-stride field. In the canonical run,
+all three references validated on their first accepted attempt.
 
-Six paired online runs completed: three holdouts x two repeats. Each paired run
-executed the same fixed source-read budget for
-`sequential_exponential` and `multi_scale_gaussian`.
+An earlier migration-era execution used
+`BestNathan/narness-engineering#35990577401` as the reference executor and
+online run `35991332346`. That execution is retained as historical evidence
+but is **superseded** by `36004833542` because the new repository can now run
+the complete reference + online experiment itself.
 
-| metric | sequential | multi-scale | delta |
-| --- | ---: | ---: | ---: |
-| mean Pearson | 0.0815 | 0.2150 | +0.1334 |
-| mean MAE | 0.2113 | 0.2096 | -0.0017 |
-| final high-line recall | **0.0977** | 0.0741 | -0.0236 |
-| high-recall AUC / probe | **0.0431** | 0.0321 | -0.0110 |
-| weighted-recall AUC / probe | **0.0458** | 0.0413 | -0.0046 |
-| useful-probe rate | **0.5605** | 0.4824 | -0.0781 |
-| mean input tokens | **81,316.5** | 90,020.2 | +8,703.7 |
+## Canonical result
 
-Multi-scale wins across the three holdouts:
+The result is intentionally separated from this pre-registration document:
 
-- high-recall AUC: **0 / 3**;
-- weighted-recall AUC: **1 / 3**;
-- final high-line recall: **0 / 3**;
-- Pearson: 1 / 3;
-- MAE: 1 / 3.
+- `docs/experiments/r08-holdout-search-effect-results-2026-09-24.md`;
+- `fixtures/research/r08-holdout-search-effect-summary.json`;
+- `fixtures/research/r08-holdout-search-effect-aggregate.json`;
+- `fixtures/research/r08-frontier-uncertainty-diagnostic.json`.
 
-The primary search-effect hypothesis is therefore **not supported**.
+Headline:
 
-### Discriminative holdouts
+- multi-scale Pearson wins: **3/3 holdouts**;
+- multi-scale MAE wins: **2/3**;
+- multi-scale high-recall AUC wins: **0/3**;
+- multi-scale final high-line recall wins: **0/3**.
 
-On `reconnect_lifecycle`:
+Therefore the pre-registered search-effect hypothesis is **not supported**.
 
-| metric | sequential | multi-scale |
-| --- | ---: | ---: |
-| Pearson | **0.4873** | 0.4311 |
-| MAE | **0.2698** | 0.2858 |
-| final high recall | **0.1166** | 0.0865 |
-| high-recall AUC / probe | **0.0504** | 0.0354 |
-| weighted-recall AUC / probe | **0.0469** | 0.0353 |
-| useful-probe rate | **0.4167** | 0.3000 |
-
-Both repeats have the same search direction: sequential has higher high-recall
-AUC and useful-probe rate.
-
-On `full_stack_command_lifecycle`:
-
-| metric | sequential | multi-scale |
-| --- | ---: | ---: |
-| Pearson | **0.2300** | 0.2124 |
-| MAE | **0.1931** | 0.2269 |
-| final high recall | **0.0906** | 0.0500 |
-| high-recall AUC / probe | **0.0335** | 0.0156 |
-| weighted-recall AUC / probe | **0.0452** | 0.0426 |
-| useful-probe rate | **0.2647** | 0.1471 |
-
-One repeat is especially important: multi-scale produced a better local
-sample-score/reference correlation than sequential, yet still produced worse
-search recall. This separates **local relevance judgment** from the
-**exploration-policy state**.
-
-### Pre-registered degenerate holdout
-
-The `protocol_catalog_consistency` full-read reference scored all 52 canonical
-windows at >= 0.70 and marked every window as core. We did not replace the case
-after seeing this result.
-
-Consequences:
-
-- every source probe is a "useful" high-relevance probe;
-- final high-line recall is effectively source coverage;
-- high-recall search metrics cannot discriminate the policies.
-
-The case remains in the aggregate because removing it post hoc would violate
-the pre-registration. It is explicitly treated as a reference-degenerate
-control rather than evidence of search superiority.
-
-## Failure diagnosis: uncertainty collapse
-
-The strongest signal is not the relevance field. It is the semantics of the
-multi-scale uncertainty field.
-
-Across the two discriminative holdouts:
-
-| diagnostic | sequential | multi-scale |
-| --- | ---: | ---: |
-| reconnect mean uncertainty | 0.4523 | **0.0737** |
-| reconnect corr(uncertainty, distance-to-nearest-observation) | **+0.8793** | **-0.4083** |
-| reconnect missed-high lines with uncertainty <= 0.10 | 0% | **99.1%** |
-| full-stack mean uncertainty | 0.4489 | **0.0946** |
-| full-stack corr(uncertainty, distance-to-nearest-observation) | **+0.8787** | **-0.1674** |
-| full-stack missed-high lines with uncertainty <= 0.10 | 0% | **78.3%** |
-
-The uncertainty-driven probes show the same failure:
-
-- reconnect uncertainty-probe high-hit rate:
-  sequential 27.3%, multi-scale 15.4%;
-- full-stack uncertainty-probe high-hit rate:
-  sequential 31.3%, multi-scale 0%.
-
-The current adaptive Gaussian estimator derives bandwidth from distance to the
-k-th nearest observation and then derives uncertainty from Gaussian support.
-In sparse regions the bandwidth grows with observation distance. Normalized
-distance therefore stays small enough that distant observations still produce
-large support.
-
-This creates the wrong epistemic behavior:
-
-```text
-far from observations
-        ->
-larger adaptive bandwidth
-        ->
-apparently strong support
-        ->
-low "uncertainty"
-```
-
-The online action generator then treats that support-derived value as epistemic
-uncertainty and deprioritizes exactly the sparse regions that should remain
-uncertain.
-
-## Conclusion
-
-R07 and R08 Phase B demonstrated that a path-independent multi-scale estimator
-can reconstruct a relevance field better on a fixed trajectory / single online
-fixture.
-
-R08 Phase C shows that this does **not** imply better search.
-
-The current design incorrectly couples two distinct quantities:
-
-```text
-P(relevance | observations)
-epistemic uncertainty / need-to-observe
-```
-
-The next iteration must keep these concepts separate. R09 will hold the
-multi-scale relevance reconstruction fixed and change only the exploration
-uncertainty semantics. The three R08 holdouts become a diagnosis set only; no
-R09 generalization claim may be made from them.
+The canonical diagnostic indicates that the failure is not the relevance
+interpolator itself. The current multi-scale support-derived uncertainty
+collapses over unread source and is being used as if it were epistemic search
+uncertainty. R09 must separate those two state variables and use a fresh
+generalization split.
