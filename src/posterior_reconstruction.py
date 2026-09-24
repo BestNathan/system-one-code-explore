@@ -11,6 +11,8 @@ import math
 
 DEFAULT_PRIOR = 0.5
 DEFAULT_PRIOR_WEIGHT = 0.25
+DEFAULT_COVERAGE_DECAY_LINES = 48.0
+DEFAULT_OBSERVED_UNCERTAINTY = 0.03
 
 
 def sample_center(sample):
@@ -138,6 +140,102 @@ def adaptive_gaussian(
     }
 
 
+def coverage_uncertainty(
+    samples,
+    line_count,
+    *,
+    decay_lines=DEFAULT_COVERAGE_DECAY_LINES,
+    observed_uncertainty=DEFAULT_OBSERVED_UNCERTAINTY,
+):
+    """Conservative exploration uncertainty from distance to real observations.
+
+    This is intentionally independent of relevance interpolation. Adaptive
+    relevance kernels may widen in sparse areas, but widening a kernel must not
+    make an unread area look epistemically certain.
+
+    Distance is measured to the nearest *observed source range*, not to a
+    kernel center. Inside an observed range uncertainty is at least the
+    configured observed floor. Away from observations it rises monotonically
+    toward 1.0.
+    """
+    n = int(line_count)
+    if n <= 0:
+        return []
+
+    ranges = [
+        (
+            max(1, int(item["start_line"])),
+            min(n, int(item["end_line"])),
+        )
+        for item in samples
+    ]
+    if not ranges:
+        return [1.0] * n
+
+    scale = max(1.0, float(decay_lines))
+    floor = _clamp(float(observed_uncertainty), 0.0, 1.0)
+    amplitude = 1.0 - floor
+
+    out = []
+    for line in range(1, n + 1):
+        distance = min(
+            0
+            if left <= line <= right
+            else left - line
+            if line < left
+            else line - right
+            for left, right in ranges
+        )
+        uncertainty = 1.0 - amplitude * math.exp(-float(distance) / scale)
+        out.append(_clamp(uncertainty, floor, 1.0))
+    return out
+
+
+def multi_scale_gaussian_coverage_guard(
+    samples,
+    line_count,
+    *,
+    sample_lines=8,
+    prior=DEFAULT_PRIOR,
+    prior_weight=DEFAULT_PRIOR_WEIGHT,
+    coverage_decay_lines=DEFAULT_COVERAGE_DECAY_LINES,
+):
+    """Keep multi-scale relevance unchanged and guard exploration uncertainty.
+
+    R08 showed that adaptive Gaussian *support* uncertainty can collapse in
+    sparse regions because the bandwidth itself grows with observation
+    distance. That quantity is useful as interpolation support, but it is not
+    safe as the exploration policy's epistemic uncertainty.
+
+    The relevance vector remains exactly the existing multi-scale vector. The
+    uncertainty vector is only allowed to become as confident as both the
+    support estimator and direct observation geometry permit.
+    """
+    base = multi_scale_gaussian(
+        samples,
+        line_count,
+        sample_lines=sample_lines,
+        prior=prior,
+        prior_weight=prior_weight,
+    )
+    geometry = coverage_uncertainty(
+        samples,
+        line_count,
+        decay_lines=coverage_decay_lines,
+    )
+    return {
+        "name": "multi_scale_gaussian_k2_k4_coverage_guard",
+        "relevance": list(base["relevance"]),
+        "uncertainty": [
+            max(float(support_u), float(coverage_u))
+            for support_u, coverage_u in zip(
+                base["uncertainty"],
+                geometry,
+            )
+        ],
+    }
+
+
 def multi_scale_gaussian(
     samples,
     line_count,
@@ -235,6 +333,12 @@ def reconstruct(
             line_count,
             sample_lines=sample_lines,
         )
+    if estimator == "multi_scale_gaussian_coverage_guard":
+        return multi_scale_gaussian_coverage_guard(
+            samples,
+            line_count,
+            sample_lines=sample_lines,
+        )
     raise ValueError(f"unknown posterior estimator: {estimator}")
 
 
@@ -244,4 +348,5 @@ ESTIMATORS = (
     "adaptive_gaussian_k3",
     "adaptive_gaussian_k4",
     "multi_scale_gaussian",
+    "multi_scale_gaussian_coverage_guard",
 )
