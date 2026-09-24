@@ -36,7 +36,9 @@ def selected_lines(run):
 
 
 def latest_final_assessments(run):
-    """Return latest assessments keyed by exact final region range."""
+    """Return final region assessments, preferring the explicit final audit."""
+    if run.get("final_assessments"):
+        return list(run["final_assessments"])
     latest = {}
     for round_item in run.get("history", []):
         for item in round_item.get(
