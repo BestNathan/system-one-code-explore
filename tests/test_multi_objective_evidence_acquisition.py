@@ -174,6 +174,14 @@ class R13Tests(unittest.TestCase):
                         "after": 0.0,
                     }
                 },
+                {
+                    (33, 96): {
+                        "utility": 0.9,
+                        "complete": 0.95,
+                        "before": 0.1,
+                        "after": 0.0,
+                    }
+                },
             ],
         )
 
@@ -220,6 +228,14 @@ class R13Tests(unittest.TestCase):
                 },
             ],
             assessments=[
+                {
+                    (1, 32): {
+                        "utility": 0.9,
+                        "complete": 0.95,
+                        "before": 0.0,
+                        "after": 0.1,
+                    }
+                },
                 {
                     (1, 32): {
                         "utility": 0.9,
