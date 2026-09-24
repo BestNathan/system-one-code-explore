@@ -263,3 +263,142 @@ Only after the baseline is characterized:
 - feeding Phase1 observations back into the Phase0 posterior.
 
 R12 first tests whether independent Noul multi-select is the right phase shape.
+
+
+## Canonical Noul result
+
+Canonical workflow run: `36036234247`.
+
+All 12 dynamic runs and aggregate completed successfully.
+
+### Aggregate
+
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| mean selected tiles | 13.0 | 16.17 |
+| mean selected lines | 416 | 517 |
+| mean source fraction | 23.1% | 31.0% |
+| mean CC relevance | **0.6456** | 0.4107 |
+| high-line precision | **0.7731** | 0.4762 |
+| high-line recall | 0.2822 | **0.3486** |
+| weighted relevance recall | 0.2539 | **0.3190** |
+| same-budget oracle precision ratio | **0.7266** | 0.4914 |
+| premature-stop rate | **100%** | **100%** |
+| mean best remaining CC relevance | 0.9333 | 0.8833 |
+| safety-cap rate | 0% | 0% |
+
+Compared with the R10 fixed-six baseline, dynamic Noul acquisition clearly
+raises recall by allowing evidence count to grow with the task. Sequential
+high-line recall rises from 0.1289 to 0.2822; multi-scale rises from 0.1086 to
+0.3486.
+
+For sequential, precision also improves from 0.6658 to 0.7731. For multi-scale,
+precision drops from 0.5946 to 0.4762 because it materializes much more source
+and is more sensitive to the weaker Phase0 frontier on some holdouts.
+
+### The phase shape is useful, but stopping is not solved
+
+Every canonical run terminates via
+`all_remaining_below_threshold`; none reaches the safety cap.
+
+However **all 12 runs are premature stops** under the hidden CC diagnostic.
+The best remaining tile still has mean CC relevance around 0.88–0.93 on
+average.
+
+Representative examples:
+
+#### reconnect / sequential / repeat 1
+
+Round 1 selects 9 tiles. Eight of the nine are genuinely high-reference
+regions. High-line precision is 0.889 and mean CC relevance is 0.828.
+
+Round 2 then selects nothing:
+
+- max remaining Noul: 0.58;
+- threshold: 0.65;
+- hidden best remaining CC tile: 0.95;
+- hidden high-reference tiles still remaining: 22.
+
+#### full-stack / multi-scale / repeat 1
+
+Round 1 selects 7 tiles:
+
+- high-line precision: 0.857;
+- mean CC relevance: 0.84.
+
+Round 2:
+
+- max remaining Noul: 0.54;
+- hidden best remaining CC tile: 0.88;
+- 10 hidden high-reference tiles remain.
+
+#### reconnect / multi-scale / repeat 1
+
+The failure happens even earlier:
+
+- first-round max Noul: 0.57;
+- therefore zero tiles are read;
+- hidden best remaining CC tile: 0.95;
+- 30 hidden high-reference tiles remain.
+
+### First-round Noul is mostly a calibrated Phase0 threshold
+
+Across all 12 runs, first-round Noul probability has very high Pearson
+correlation with Phase0 mean relevance:
+
+- minimum observed correlation: about 0.818;
+- maximum: about 0.977;
+- most runs: about 0.90–0.95.
+
+So before any new source is materialized, R12 Noul is not discovering a new
+semantic signal. It is largely transforming the Phase0 probability frontier
+into a read-worthiness probability.
+
+That is expected because unread actions expose no source text. The only semantic
+prior available for an unread tile is the Phase0 frontier itself.
+
+### Second-round collapse
+
+The more important failure is what happens after evidence feedback.
+
+After one batch is materialized, Noul is asked for **new marginal evidence**.
+Scores then fall sharply across the remaining action space and frequently move
+below the fixed 0.65 threshold all at once.
+
+The hidden reference shows that this confidence is unjustified.
+
+Current interpretation:
+
+> the Noul multi-select state-machine shape is correct, but the scoring/stopping
+> semantics are over-aggressive after evidence feedback.
+
+The current 0.65 threshold should therefore not be interpreted as calibrated
+probability of useful remaining evidence.
+
+### R12 conclusion so far
+
+R12 improves on R10 in one important architectural sense:
+
+- evidence count is no longer fixed;
+- multiple high-value actions can be materialized in parallel;
+- the action space shrinks monotonically;
+- recall can grow substantially without forcing a fixed count.
+
+But it exposes a new calibration problem:
+
+```text
+Phase0 prior
+    -> first-round Noul ≈ calibrated Phase0 relevance
+    -> read a batch
+    -> evidence feedback
+    -> Noul scores collapse too aggressively
+    -> premature stop
+```
+
+The next R12 iteration should research the stopping/marginal-value signal
+itself rather than change action-space shape again.
+
+Pinned evidence:
+
+- `fixtures/research/r12-dynamic-evidence-aggregate.json`;
+- `fixtures/research/r12-noul-phase0-coupling-diagnostic.json`.
