@@ -62,10 +62,10 @@ def evaluate(reference, dynamic_run, high_threshold=0.70):
             "id": item["id"],
             "start_line": left,
             "end_line": right,
-            "choice_probability": float(
-                item["choice_probability"]
+            "noul_probability": float(
+                item["noul_probability"]
             ),
-            "choice_lift": float(item["choice_lift"]),
+            
             "phase0_mean_relevance": float(
                 item["phase0_mean_relevance"]
             ),
@@ -275,8 +275,8 @@ def render_markdown(result):
         lines.append(
             f"| {item['order']} | "
             f"{item['start_line']}-{item['end_line']} | "
-            f"{item['choice_probability']:.4f} | "
-            f"{item['choice_lift']:.2f} | "
+            f"{item['noul_probability']:.4f} | "
+            
             f"{item['phase0_mean_relevance']:.4f} | "
             f"{item['mean_relevance']:.4f} | "
             f"{item['high_fraction']:.4f} |"
