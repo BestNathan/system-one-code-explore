@@ -37,6 +37,16 @@ class ProbabilityFrontierV5Tests(unittest.TestCase):
         self.assertGreaterEqual(len(a), 8)
         starts = [x["start_line"] for x in a]
         self.assertGreater(max(starts) - min(starts), 1500)
+        kinds = {x["kind"] for x in a}
+        self.assertIn("random_stratified", kinds)
+        self.assertIn("uncertainty", kinds)
+        self.assertIn("gradient", kinds)
+        self.assertIn("peak_neighbor", kinds)
+
+        centers = sorted((x["start_line"] + x["end_line"]) // 2 for x in a)
+        self.assertTrue(
+            all(right - left >= 24 for left, right in zip(centers, centers[1:]))
+        )
 
     def test_choice_distribution_selects_multiple_probes(self):
         ids = ["p1", "p2", "p3", "p4"]
