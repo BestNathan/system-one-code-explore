@@ -48,6 +48,16 @@ class ProbabilityFrontierV5Tests(unittest.TestCase):
         )
         self.assertEqual(selected, ["p1", "p2"])
 
+    def test_choice_can_stop_when_no_probe_clears_threshold(self):
+        ids = ["p1", "p2", "p3"]
+        selected = select_choice_batch(
+            {"p1": 0.12, "p2": 0.10, "p3": 0.08, "stop": 0.70},
+            ids,
+            threshold=0.20,
+            max_batch=4,
+        )
+        self.assertEqual(selected, [])
+
 
 if __name__ == "__main__":
     unittest.main()
