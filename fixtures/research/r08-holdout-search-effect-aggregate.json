@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "kind": "r08-holdout-search-effect-aggregate",
+  "source_run": 36004833542,
+  "source_commit": "3b8a8a5273b6fe9ec91ea7e5753d91add46ec9df",
+  "subject": {
+    "repository": "BestNathan/nession",
+    "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df"
+  },
+  "cases": 3,
+  "paired_runs": 6,
+  "repeats_per_case": [2],
+  "win_counts": {
+    "high_recall_auc": 0,
+    "weighted_recall_auc": 1,
+    "final_high_recall": 0,
+    "pearson": 3,
+    "mae": 2
+  },
+  "per_case": [
+    {
+      "case_id": "full_stack_command_lifecycle",
+      "probe_budget": 17,
+      "sequential": {
+        "pearson": 0.035880668767828104,
+        "mae": 0.2166618849452644,
+        "final_high_recall": 0.125,
+        "high_recall_auc": 0.0537685,
+        "weighted_recall_auc": 0.0465985,
+        "useful_probe_rate": 0.470588,
+        "input_tokens": 51675.5
+      },
+      "multi_scale": {
+        "pearson": 0.3472796927293366,
+        "mae": 0.21054157737863136,
+        "final_high_recall": 0.0839845,
+        "high_recall_auc": 0.038718,
+        "weighted_recall_auc": 0.0442835,
+        "useful_probe_rate": 0.3235295,
+        "input_tokens": 63007.5
+      }
+    },
+    {
+      "case_id": "protocol_catalog_consistency",
+      "probe_budget": 18,
+      "sequential": {
+        "pearson": -0.16387116553917494,
+        "mae": 0.16717679616914982,
+        "final_high_recall": 0.085816,
+        "high_recall_auc": 0.045292,
+        "weighted_recall_auc": 0.045269,
+        "useful_probe_rate": 1.0,
+        "input_tokens": 58632.5
+      },
+      "multi_scale": {
+        "pearson": 0.0946532537822025,
+        "mae": 0.14162864920374363,
+        "final_high_recall": 0.085816,
+        "high_recall_auc": 0.045292,
+        "weighted_recall_auc": 0.0457315,
+        "useful_probe_rate": 1.0,
+        "input_tokens": 58072.0
+      }
+    },
+    {
+      "case_id": "reconnect_lifecycle",
+      "probe_budget": 30,
+      "sequential": {
+        "pearson": 0.4577469894081857,
+        "mae": 0.27275674171092285,
+        "final_high_recall": 0.130729,
+        "high_recall_auc": 0.0597395,
+        "weighted_recall_auc": 0.049195,
+        "useful_probe_rate": 0.533333,
+        "input_tokens": 146798.0
+      },
+      "multi_scale": {
+        "pearson": 0.5115057048744592,
+        "mae": 0.27366968257260427,
+        "final_high_recall": 0.0958335,
+        "high_recall_auc": 0.040972,
+        "weighted_recall_auc": 0.043047,
+        "useful_probe_rate": 0.3833335,
+        "input_tokens": 155625.5
+      }
+    }
+  ],
+  "overall": {
+    "sequential": {
+      "pearson": 0.10991883087894629,
+      "mae": 0.218865140941779,
+      "final_high_recall": 0.11384833333333333,
+      "high_recall_auc": 0.05293333333333333,
+      "weighted_recall_auc": 0.04702083333333334,
+      "useful_probe_rate": 0.6679736666666667,
+      "input_tokens": 85702.0
+    },
+    "multi_scale": {
+      "pearson": 0.3178128837953328,
+      "mae": 0.20861330305165973,
+      "final_high_recall": 0.08854466666666667,
+      "high_recall_auc": 0.041660666666666665,
+      "weighted_recall_auc": 0.044354,
+      "useful_probe_rate": 0.5689543333333333,
+      "input_tokens": 92235.0
+    }
+  }
+}
