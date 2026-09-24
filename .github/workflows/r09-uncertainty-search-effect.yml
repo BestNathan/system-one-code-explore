@@ -1,0 +1,490 @@
+name: R09 uncertainty-guard search effect
+
+on:
+  push:
+    branches:
+      - experiment/r09-online-run-20260924
+    paths:
+      - "experiments/R09_RUN_TRIGGER.md"
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  online:
+    name: Online / ${{ matrix.case.id }} / repeat-${{ matrix.repeat }}
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        case:
+          - id: fs_read_safety
+            path: crates/nession-agent/src/fs/ops.rs
+            query: >-
+              Help me harden file.read: locate the code that enforces
+              sandbox-safe path resolution, full-read versus chunked size
+              limits, offset/limit semantics, MIME/binary handling, and
+              has_more behavior.
+          - id: tmux_lifecycle_safety
+            path: crates/nession-agent/src/tmux/manager.rs
+            query: >-
+              Help me make tmux session lifecycle cleanup safer: locate session
+              create/list/kill behavior, socket isolation, inherited
+              environment filtering/cleanup, command timeouts, and error
+              handling.
+          - id: terminal_attach_lifecycle
+            path: web/src/platform/terminal-runtime/controller/TerminalController.ts
+            query: >-
+              Help me make terminal attach and reconnect lifecycle robust:
+              locate attach/reparent logic, transport rewiring and callback
+              cleanup, input-router lifecycle, resize handling, detach/dispose
+              behavior, and reconnect state propagation.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      REPEAT: ${{ matrix.repeat }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run frozen estimator arms
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p "artifacts/run/$CASE_ID/repeat-$REPEAT"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("src").resolve()))
+          from system_one_code_locator import Trace
+          from system_one_probability_frontier import (
+              ProbabilityFrontierDecider,
+              phase0_probability_frontier,
+          )
+
+          root = Path("subject")
+          source_path = os.environ["FILE_PATH"]
+          line_count = sum(
+              1 for _ in (root / source_path).open("r", encoding="utf-8")
+          )
+          sample_lines = 8
+          probe_budget = max(
+              8,
+              min(32, round(line_count * 0.085 / sample_lines)),
+          )
+          base = (
+              Path("artifacts/run")
+              / os.environ["CASE_ID"]
+              / f"repeat-{os.environ['REPEAT']}"
+          )
+
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+              "multi_scale_gaussian_coverage_guard",
+          ):
+              out = base / estimator
+              out.mkdir(parents=True, exist_ok=True)
+              trace = Trace(out / "trace.jsonl")
+              decider = ProbabilityFrontierDecider(
+                  os.environ["TYPESAFE_API_KEY"],
+                  trace,
+                  os.environ["TYPESAFE_API_URL"],
+                  os.environ["TYPESAFE_MODEL"],
+              )
+              started = time.perf_counter()
+              result, usage = phase0_probability_frontier(
+                  root,
+                  os.environ["QUERY"],
+                  source_path,
+                  line_count,
+                  decider,
+                  sample_lines=sample_lines,
+                  max_epochs=40,
+                  max_actions=16,
+                  max_batch=4,
+                  probability_threshold=None,
+                  max_total_probes=probe_budget,
+                  respect_stop=False,
+                  posterior_estimator=estimator,
+              )
+              result.update({
+                  "query": os.environ["QUERY"],
+                  "model": os.environ["TYPESAFE_MODEL"],
+                  "repeat": int(os.environ["REPEAT"]),
+                  "subject": {
+                      "repository": os.environ["SUBJECT_REPOSITORY"],
+                      "revision": os.environ["SUBJECT_SHA"],
+                      "path": source_path,
+                  },
+                  "usage": usage,
+                  "elapsed_ms": round(
+                      (time.perf_counter() - started) * 1000.0, 3
+                  ),
+                  "probe_budget": probe_budget,
+              })
+              (out / "run.json").write_text(
+                  json.dumps(result, indent=2, ensure_ascii=False) + "\n"
+              )
+
+          (base / "budget.json").write_text(
+              json.dumps({
+                  "line_count": line_count,
+                  "sample_lines": sample_lines,
+                  "target_source_fraction": 0.085,
+                  "probe_budget": probe_budget,
+              }, indent=2) + "\n"
+          )
+          PY
+
+      - name: Evaluate field fit and search effect
+        run: |
+          set -euo pipefail
+          BASE="artifacts/run/$CASE_ID/repeat-$REPEAT"
+          REF="fixtures/research/r09-holdout-$CASE_ID-reference.json"
+          test -s "$REF"
+          BUDGET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["probe_budget"])' "$BASE/budget.json")"
+          CHECKPOINTS="$(python3 - "$BUDGET" <<'PY'
+          import sys
+          n = int(sys.argv[1])
+          pts = [x for x in (4, 8, 12, 16, 24, 32) if x < n]
+          pts.append(n)
+          print(",".join(map(str, sorted(set(pts)))))
+          PY
+          )"
+
+          for estimator in             sequential_exponential             multi_scale_gaussian             multi_scale_gaussian_coverage_guard
+          do
+            python3 src/probability_frontier_benchmark.py               --reference "$REF"               --run "$BASE/$estimator/run.json"               --checkpoints "$CHECKPOINTS"               --high-threshold 0.70               --output-json "$BASE/$estimator/convergence.json"               --output-markdown "$BASE/$estimator/convergence.md"
+
+            python3 src/search_effect_benchmark.py               --reference "$REF"               --run "$BASE/$estimator/run.json"               --high-threshold 0.70               --output-json "$BASE/$estimator/search-effect.json"               --output-markdown "$BASE/$estimator/search-effect.md"
+          done
+
+      - name: Build paired summary
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          base = (
+              Path("artifacts/run")
+              / os.environ["CASE_ID"]
+              / f"repeat-{os.environ['REPEAT']}"
+          )
+          estimators = [
+              "sequential_exponential",
+              "multi_scale_gaussian",
+              "multi_scale_gaussian_coverage_guard",
+          ]
+          summary = {
+              "case_id": os.environ["CASE_ID"],
+              "repeat": int(os.environ["REPEAT"]),
+              "query": os.environ["QUERY"],
+              "path": os.environ["FILE_PATH"],
+              "subject_sha": os.environ["SUBJECT_SHA"],
+              "budget": json.loads((base / "budget.json").read_text()),
+              "estimators": {},
+          }
+          ranges = {}
+          for estimator in estimators:
+              run = json.loads((base / estimator / "run.json").read_text())
+              field = json.loads(
+                  (base / estimator / "convergence.json").read_text()
+              )
+              search = json.loads(
+                  (base / estimator / "search-effect.json").read_text()
+              )
+              summary["estimators"][estimator] = {
+                  "probes": run["probes"],
+                  "usage": run["usage"],
+                  "elapsed_ms": run["elapsed_ms"],
+                  "field_final": field["final"],
+                  "search_final": search["final"],
+                  "search": search["search"],
+              }
+              ranges[estimator] = {
+                  (int(s["start_line"]), int(s["end_line"]))
+                  for s in run["frontier"]["samples"]
+              }
+
+          plain = ranges["multi_scale_gaussian"]
+          guard = ranges["multi_scale_gaussian_coverage_guard"]
+          union = plain | guard
+          summary["primary_trajectory"] = {
+              "exact_shared_ranges": len(plain & guard),
+              "exact_union_ranges": len(union),
+              "exact_jaccard": (
+                  len(plain & guard) / len(union) if union else 1.0
+              ),
+          }
+          (base / "summary.json").write_text(
+              json.dumps(summary, indent=2, ensure_ascii=False) + "\n"
+          )
+
+          names = {
+              "sequential_exponential": "sequential",
+              "multi_scale_gaussian": "multi",
+              "multi_scale_gaussian_coverage_guard": "guard",
+          }
+          lines = [
+              f"# {summary['case_id']} repeat {summary['repeat']}",
+              "",
+              f"File: `{summary['path']}`",
+              f"Probe budget: {summary['budget']['probe_budget']}",
+              "",
+              "| estimator | Pearson | MAE | high recall | high-AUC | weighted-AUC | useful probes | input tokens |",
+              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+          ]
+          for estimator in estimators:
+              x = summary["estimators"][estimator]
+              lines.append(
+                  f"| {names[estimator]} | "
+                  f"{x['field_final']['pearson']:.4f} | "
+                  f"{x['field_final']['mae']:.4f} | "
+                  f"{x['search_final']['high_line_recall']:.4f} | "
+                  f"{x['search']['high_recall_auc_per_probe']:.4f} | "
+                  f"{x['search']['weighted_recall_auc_per_probe']:.4f} | "
+                  f"{x['search']['useful_probe_rate']:.4f} | "
+                  f"{x['usage']['input_tokens']} |"
+              )
+          lines += [
+              "",
+              "Plain-vs-guard exact trajectory Jaccard: "
+              f"{summary['primary_trajectory']['exact_jaccard']:.4f}",
+          ]
+          (base / "summary.md").write_text("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+
+      - name: Add summary
+        run: cat "artifacts/run/$CASE_ID/repeat-$REPEAT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: r09-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
+          path: artifacts/run/${{ matrix.case.id }}/repeat-${{ matrix.repeat }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R09 search effect
+    needs: online
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: r09-result-*
+          path: artifacts/all
+
+      - name: Aggregate
+        run: |
+          mkdir -p artifacts/aggregate
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = [
+              json.loads(path.read_text())
+              for path in sorted(Path("artifacts/all").glob("*/summary.json"))
+          ]
+          if not rows:
+              raise SystemExit("no R09 summaries")
+
+          estimators = [
+              "sequential_exponential",
+              "multi_scale_gaussian",
+              "multi_scale_gaussian_coverage_guard",
+          ]
+
+          def mean(xs):
+              return statistics.fmean(xs) if xs else 0.0
+
+          grouped = defaultdict(list)
+          for row in rows:
+              grouped[row["case_id"]].append(row)
+
+          per_case = []
+          for case_id, case_rows in sorted(grouped.items()):
+              record = {
+                  "case_id": case_id,
+                  "path": case_rows[0]["path"],
+                  "probe_budget": case_rows[0]["budget"]["probe_budget"],
+                  "repeats": len(case_rows),
+                  "estimators": {},
+              }
+              for estimator in estimators:
+                  record["estimators"][estimator] = {
+                      "pearson": mean([
+                          r["estimators"][estimator]["field_final"]["pearson"]
+                          for r in case_rows
+                      ]),
+                      "mae": mean([
+                          r["estimators"][estimator]["field_final"]["mae"]
+                          for r in case_rows
+                      ]),
+                      "final_high_recall": mean([
+                          r["estimators"][estimator]["search_final"]["high_line_recall"]
+                          for r in case_rows
+                      ]),
+                      "high_recall_auc": mean([
+                          r["estimators"][estimator]["search"]["high_recall_auc_per_probe"]
+                          for r in case_rows
+                      ]),
+                      "weighted_recall_auc": mean([
+                          r["estimators"][estimator]["search"]["weighted_recall_auc_per_probe"]
+                          for r in case_rows
+                      ]),
+                      "useful_probe_rate": mean([
+                          r["estimators"][estimator]["search"]["useful_probe_rate"]
+                          for r in case_rows
+                      ]),
+                      "input_tokens": mean([
+                          r["estimators"][estimator]["usage"]["input_tokens"]
+                          for r in case_rows
+                      ]),
+                  }
+              per_case.append(record)
+
+          plain = "multi_scale_gaussian"
+          guard = "multi_scale_gaussian_coverage_guard"
+          seq = "sequential_exponential"
+
+          def wins(left, right, key, higher=True):
+              return sum(
+                  (
+                      case["estimators"][left][key]
+                      > case["estimators"][right][key]
+                  )
+                  if higher else
+                  (
+                      case["estimators"][left][key]
+                      < case["estimators"][right][key]
+                  )
+                  for case in per_case
+              )
+
+          aggregate = {
+              "schema_version": 1,
+              "kind": "r09-uncertainty-guard-search-effect-aggregate",
+              "cases": len(per_case),
+              "paired_runs": len(rows),
+              "per_case": per_case,
+              "primary_guard_vs_plain_wins": {
+                  "high_recall_auc": wins(guard, plain, "high_recall_auc"),
+                  "weighted_recall_auc": wins(guard, plain, "weighted_recall_auc"),
+                  "final_high_recall": wins(guard, plain, "final_high_recall"),
+                  "useful_probe_rate": wins(guard, plain, "useful_probe_rate"),
+                  "pearson": wins(guard, plain, "pearson"),
+                  "mae": wins(guard, plain, "mae", higher=False),
+              },
+              "guard_vs_sequential_wins": {
+                  "high_recall_auc": wins(guard, seq, "high_recall_auc"),
+                  "weighted_recall_auc": wins(guard, seq, "weighted_recall_auc"),
+                  "final_high_recall": wins(guard, seq, "final_high_recall"),
+                  "useful_probe_rate": wins(guard, seq, "useful_probe_rate"),
+              },
+              "overall": {},
+          }
+          for estimator in estimators:
+              aggregate["overall"][estimator] = {
+                  key: mean([
+                      case["estimators"][estimator][key]
+                      for case in per_case
+                  ])
+                  for key in (
+                      "pearson",
+                      "mae",
+                      "final_high_recall",
+                      "high_recall_auc",
+                      "weighted_recall_auc",
+                      "useful_probe_rate",
+                      "input_tokens",
+                  )
+              }
+
+          Path("artifacts/aggregate/aggregate.json").write_text(
+              json.dumps(aggregate, indent=2, ensure_ascii=False) + "\n"
+          )
+
+          md = [
+              "# R09 uncertainty-guard search effect",
+              "",
+              f"Cases: {len(per_case)}; paired runs: {len(rows)}",
+              "",
+              "| case | probes | plain high-AUC | guard high-AUC | seq high-AUC | plain weighted-AUC | guard weighted-AUC | seq weighted-AUC |",
+              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+          ]
+          for case in per_case:
+              p = case["estimators"][plain]
+              g = case["estimators"][guard]
+              s = case["estimators"][seq]
+              md.append(
+                  f"| {case['case_id']} | {case['probe_budget']} | "
+                  f"{p['high_recall_auc']:.4f} | {g['high_recall_auc']:.4f} | {s['high_recall_auc']:.4f} | "
+                  f"{p['weighted_recall_auc']:.4f} | {g['weighted_recall_auc']:.4f} | {s['weighted_recall_auc']:.4f} |"
+              )
+
+          md += [
+              "",
+              "## Guard vs plain win counts",
+              "",
+          ]
+          for key, value in aggregate["primary_guard_vs_plain_wins"].items():
+              md.append(f"- {key}: {value}/{len(per_case)}")
+
+          Path("artifacts/aggregate/aggregate.md").write_text(
+              "\n".join(md) + "\n"
+          )
+          print("\n".join(md))
+          PY
+          cat artifacts/aggregate/aggregate.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload aggregate
+        uses: actions/upload-artifact@v4
+        with:
+          name: r09-aggregate-${{ github.run_id }}
+          path: artifacts/aggregate/
+          if-no-files-found: error
+          retention-days: 90
