@@ -4,6 +4,19 @@
 
 Current research direction.
 
+Phase A implementation is complete on `main`: the online runtime now accepts a
+pluggable posterior estimator and recomputes the complete frontier from durable
+observations.
+
+Phase B workflow is implemented at
+`.github/workflows/r08-online-posterior-ab.yml`, but the first run
+(`35978076501`) stopped before model execution because the new repository's
+`typesafe` environment does not currently expose `TYPESAFE_API_KEY`.
+
+This is an experiment-environment blocker, not an algorithm result. The
+workflow is manual-only until that credential exists in this repository, so
+normal research commits do not produce expected red Actions runs.
+
 ## Question
 
 R07 showed that a path-independent posterior can reconstruct the fixed
@@ -55,7 +68,22 @@ Support at least:
 - `adaptive_gaussian_k3`;
 - `multi_scale_gaussian`.
 
-After every probe batch, recompute the whole frontier from durable observations.
+After every individual observed micro-block, recompute the whole frontier from
+durable observations. A Choice-selected batch is still chosen from one
+pre-batch state, but each resulting observation is persisted independently.
+
+Implemented in:
+
+- `src/posterior_reconstruction.py`
+- `src/system_one_probability_frontier.py`
+
+The historical `update_probability_frontier` remains only for compatibility
+and regression comparison. The online runtime uses
+`append_probability_sample + rebuild_probability_frontier`.
+
+A regression test proves that the pluggable
+`sequential_exponential` estimator reproduces the old mutation behavior for
+the same ordered samples.
 
 Do not change the current mixed/spatially-diverse action generator in this
 phase.
