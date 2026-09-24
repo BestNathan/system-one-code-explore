@@ -8,14 +8,11 @@ Phase A implementation is complete on `main`: the online runtime now accepts a
 pluggable posterior estimator and recomputes the complete frontier from durable
 observations.
 
-Phase B workflow is implemented at
-`.github/workflows/r08-online-posterior-ab.yml`, but the first run
-(`35978076501`) stopped before model execution because the new repository's
-`typesafe` environment does not currently expose `TYPESAFE_API_KEY`.
+Phase B is now complete. After `TYPESAFE_API_KEY` was configured in this
+repository, workflow run `35978076501` was rerun successfully.
 
-This is an experiment-environment blocker, not an algorithm result. The
-workflow is manual-only until that credential exists in this repository, so
-normal research commits do not produce expected red Actions runs.
+The workflow remains manual-only because it is a credentialed research
+experiment and should not consume model calls on every normal `main` commit.
 
 ## Question
 
@@ -90,18 +87,53 @@ phase.
 
 ## Phase B — Same-task online A/B
 
-On the existing websocket benchmark:
+Completed on workflow run `35978076501`.
+
+On the existing websocket benchmark both arms used:
 
 - same source revision;
 - same query;
-- same read budget;
-- same action-generation rules;
-- same System One model;
-- estimator is the only intended algorithmic change.
+- 32 x 8-line read budget;
+- same mixed/spatially-diverse action-generation rules;
+- same Choice batching rules;
+- same `jev-latest` model;
+- same CC full-read reference.
 
-Because the posterior changes Choice state, trajectories are expected to
-diverge. Compare convergence and read efficiency rather than expecting matched
-probe locations.
+Only the online posterior estimator differed.
+
+Final result:
+
+| estimator | MAE ↓ | Pearson ↑ | Spearman ↑ | JS ↓ | input tokens |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| sequential | 0.2520 | 0.4962 | 0.4336 | 0.1017 | 163,275 |
+| multi-scale | **0.1995** | **0.7280** | **0.6877** | **0.0696** | 176,053 |
+
+At the same 256 source-line budget, multi-scale improves:
+
+- MAE by about 20.8%;
+- Pearson by +0.232 absolute;
+- Spearman by +0.254 absolute;
+- JS divergence by about 31.6%.
+
+The online trajectories diverge substantially: only 9 of 32 exact probe ranges
+are shared (Jaccard ≈ 0.164). This demonstrates that the posterior changes the
+active sampling path rather than merely redrawing the final field.
+
+From 8 probes onward, multi-scale has higher Pearson at every recorded
+checkpoint in this run. At 4 probes sequential is still slightly stronger,
+consistent with the R07 finding that geometry-adaptive posteriors need a
+minimum observation density.
+
+Pinned evidence:
+
+- `fixtures/research/r08-online-sequential-trajectory.json`
+- `fixtures/research/r08-online-multiscale-trajectory.json`
+- `docs/experiments/r08-online-posterior-ab-2026-09-24.md`
+
+Conclusion:
+
+> the R07 posterior improvement survives the online feedback loop and changes
+> System One's exploration path in a beneficial direction on this fixture.
 
 ## Synthetic estimator-bias sanity check
 
@@ -146,6 +178,8 @@ reconstruction weakness rather than only a websocket-specific weakness.
 No estimator parameters were changed as a result.
 
 ## Phase C — Holdout generalization
+
+**Current phase.**
 
 Freeze all R07 estimator parameters before generating new references.
 
