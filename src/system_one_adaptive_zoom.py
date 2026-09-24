@@ -20,6 +20,7 @@ import sys
 import time
 from pathlib import Path
 
+from localization_result import build_system_one_adaptive_zoom_result
 from system_one_code_locator import (
     API_URL,
     MODEL,
@@ -710,6 +711,8 @@ def run(
     exploration_floor=DEFAULT_EXPLORATION_FLOOR,
     max_rounds=DEFAULT_MAX_ZOOM_ROUNDS,
     stable_rounds=DEFAULT_STABLE_ROUNDS,
+    subject_repository=None,
+    subject_revision=None,
 ):
     started = time.perf_counter()
     directories, selected_files, phase1_metrics = run_phase1(
@@ -758,6 +761,9 @@ def run(
         "observations": sum(
             len(item["observations"]) for item in file_states
         ),
+        "reads_executed": sum(
+            len(item["observations"]) for item in file_states
+        ),
         "valuable_files": len(result_files),
         "evidence_regions": sum(
             len(item["evidence"]) for item in result_files
@@ -798,6 +804,15 @@ def run(
         "result_files": result_files,
         "metrics": metrics,
     }
+    if subject_repository and subject_revision:
+        result["subject"] = {
+            "repository": subject_repository,
+            "revision": subject_revision,
+        }
+    result["localization_result"] = build_system_one_adaptive_zoom_result(
+        result,
+        decider.model,
+    )
     trace.emit("adaptive_zoom_completed", result=result)
     return result
 
@@ -869,6 +884,9 @@ def main(argv=None):
     parser.add_argument("--offline-decider", action="store_true")
     parser.add_argument("--trace-file")
     parser.add_argument("--output-json")
+    parser.add_argument("--output-localization-json")
+    parser.add_argument("--subject-repository")
+    parser.add_argument("--subject-revision")
     parser.add_argument(
         "--typesafe-endpoint",
         default=os.getenv("TYPESAFE_API_URL", API_URL),
@@ -914,10 +932,22 @@ def main(argv=None):
         exploration_floor=args.exploration_floor,
         max_rounds=args.max_rounds,
         stable_rounds=args.stable_rounds,
+        subject_repository=args.subject_repository,
+        subject_revision=args.subject_revision,
     )
     payload = json.dumps(result, indent=2, ensure_ascii=False)
     if args.output_json:
         Path(args.output_json).write_text(payload + "\n", encoding="utf-8")
+    if args.output_localization_json:
+        Path(args.output_localization_json).write_text(
+            json.dumps(
+                result["localization_result"],
+                indent=2,
+                ensure_ascii=False,
+            ) + "\n",
+            encoding="utf-8",
+        )
+    if args.output_json or args.output_localization_json:
         print(json.dumps(result["metrics"], ensure_ascii=False))
     else:
         print(payload)
