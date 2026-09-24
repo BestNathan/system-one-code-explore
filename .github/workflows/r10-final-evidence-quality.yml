@@ -1,0 +1,170 @@
+name: R10 final evidence quality
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/evidence_snippet_benchmark.py"
+      - ".github/workflows/r10-final-evidence-quality.yml"
+      - "docs/research/2026-09-25-r10-final-evidence-quality.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "36004833542"
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+
+jobs:
+  evidence:
+    name: Evidence / \${{ matrix.case.id }} / r\${{ matrix.repeat }} / \${{ matrix.estimator }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+          - id: protocol_catalog_consistency
+            path: crates/nession-protocol-codegen/src/catalog.rs
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+    env:
+      CASE_ID: \${{ matrix.case.id }}
+      FILE_PATH: \${{ matrix.case.path }}
+      REPEAT: \${{ matrix.repeat }}
+      ESTIMATOR: \${{ matrix.estimator }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: \${{ env.SUBJECT_REPOSITORY }}
+          ref: \${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download canonical R08 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-\${{ matrix.case.id }}
+          path: artifacts/reference
+          github-token: \${{ github.token }}
+          run-id: \${{ env.SOURCE_RUN_ID }}
+
+      - name: Download canonical R08 Phase0 trajectory
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-result-\${{ matrix.case.id }}-repeat-\${{ matrix.repeat }}
+          path: artifacts/run
+          github-token: \${{ github.token }}
+          run-id: \${{ env.SOURCE_RUN_ID }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build final evidence snippets
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/out
+          python3 src/evidence_snippet_benchmark.py \
+            --reference artifacts/reference/reference.json \
+            --run "artifacts/run/$ESTIMATOR/run.json" \
+            --source "subject/$FILE_PATH" \
+            --snippet-lines 32 \
+            --max-snippets 6 \
+            --output-json artifacts/out/result.json \
+            --output-markdown artifacts/out/result.md
+          cat artifacts/out/result.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence result
+        uses: actions/upload-artifact@v4
+        with:
+          name: r10-evidence-\${{ matrix.case.id }}-r\${{ matrix.repeat }}-\${{ matrix.estimator }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R10 evidence quality
+    needs: evidence
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r10-evidence-*
+          path: artifacts/all
+
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = [
+              json.loads(p.read_text())
+              for p in sorted(Path("artifacts/all").glob("*/result.json"))
+          ]
+          grouped = defaultdict(list)
+          for row in rows:
+              grouped[row["posterior_estimator"]].append(row)
+
+          keys = (
+              "mean_reference_relevance",
+              "high_line_precision",
+              "high_line_recall",
+              "weighted_relevance_recall",
+          )
+          aggregate = {
+              "schema_version": 1,
+              "kind": "r10-final-evidence-quality-aggregate",
+              "source_run": 36004833542,
+              "runs": len(rows),
+              "estimators": {},
+          }
+          for estimator, items in sorted(grouped.items()):
+              aggregate["estimators"][estimator] = {
+                  key: statistics.fmean(
+                      item["metrics"][key] for item in items
+                  )
+                  for key in keys
+              }
+              aggregate["estimators"][estimator]["oracle_ratio_high_recall"] = (
+                  statistics.fmean(
+                      item["oracle_ratio"]["high_line_recall"]
+                      for item in items
+                  )
+              )
+              aggregate["estimators"][estimator]["oracle_ratio_precision"] = (
+                  statistics.fmean(
+                      item["oracle_ratio"]["mean_reference_relevance"]
+                      for item in items
+                  )
+              )
+
+          Path("aggregate.json").write_text(
+              json.dumps(aggregate, indent=2) + "\n"
+          )
+          print(json.dumps(aggregate, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r10-final-evidence-aggregate-\${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
