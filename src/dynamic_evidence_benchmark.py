@@ -268,15 +268,14 @@ def render_markdown(result):
         "",
         "## Selected sequence",
         "",
-        "| # | range | Choice p | lift | Phase0 mean | CC mean | CC high fraction |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| # | range | Noul p | Phase0 mean | CC mean | CC high fraction |",
+        "| ---: | --- | ---: | ---: | ---: | ---: |",
     ]
     for item in result["selected_truth"]:
         lines.append(
             f"| {item['order']} | "
             f"{item['start_line']}-{item['end_line']} | "
             f"{item['noul_probability']:.4f} | "
-            
             f"{item['phase0_mean_relevance']:.4f} | "
             f"{item['mean_relevance']:.4f} | "
             f"{item['high_fraction']:.4f} |"
