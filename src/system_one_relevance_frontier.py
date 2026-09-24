@@ -1408,12 +1408,10 @@ class ChoiceRelevanceFrontierDecider(RelevanceFrontierDecider):
             raise RuntimeError("cannot choose from an empty frontier action space")
 
         action_by_id = {}
+        action_views = []
         for index, action in enumerate(actions):
             action_id = f"a{index + 1}"
             action_by_id[action_id] = action
-
-        action_views = []
-        for action_id, action in action_by_id.items():
             node = state["nodes"].get(action["node_id"])
             action_views.append({
                 "id": action_id,
@@ -1429,91 +1427,56 @@ class ChoiceRelevanceFrontierDecider(RelevanceFrontierDecider):
                 "source": action.get("source"),
             })
 
-        questions = {
-            "next_action": {
-                "type": "choice",
-                "instructions": {
-                    "goal": goal,
-                    "file": state["path"],
-                    "phase": "adaptive_frontier_policy",
-                    "question": (
-                        "Choose the SINGLE next exploration action that should "
-                        "advance localization. The harness owns all effects and "
-                        "will execute exactly the selected legal action. Prefer "
-                        "actions with high expected information gain, including "
-                        "missing global coverage and evidence-completing "
-                        "expansion. Choose stop only when current evidence is "
-                        "already sufficient."
-                    ),
-                    "actions": action_views,
-                },
-                "criteria": {
-                    action_id: (
-                        f"Select this legal action: {action['kind']} on "
-                        f"{action['node_id']}."
-                    )
-                    for action_id, action in action_by_id.items()
-                },
-            }
-        }
-
-        observed = [
-            node for node in frontier_leaves(state)
-            if node["observation_ids"]
-        ]
-        for index, node in enumerate(observed):
-            questions[f"score_{index}"] = {
-                "type": "noul",
-                "instructions": {
-                    "goal": goal,
-                    "node_id": node["id"],
-                    "range": [node["start_line"], node["end_line"]],
-                    "question": (
-                        "Score this observed frontier interval's current "
-                        "relevance potential for the task. This is a value "
-                        "signal for the harness, not the next action choice."
-                    ),
-                },
-                "criteria": {
-                    "true": "Material evidence is present or increasingly likely.",
-                    "false": "The interval is incidental or low-value.",
-                },
-            }
-
         response, usage = self.send(
             "relevance_frontier_choice_policy",
             score_state_view(goal, state),
-            questions,
+            {
+                "next_action": {
+                    "type": "choice",
+                    "instructions": {
+                        "goal": goal,
+                        "file": state["path"],
+                        "phase": "adaptive_frontier_policy",
+                        "question": (
+                            "Choose the SINGLE next exploration action from the "
+                            "legal action set. The harness owns all effects and "
+                            "will execute exactly the selected action. Prefer "
+                            "global coverage when relevant, then evidence "
+                            "completion/refinement, and choose stop only when "
+                            "current evidence is sufficient."
+                        ),
+                        "actions": action_views,
+                    },
+                    "criteria": {
+                        action_id: (
+                            f"Select this legal action: {action['kind']} on "
+                            f"{action['node_id']}."
+                        )
+                        for action_id, action in action_by_id.items()
+                    },
+                }
+            },
         )
-        answers = response.get("answers", {})
-        action_answer = answers.get("next_action", {})
-        if action_answer.get("type") != "choice":
+        answer = response.get("answers", {}).get("next_action", {})
+        if answer.get("type") != "choice":
             raise RuntimeError(
-                f"unexpected frontier policy answer: {action_answer!r}"
+                f"unexpected frontier policy answer: {answer!r}"
             )
-        chosen_id = action_answer.get("choice")
+        chosen_id = answer.get("choice")
         if chosen_id not in action_by_id:
             raise RuntimeError(
                 f"frontier policy selected unknown action: {chosen_id!r}"
             )
 
-        scores = {}
-        for index, node in enumerate(observed):
-            answer = answers.get(f"score_{index}", {})
-            if answer.get("type") != "noul":
-                raise RuntimeError(
-                    f"unexpected frontier score answer: {answer!r}"
-                )
-            scores[node["id"]] = float(answer["noul"])
-
         return {
             "action": action_by_id[chosen_id],
             "choice": chosen_id,
             "confidence": float(
-                action_answer.get("confidence", 0.0) or 0.0
+                answer.get("confidence", 0.0) or 0.0
             ),
-            "probabilities": action_answer.get("probabilities", {}),
-        }, scores, usage
+            "probabilities": answer.get("probabilities", {}),
+        }, usage
+
 
 
 class OfflineChoiceRelevanceFrontierDecider(
