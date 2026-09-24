@@ -879,6 +879,7 @@ def fine_candidates(
                     "score": current_score(node),
                     "content": content,
                     "frontier_node_id": node["id"],
+                    "observation_id": oid,
                     "score_history": [
                         float(value)
                         for value in node["score_history"]
@@ -1392,3 +1393,919 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+class ChoiceRelevanceFrontierDecider(RelevanceFrontierDecider):
+    """Phase-0 + Choice-policy frontier runtime.
+
+    Phase 0 is an independent coarse scan: every depth-0 region is observed
+    exactly once before adaptive refinement is allowed. Phase 1 exposes the
+    harness-generated legal actions to one Choice question. Noul scores remain
+    auxiliary value signals for already-observed regions.
+    """
+
+    def choose_next_action(self, goal, state, actions):
+        if not actions:
+            raise RuntimeError("cannot choose from an empty frontier action space")
+
+        action_by_id = {}
+        action_views = []
+        for index, action in enumerate(actions):
+            action_id = f"a{index + 1}"
+            action_by_id[action_id] = action
+            node = state["nodes"].get(action["node_id"])
+            action_views.append({
+                "id": action_id,
+                "kind": action["kind"],
+                "node_id": action["node_id"],
+                "range": (
+                    [node["start_line"], node["end_line"]]
+                    if node is not None
+                    else [1, state["line_count"]]
+                ),
+                "priority_hint": action["priority"],
+                "reason": action["reason"],
+                "source": action.get("source"),
+            })
+
+        response, usage = self.send(
+            "relevance_frontier_choice_policy",
+            score_state_view(goal, state),
+            {
+                "next_action": {
+                    "type": "choice",
+                    "instructions": {
+                        "goal": goal,
+                        "file": state["path"],
+                        "phase": "adaptive_frontier_policy",
+                        "question": (
+                            "Choose the SINGLE next exploration action from the "
+                            "legal action set. The harness owns all effects and "
+                            "will execute exactly the selected action. Prefer "
+                            "global coverage when relevant, then evidence "
+                            "completion/refinement, and choose stop only when "
+                            "current evidence is sufficient."
+                        ),
+                        "actions": action_views,
+                    },
+                    "criteria": {
+                        action_id: (
+                            f"Select this legal action: {action['kind']} on "
+                            f"{action['node_id']}."
+                        )
+                        for action_id, action in action_by_id.items()
+                    },
+                }
+            },
+        )
+        answer = response.get("answers", {}).get("next_action", {})
+        if answer.get("type") != "choice":
+            raise RuntimeError(
+                f"unexpected frontier policy answer: {answer!r}"
+            )
+        chosen_id = answer.get("choice")
+        if chosen_id not in action_by_id:
+            raise RuntimeError(
+                f"frontier policy selected unknown action: {chosen_id!r}"
+            )
+
+        return {
+            "action": action_by_id[chosen_id],
+            "choice": chosen_id,
+            "confidence": float(
+                answer.get("confidence", 0.0) or 0.0
+            ),
+            "probabilities": answer.get("probabilities", {}),
+        }, usage
+
+
+
+class OfflineChoiceRelevanceFrontierDecider(
+    ChoiceRelevanceFrontierDecider
+):
+    model = "offline-choice-relevance-frontier-fixture"
+
+    def __init__(self, trace):
+        self.trace = trace
+
+    def score_frontier(self, goal, state):
+        scores = {}
+        for node in frontier_leaves(state):
+            if not node["observation_ids"]:
+                continue
+            text = " ".join(
+                state["observation_by_id"][oid]["content"]
+                for oid in node["observation_ids"]
+            )
+            scores[node["id"]] = 0.9 if "TARGET" in text else 0.55
+        return scores, empty_usage()
+
+    def choose_next_action(self, goal, state, actions):
+        ranked = sorted(
+            actions,
+            key=lambda item: (
+                -float(item["priority"]),
+                item["node_id"],
+                item["kind"],
+            ),
+        )
+        selected = ranked[0]
+        scores = {}
+        for node in frontier_leaves(state):
+            if not node["observation_ids"]:
+                continue
+            text = " ".join(
+                state["observation_by_id"][oid]["content"]
+                for oid in node["observation_ids"]
+            )
+            scores[node["id"]] = 0.9 if "TARGET" in text else 0.55
+        return {
+            "action": selected,
+            "choice": selected["kind"] + ":" + selected["node_id"],
+            "confidence": 1.0,
+            "probabilities": {},
+        }, scores, empty_usage()
+
+
+def coarse_sample_ranges(node, sample_lines):
+    start = int(node["start_line"])
+    end = int(node["end_line"])
+    width = max(1, min(int(sample_lines), end - start + 1))
+    middle = max(start, (start + end - width + 1) // 2)
+    ranges = [
+        ("coarse_head", start, min(end, start + width - 1)),
+        ("coarse_middle", middle, min(end, middle + width - 1)),
+        ("coarse_tail", max(start, end - width + 1), end),
+    ]
+    out = []
+    seen = set()
+    for kind, left, right in ranges:
+        key = (left, right)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((kind, left, right))
+    return out
+
+
+def phase0_coarse_scan(
+    root,
+    goal,
+    state,
+    decider,
+    trace,
+    probe_lines,
+):
+    coarse = [
+        node for node in frontier_leaves(state)
+        if node["depth"] == 0
+    ]
+    executed = []
+    for node in coarse:
+        for kind, start, end in coarse_sample_ranges(node, probe_lines):
+            observation = read_range(
+                root,
+                {
+                    "path": state["path"],
+                    "start_line": start,
+                    "end_line": end,
+                },
+            )
+            item = append_observation(
+                state,
+                node,
+                observation,
+                kind,
+            )
+            executed.append({
+                "node_id": node["id"],
+                "kind": kind,
+                "observation": item,
+            })
+
+    if not executed:
+        raise RuntimeError("phase0 coarse scan produced no observations")
+
+    scores, usage = decider.score_frontier(goal, state)
+    apply_scores(state, scores)
+    state["phase0"] = {
+        "kind": "coarse_scan",
+        "sampling": "head_middle_tail",
+        "sample_lines": int(probe_lines),
+        "regions": [
+            {
+                "id": node["id"],
+                "range": [node["start_line"], node["end_line"]],
+                "score": current_score(node),
+            }
+            for node in coarse
+        ],
+        "all_regions_observed": all(
+            node["observation_ids"] for node in coarse
+        ),
+        "reads": len(executed),
+    }
+    trace.emit(
+        "relevance_frontier_phase0_completed",
+        path=state["path"],
+        regions=state["phase0"]["regions"],
+        sampling=state["phase0"]["sampling"],
+        reads=len(executed),
+    )
+    return usage
+
+
+def run_frontier_file_phase0_choice(
+    root,
+    goal,
+    candidate,
+    decider,
+    trace,
+    *,
+    max_rounds=10,
+    probe_lines=96,
+    target_region_lines=48,
+    final_window_lines=32,
+    refine_threshold=0.72,
+    candidate_threshold=0.55,
+    gradient_threshold=0.18,
+    volatility_threshold=0.12,
+    stable_delta=0.08,
+    stable_rounds=2,
+    max_frontier_leaves=24,
+    final_max_candidates=24,
+):
+    usage = empty_usage()
+    state = new_file_state(root, candidate, max_frontier_leaves)
+    if state is None:
+        return None, usage
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_file_started",
+        path=state["path"],
+        line_count=state["line_count"],
+        initial_frontier=frontier_summary(state),
+    )
+
+    current = phase0_coarse_scan(
+        root,
+        goal,
+        state,
+        decider,
+        trace,
+        probe_lines,
+    )
+    merge_usage(usage, current)
+
+    if not state.get("phase0", {}).get("all_regions_observed"):
+        raise RuntimeError("phase0 coarse bootstrap invariant failed")
+
+    for round_number in range(1, max_rounds + 1):
+        state["round"] = round_number
+        actions = generate_actions(
+            state,
+            max_actions=1,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        actions.append({
+            "kind": "stop_frontier",
+            "node_id": "file",
+            "priority": 0.0,
+            "reason": (
+                "finalize when current coarse-to-fine evidence is sufficient "
+                "and remaining actions have low expected information gain"
+            ),
+            "side": None,
+            "source": None,
+        })
+
+        # Stop is a file-level action and has no node in the frontier.
+        policy, scores, current = decider.choose_next_action(
+            goal,
+            state,
+            actions,
+        )
+        merge_usage(usage, current)
+        apply_scores(state, scores)
+
+        chosen = policy["action"]
+        if chosen["kind"] == "stop_frontier":
+            state["termination"] = "model_stop"
+            state["policy_stop"] = policy
+            trace.emit(
+                "relevance_frontier_phase1_stop",
+                path=state["path"],
+                round=round_number,
+                policy=policy,
+                frontier=frontier_summary(state),
+            )
+            break
+
+        result = execute_action(
+            root,
+            state,
+            chosen,
+            probe_lines,
+        )
+        if result is None:
+            state["termination"] = "frontier_exhausted"
+            break
+
+        # Re-score after the new observation so the next Choice sees updated
+        # value state. This is intentionally a separate policy epoch.
+        rescored, current = decider.score_frontier(goal, state)
+        merge_usage(usage, current)
+        apply_scores(state, rescored)
+
+        stability = update_stability(
+            state,
+            candidate_threshold,
+            stable_delta,
+        )
+        snapshot = {
+            "round": round_number,
+            "policy": policy,
+            "executed": [{
+                "kind": chosen["kind"],
+                "source_node_id": chosen["node_id"],
+                "target_node_id": result["target_node_id"],
+                "range": [
+                    result["observation"]["start_line"],
+                    result["observation"]["end_line"],
+                ],
+            }],
+            "frontier": frontier_summary(state),
+            "stability": stability,
+        }
+        state["action_history"].append(snapshot)
+        trace.emit(
+            "relevance_frontier_phase1_round_completed",
+            path=state["path"],
+            **snapshot,
+        )
+
+        next_actions = generate_actions(
+            state,
+            max_actions=1,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        if (
+            stability["stable_rounds"] >= stable_rounds
+            and not next_actions
+        ):
+            state["termination"] = "frontier_stable"
+            break
+    else:
+        state["termination"] = "round_budget_exhausted"
+
+    candidates = fine_candidates(
+        state,
+        candidate_threshold=candidate_threshold,
+        final_window_lines=final_window_lines,
+        max_candidates=final_max_candidates,
+    )
+    selected, current = decider.finalize_choices(
+        goal,
+        state,
+        candidates,
+    )
+    merge_usage(usage, current)
+    state["final_candidates"] = candidates
+    state["evidence"] = merge_selected_candidates(selected)
+    state["frontier_coverage"] = observed_frontier_coverage(state)
+    state["source_coverage"] = (
+        unique_source_coverage(state) / max(1, state["line_count"])
+    )
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_file_completed",
+        path=state["path"],
+        termination=state["termination"],
+        rounds=state["round"],
+        phase0=state.get("phase0"),
+        observations=len(state["observations"]),
+        frontier_coverage=state["frontier_coverage"],
+        source_coverage=state["source_coverage"],
+        final_candidates=len(candidates),
+        evidence=len(state["evidence"]),
+    )
+    return state, usage
+
+
+def run_frontier_file_phase0_choice_v2(
+    root,
+    goal,
+    candidate,
+    decider,
+    trace,
+    *,
+    max_rounds=10,
+    max_actions_per_choice=6,
+    probe_lines=112,
+    target_region_lines=48,
+    final_window_lines=32,
+    refine_threshold=0.72,
+    candidate_threshold=0.55,
+    gradient_threshold=0.15,
+    volatility_threshold=0.10,
+    stable_delta=0.06,
+    stable_rounds=2,
+    max_frontier_leaves=24,
+    final_max_candidates=24,
+):
+    """Phase 0 coarse field + Choice policy + periodic value refresh.
+
+    Phase 0 establishes the only initial relevance distribution. Phase 1 then
+    lets Choice select one action from a larger harness-generated action set.
+    After each executed action the value field is refreshed before the next
+    policy epoch. This deliberately separates policy (Choice) from value
+    estimation (Noul) instead of asking independent Noul questions to decide
+    the next action.
+    """
+    usage = empty_usage()
+    state = new_file_state(root, candidate, max_frontier_leaves)
+    if state is None:
+        return None, usage
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_v2_started",
+        path=state["path"],
+        line_count=state["line_count"],
+        initial_frontier=frontier_summary(state),
+    )
+
+    current = phase0_coarse_scan(
+        root,
+        goal,
+        state,
+        decider,
+        trace,
+        probe_lines,
+    )
+    merge_usage(usage, current)
+    state["coarse_coverage"] = 1.0
+
+    if not state.get("phase0", {}).get("all_regions_observed"):
+        raise RuntimeError("phase0 coarse bootstrap invariant failed")
+
+    for round_number in range(1, max_rounds + 1):
+        state["round"] = round_number
+        actions = generate_actions(
+            state,
+            max_actions=max_actions_per_choice,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        actions.append({
+            "kind": "stop_frontier",
+            "node_id": "file",
+            "priority": 0.0,
+            "reason": (
+                "finalize when current evidence is sufficient and every "
+                "remaining legal action has lower expected information gain"
+            ),
+            "side": None,
+            "source": None,
+        })
+
+        policy, current = decider.choose_next_action(
+            goal,
+            state,
+            actions,
+        )
+        merge_usage(usage, current)
+
+        chosen = policy["action"]
+        if chosen["kind"] == "stop_frontier":
+            state["termination"] = "model_stop"
+            state["policy_stop"] = policy
+            trace.emit(
+                "relevance_frontier_phase0_choice_v2_stop",
+                path=state["path"],
+                round=round_number,
+                policy=policy,
+                frontier=frontier_summary(state),
+            )
+            break
+
+        result = execute_action(
+            root,
+            state,
+            chosen,
+            probe_lines,
+        )
+        if result is None:
+            state["termination"] = "frontier_exhausted"
+            break
+
+        # Value refresh happens after execution, so the next Choice epoch sees
+        # the new observation and an updated relevance field.
+        rescored, current = decider.score_frontier(goal, state)
+        merge_usage(usage, current)
+        apply_scores(state, rescored)
+
+        stability = update_stability(
+            state,
+            candidate_threshold,
+            stable_delta,
+        )
+        snapshot = {
+            "round": round_number,
+            "policy": policy,
+            "executed": [{
+                "kind": chosen["kind"],
+                "source_node_id": chosen["node_id"],
+                "target_node_id": result["target_node_id"],
+                "range": [
+                    result["observation"]["start_line"],
+                    result["observation"]["end_line"],
+                ],
+            }],
+            "frontier": frontier_summary(state),
+            "stability": stability,
+        }
+        state["action_history"].append(snapshot)
+        trace.emit(
+            "relevance_frontier_phase0_choice_v2_round_completed",
+            path=state["path"],
+            **snapshot,
+        )
+
+    else:
+        state["termination"] = "round_budget_exhausted"
+
+    candidates = fine_candidates(
+        state,
+        candidate_threshold=candidate_threshold,
+        final_window_lines=final_window_lines,
+        max_candidates=final_max_candidates,
+    )
+    selected, current = decider.finalize_choices(
+        goal,
+        state,
+        candidates,
+    )
+    merge_usage(usage, current)
+
+    state["final_candidates"] = candidates
+    state["evidence"] = merge_selected_candidates(selected)
+    state["frontier_coverage"] = observed_frontier_coverage(state)
+    state["source_coverage"] = (
+        unique_source_coverage(state) / max(1, state["line_count"])
+    )
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_v2_completed",
+        path=state["path"],
+        termination=state["termination"],
+        rounds=state["round"],
+        phase0=state.get("phase0"),
+        coarse_coverage=state.get("coarse_coverage"),
+        observations=len(state["observations"]),
+        frontier_coverage=state["frontier_coverage"],
+        source_coverage=state["source_coverage"],
+        final_candidates=len(candidates),
+        evidence=len(state["evidence"]),
+    )
+    return state, usage
+
+
+class ClosureChoiceRelevanceFrontierDecider(
+    ChoiceRelevanceFrontierDecider
+):
+    """Group-aware final Choice stage that preserves observation continuity."""
+
+    def finalize_group_choices(self, goal, state, candidates):
+        if not candidates:
+            return [], empty_usage()
+
+        groups = {}
+        for item in candidates:
+            key = (
+                item["frontier_node_id"],
+                item.get("observation_id"),
+            )
+            groups.setdefault(key, []).append(item)
+
+        grouped = []
+        for index, (key, items) in enumerate(
+            sorted(
+                groups.items(),
+                key=lambda pair: (
+                    min(item["start_line"] for item in pair[1]),
+                    max(item["end_line"] for item in pair[1]),
+                ),
+            )
+        ):
+            items = sorted(items, key=lambda item: item["start_line"])
+            grouped.append({
+                "id": (
+                    f"group:{state['path']}:{key[0]}:"
+                    f"{key[1] or 'unknown'}"
+                ),
+                "frontier_node_id": key[0],
+                "observation_id": key[1],
+                "start_line": items[0]["start_line"],
+                "end_line": items[-1]["end_line"],
+                "score": max(item["score"] for item in items),
+                "content": "\n".join(
+                    item["content"] for item in items
+                ),
+                "fragment_ids": [item["id"] for item in items],
+                "fragment_count": len(items),
+                "score_history": items[0]["score_history"],
+                "navigation": items[0]["navigation"],
+            })
+
+        state_view = {
+            "goal": goal,
+            "phase": "relevance_frontier_evidence_closure",
+            "file": state["path"],
+            "frontier": frontier_summary(state),
+            "groups": [
+                {
+                    "id": group["id"],
+                    "range": [
+                        group["start_line"],
+                        group["end_line"],
+                    ],
+                    "frontier_score": group["score"],
+                    "frontier_node_id": group["frontier_node_id"],
+                    "fragment_count": group["fragment_count"],
+                    "content": sanitize_source(group["content"]),
+                }
+                for group in grouped
+            ],
+            "instruction": (
+                "Resolve final evidence at the GROUP level. A group contains "
+                "contiguous fine-grained fragments from the same observed "
+                "source span. Judge the complete group, not each fragment in "
+                "isolation. Prefer keeping a group when the combined span "
+                "contains materially useful evidence even if individual "
+                "fragments are weak or incomplete."
+            ),
+        }
+
+        questions = {}
+        for index, group in enumerate(grouped):
+            questions[f"group_{index}"] = {
+                "type": "choice",
+                "instructions": {
+                    "goal": goal,
+                    "group_id": group["id"],
+                    "range": [
+                        group["start_line"],
+                        group["end_line"],
+                    ],
+                    "question": (
+                        "Should this COMPLETE evidence group be retained in the "
+                        "final localization result?"
+                    ),
+                },
+                "criteria": {
+                    "keep": (
+                        "Retain the complete group because its combined "
+                        "evidence is materially useful or provides necessary "
+                        "context."
+                    ),
+                    "drop": (
+                        "Drop the whole group because the combined span is "
+                        "incidental, redundant, or not materially useful."
+                    ),
+                },
+            }
+
+        response, usage = self.send(
+            "relevance_frontier_evidence_group_choice",
+            state_view,
+            questions,
+        )
+        answers = response.get("answers", {})
+        selected = []
+        for index, group in enumerate(grouped):
+            answer = answers.get(f"group_{index}", {})
+            if answer.get("type") != "choice":
+                raise RuntimeError(
+                    f"unexpected evidence-group choice answer: {answer!r}"
+                )
+            if answer.get("choice") != "keep":
+                continue
+            selected.append({
+                **group,
+                "final_choice": {
+                    "choice": "keep",
+                    "confidence": float(
+                        answer.get("confidence", 0.0) or 0.0
+                    ),
+                    "probabilities": answer.get("probabilities", {}),
+                },
+            })
+        return selected, usage
+
+
+class OfflineClosureChoiceRelevanceFrontierDecider(
+    ClosureChoiceRelevanceFrontierDecider
+):
+    model = "offline-closure-choice-relevance-frontier-fixture"
+
+    def __init__(self, trace):
+        self.trace = trace
+
+    def score_frontier(self, goal, state):
+        scores = {}
+        for node in frontier_leaves(state):
+            if not node["observation_ids"]:
+                continue
+            text = " ".join(
+                state["observation_by_id"][oid]["content"]
+                for oid in node["observation_ids"]
+            )
+            scores[node["id"]] = 0.9 if "TARGET" in text else 0.55
+        return scores, empty_usage()
+
+    def finalize_group_choices(self, goal, state, candidates):
+        groups = {}
+        for item in candidates:
+            key = (item["frontier_node_id"], item.get("observation_id"))
+            groups.setdefault(key, []).append(item)
+        selected = []
+        for key, items in groups.items():
+            if max(item["score"] for item in items) < 0.7:
+                continue
+            items = sorted(items, key=lambda item: item["start_line"])
+            selected.append({
+                "id": f"group:{key[0]}:{key[1]}",
+                "frontier_node_id": key[0],
+                "observation_id": key[1],
+                "start_line": items[0]["start_line"],
+                "end_line": items[-1]["end_line"],
+                "score": max(item["score"] for item in items),
+                "content": "\n".join(item["content"] for item in items),
+                "fragment_ids": [item["id"] for item in items],
+                "fragment_count": len(items),
+                "score_history": items[0]["score_history"],
+                "navigation": items[0]["navigation"],
+                "final_choice": {
+                    "choice": "keep",
+                    "confidence": 1.0,
+                    "probabilities": {"keep": 1.0, "drop": 0.0},
+                },
+            })
+        return selected, empty_usage()
+
+
+def run_frontier_file_phase0_choice_closure_v3(
+    root,
+    goal,
+    candidate,
+    decider,
+    trace,
+    *,
+    max_rounds=10,
+    max_actions_per_choice=6,
+    probe_lines=112,
+    target_region_lines=48,
+    final_window_lines=32,
+    refine_threshold=0.72,
+    candidate_threshold=0.55,
+    gradient_threshold=0.15,
+    volatility_threshold=0.10,
+    stable_delta=0.06,
+    stable_rounds=2,
+    max_frontier_leaves=24,
+    final_max_candidates=24,
+):
+    usage = empty_usage()
+    state = new_file_state(root, candidate, max_frontier_leaves)
+    if state is None:
+        return None, usage
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_closure_v3_started",
+        path=state["path"],
+        line_count=state["line_count"],
+        initial_frontier=frontier_summary(state),
+    )
+
+    current = phase0_coarse_scan(
+        root,
+        goal,
+        state,
+        decider,
+        trace,
+        probe_lines,
+    )
+    merge_usage(usage, current)
+    state["coarse_coverage"] = 1.0
+
+    if not state.get("phase0", {}).get("all_regions_observed"):
+        raise RuntimeError("phase0 coarse bootstrap invariant failed")
+
+    for round_number in range(1, max_rounds + 1):
+        state["round"] = round_number
+        actions = generate_actions(
+            state,
+            max_actions=max_actions_per_choice,
+            target_region_lines=target_region_lines,
+            refine_threshold=refine_threshold,
+            gradient_threshold=gradient_threshold,
+            volatility_threshold=volatility_threshold,
+        )
+        actions.append({
+            "kind": "stop_frontier",
+            "node_id": "file",
+            "priority": 0.0,
+            "reason": (
+                "finalize when current evidence is sufficient and remaining "
+                "actions have lower expected information gain"
+            ),
+            "side": None,
+            "source": None,
+        })
+
+        policy, current = decider.choose_next_action(
+            goal,
+            state,
+            actions,
+        )
+        merge_usage(usage, current)
+
+        chosen = policy["action"]
+        if chosen["kind"] == "stop_frontier":
+            state["termination"] = "model_stop"
+            state["policy_stop"] = policy
+            break
+
+        result = execute_action(
+            root,
+            state,
+            chosen,
+            probe_lines,
+        )
+        if result is None:
+            state["termination"] = "frontier_exhausted"
+            break
+
+        rescored, current = decider.score_frontier(goal, state)
+        merge_usage(usage, current)
+        apply_scores(state, rescored)
+
+        state["action_history"].append({
+            "round": round_number,
+            "policy": policy,
+            "executed": [{
+                "kind": chosen["kind"],
+                "source_node_id": chosen["node_id"],
+                "target_node_id": result["target_node_id"],
+                "range": [
+                    result["observation"]["start_line"],
+                    result["observation"]["end_line"],
+                ],
+            }],
+        })
+
+    else:
+        state["termination"] = "round_budget_exhausted"
+
+    candidates = fine_candidates(
+        state,
+        candidate_threshold=candidate_threshold,
+        final_window_lines=final_window_lines,
+        max_candidates=final_max_candidates,
+    )
+    selected, current = decider.finalize_group_choices(
+        goal,
+        state,
+        candidates,
+    )
+    merge_usage(usage, current)
+
+    state["final_candidates"] = candidates
+    state["evidence"] = merge_selected_candidates(selected)
+    state["frontier_coverage"] = observed_frontier_coverage(state)
+    state["source_coverage"] = (
+        unique_source_coverage(state) / max(1, state["line_count"])
+    )
+
+    trace.emit(
+        "relevance_frontier_phase0_choice_closure_v3_completed",
+        path=state["path"],
+        termination=state["termination"],
+        rounds=state["round"],
+        phase0=state.get("phase0"),
+        coarse_coverage=state.get("coarse_coverage"),
+        observations=len(state["observations"]),
+        frontier_coverage=state["frontier_coverage"],
+        source_coverage=state["source_coverage"],
+        final_candidates=len(candidates),
+        evidence=len(state["evidence"]),
+    )
+    return state, usage
