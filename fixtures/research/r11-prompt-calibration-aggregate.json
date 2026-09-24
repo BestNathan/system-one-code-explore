@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "kind": "r11-system-one-prompt-calibration-aggregate",
+  "source_run": 36026215590,
+  "cases": 3,
+  "benchmark_limitation": "The discovery references produced high and mid examples but no fixed-threshold low (<0.35) examples, so Phase A measures high-vs-mid separation rather than high-vs-low calibration.",
+  "prompts": {
+    "generic_relevance": {
+      "pearson": 0.37886632265943093,
+      "spearman": 0.4025551091538612,
+      "high_vs_rest_auc": 0.7225,
+      "precision_at_high_count": 0.7000000000000001,
+      "brier_high_label": 0.225819044834308,
+      "mean_high_probability": 0.6443333333333333
+    },
+    "material_evidence": {
+      "pearson": 0.2860662042178853,
+      "spearman": 0.3127095392490629,
+      "high_vs_rest_auc": 0.6704629629629629,
+      "precision_at_high_count": 0.6666666666666666,
+      "brier_high_label": 0.24924730994152047,
+      "mean_high_probability": 0.5653333333333334
+    },
+    "mechanism_match": {
+      "pearson": 0.2728060857910278,
+      "spearman": 0.2829624150911287,
+      "high_vs_rest_auc": 0.6774074074074075,
+      "precision_at_high_count": 0.7000000000000001,
+      "brier_high_label": 0.24657186159844055,
+      "mean_high_probability": 0.6196666666666667
+    },
+    "minimal_evidence_keep": {
+      "pearson": 0.3031913397416019,
+      "spearman": 0.3025517979283007,
+      "high_vs_rest_auc": 0.6606944444444445,
+      "precision_at_high_count": 0.6333333333333333,
+      "brier_high_label": 0.24333928849902534,
+      "mean_high_probability": 0.5083333333333334
+    },
+    "counterfactual_answer_impact": {
+      "pearson": 0.12198763196600394,
+      "spearman": 0.1775141216972375,
+      "high_vs_rest_auc": 0.5872222222222222,
+      "precision_at_high_count": 0.6333333333333333,
+      "brier_high_label": 0.2793926023391813,
+      "mean_high_probability": 0.5193333333333333
+    }
+  },
+  "per_case_generic_auc": {
+    "command_broker_ownership": 0.45,
+    "extension_registry_integrity": 0.83,
+    "git_agent_security": 0.8875
+  }
+}
