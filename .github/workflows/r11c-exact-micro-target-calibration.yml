@@ -1,0 +1,322 @@
+name: R11C exact micro-target prompt calibration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/micro_target_reference.py"
+      - "src/micro_target_prompt_benchmark.py"
+      - ".github/workflows/r11c-exact-micro-target-calibration.yml"
+      - "docs/experiments/r11c-exact-micro-target-calibration-2026-09-25.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  teacher:
+    name: Teacher / ${{ matrix.case.id }}
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case:
+          - id: broker_stale_generation
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Locate only the code that prevents an old superseded agent
+              connection from owning or completing command traffic after a
+              reconnect: connection generation creation, current-generation
+              ownership checks, stale response rejection, and stale disconnect
+              protection.
+          - id: broker_pending_timeout
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Locate only the pending-command timeout and cleanup lifecycle:
+              where a pending request is inserted, awaited with a timeout,
+              removed on timeout/send failure/disconnect, and where its oneshot
+              response is completed.
+          - id: extension_duplicate_routes
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Locate only the startup validation that detects duplicate or
+              conflicting protocol/wire routes across extensions and constructs
+              the corresponding conflict error instead of silently using one
+              provider.
+          - id: extension_runtime_dispatch
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Locate only the runtime dispatch path after registry construction:
+              mapping an incoming wire message type to the owning extension,
+              decoding or forwarding the payload, and returning the provider
+              result or unknown-route error.
+          - id: git_cwd_security
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Locate only the security boundary that ignores any client supplied
+              cwd/path and resolves the git working directory from the live
+              session through the injected resolver before executing git.
+          - id: git_typed_decode
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Locate only the typed command decoding and error-mapping boundary:
+              converting erased JSON payloads into typed protocol requests,
+              invoking the typed inner handlers, and mapping decode/provider
+              failures back to the erased response.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Prepare exact micro-target teacher prompt
+        run: |
+          mkdir -p "artifacts/teacher/$CASE_ID"
+          python3 src/micro_target_reference.py prepare \
+            --source "subject/$FILE_PATH" \
+            --query "$GOAL" \
+            --target-lines 8 \
+            --stride-lines 16 \
+            --output-prompt "artifacts/teacher/$CASE_ID/prompt.txt" \
+            --output-manifest "artifacts/teacher/$CASE_ID/manifest.json"
+
+      - name: Generate exact micro-target labels
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+          CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "1"
+        run: |
+          set -euo pipefail
+          ROOT="artifacts/teacher/$CASE_ID"
+          rm -f "$ROOT/reference.json"
+          for attempt in 1 2 3; do
+            claude -p \
+              --output-format text \
+              --max-turns 4 \
+              --permission-mode dontAsk \
+              --no-session-persistence \
+              --setting-sources '' \
+              --strict-mcp-config \
+              --mcp-config '{"mcpServers":{}}' \
+              --disable-slash-commands \
+              --tools '' \
+              --settings '{"disableAllHooks":true}' \
+              < "$ROOT/prompt.txt" \
+              > "$ROOT/output-attempt-$attempt.txt" || true
+            if python3 src/micro_target_reference.py normalize \
+              --source "subject/$FILE_PATH" \
+              --query "$GOAL" \
+              --target-lines 8 \
+              --stride-lines 16 \
+              --raw-output "$ROOT/output-attempt-$attempt.txt" \
+              --output "$ROOT/reference.json"; then
+              echo "$attempt" > "$ROOT/accepted-attempt.txt"
+              break
+            fi
+            rm -f "$ROOT/reference.json"
+          done
+          test -s "$ROOT/reference.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11c-teacher-${{ matrix.case.id }}
+          path: artifacts/teacher/${{ matrix.case.id }}/
+          retention-days: 90
+
+  student:
+    name: Student prompts / ${{ matrix.case.id }}
+    needs: teacher
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        case:
+          - id: broker_stale_generation
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Locate only the code that prevents an old superseded agent
+              connection from owning or completing command traffic after a
+              reconnect: connection generation creation, current-generation
+              ownership checks, stale response rejection, and stale disconnect
+              protection.
+          - id: broker_pending_timeout
+            path: crates/nession-server/src/server/command_broker.rs
+            goal: >-
+              Locate only the pending-command timeout and cleanup lifecycle:
+              where a pending request is inserted, awaited with a timeout,
+              removed on timeout/send failure/disconnect, and where its oneshot
+              response is completed.
+          - id: extension_duplicate_routes
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Locate only the startup validation that detects duplicate or
+              conflicting protocol/wire routes across extensions and constructs
+              the corresponding conflict error instead of silently using one
+              provider.
+          - id: extension_runtime_dispatch
+            path: crates/nession-agent/src/extension.rs
+            goal: >-
+              Locate only the runtime dispatch path after registry construction:
+              mapping an incoming wire message type to the owning extension,
+              decoding or forwarding the payload, and returning the provider
+              result or unknown-route error.
+          - id: git_cwd_security
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Locate only the security boundary that ignores any client supplied
+              cwd/path and resolves the git working directory from the live
+              session through the injected resolver before executing git.
+          - id: git_typed_decode
+            path: crates/nession-git/src/agent.rs
+            goal: >-
+              Locate only the typed command decoding and error-mapping boundary:
+              converting erased JSON payloads into typed protocol requests,
+              invoking the typed inner handlers, and mapping decode/provider
+              failures back to the erased response.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download exact teacher labels
+        uses: actions/download-artifact@v4
+        with:
+          name: r11c-teacher-${{ matrix.case.id }}
+          path: artifacts/teacher
+
+      - name: Score prompt family against exact micro labels
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/micro_target_prompt_benchmark.py \
+            --reference artifacts/teacher/reference.json \
+            --source "subject/$FILE_PATH" \
+            --goal "$GOAL" \
+            --file-path "$FILE_PATH" \
+            --per-bucket 10 \
+            --trace-file artifacts/out/trace.jsonl \
+            --output artifacts/out/result.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11c-student-${{ matrix.case.id }}
+          path: artifacts/out/
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R11C exact micro-target calibration
+    needs: student
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r11c-student-*
+          path: artifacts/all
+
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from pathlib import Path
+
+          rows=[
+              json.loads(p.read_text())
+              for p in sorted(Path("artifacts/all").glob("*/result.json"))
+          ]
+          names=sorted(rows[0]["prompts"])
+          metrics=(
+              "pearson","spearman","high_vs_rest_auc",
+              "precision_at_high_count","brier_high_label",
+              "mean_high_probability","mean_mid_probability",
+              "mean_low_probability","high_low_separation"
+          )
+          out={
+              "schema_version":1,
+              "kind":"r11c-exact-micro-target-prompt-aggregate",
+              "cases":len(rows),
+              "case_geometry":{},
+              "prompts":{}
+          }
+          for row in rows:
+              counts={"high":0,"mid":0,"low":0}
+              for item in row["examples"]:
+                  counts[item["bucket"]]+=1
+              out["case_geometry"][row["file_path"]+" :: "+row["goal"]]=counts
+          for name in names:
+              out["prompts"][name]={}
+              for metric in metrics:
+                  values=[
+                      row["prompts"][name]["metrics"].get(metric)
+                      for row in rows
+                  ]
+                  values=[v for v in values if v is not None]
+                  out["prompts"][name][metric]=(
+                      statistics.fmean(values) if values else None
+                  )
+          Path("aggregate.json").write_text(
+              json.dumps(out,indent=2)+"\n"
+          )
+          print(json.dumps(out,indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r11c-exact-micro-target-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
