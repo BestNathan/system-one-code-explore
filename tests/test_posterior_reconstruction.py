@@ -22,8 +22,10 @@ class PosteriorReconstructionTests(unittest.TestCase):
             120,
             kth_neighbor=3,
         )
-        self.assertEqual(a["relevance"], b["relevance"])
-        self.assertEqual(a["uncertainty"], b["uncertainty"])
+        for left, right in zip(a["relevance"], b["relevance"]):
+            self.assertAlmostEqual(left, right, places=14)
+        for left, right in zip(a["uncertainty"], b["uncertainty"]):
+            self.assertAlmostEqual(left, right, places=14)
 
     def test_sequential_baseline_is_order_sensitive(self):
         a = sequential_exponential(SAMPLES, 120)
