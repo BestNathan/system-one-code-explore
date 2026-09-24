@@ -122,3 +122,42 @@ no longer used as fine-grained prompt-calibration ground truth.
 R11C also adds `direct_target_relevance`, a concise prompt that preserves the
 generic relevance formulation while explicitly denying relevance credit from
 nearby code, shared symbols, or file-level theme.
+
+
+## Phase A result
+
+Completed in workflow run `36026215590`.
+
+Discovery-set aggregate:
+
+| prompt | ROC AUC | top-K precision | Pearson | Spearman | Brier |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| generic relevance | **0.7225** | **0.7000** | **0.3789** | **0.4026** | **0.2258** |
+| mechanism match | 0.6774 | **0.7000** | 0.2728 | 0.2830 | 0.2466 |
+| material evidence | 0.6705 | 0.6667 | 0.2861 | 0.3127 | 0.2492 |
+| minimal evidence keep | 0.6607 | 0.6333 | 0.3032 | 0.3026 | 0.2433 |
+| counterfactual answer impact | 0.5872 | 0.6333 | 0.1220 | 0.1775 | 0.2794 |
+
+The simplest prompt — direct task relevance — is the strongest Phase A candidate.
+
+However the fixed absolute sampling buckets exposed a benchmark flaw: all three full-read references produced high and medium examples but no examples below the fixed `0.35` low threshold. Phase A therefore measures high-vs-mid separation, not true high-vs-low calibration.
+
+Per-case generic-relevance AUC:
+
+- command broker ownership: **0.45**;
+- extension registry integrity: **0.83**;
+- git agent security: **0.8875**.
+
+This variance is important. The aggregate winner is not yet robust across goals.
+
+### Next step
+
+Phase B should:
+
+1. freeze `generic_relevance` as the current candidate;
+2. replace fixed score buckets with within-file CC quantiles so every benchmark contributes positive, ambiguous, and negative targets;
+3. use fresh files/goals not present in Phase A or R09;
+4. compare small wording variants around the winning simple semantics rather than increasingly elaborate evidence language;
+5. require consistent per-file AUC/precision before promoting a prompt into Phase0.
+
+Pinned aggregate: `fixtures/research/r11-prompt-calibration-aggregate.json`.
