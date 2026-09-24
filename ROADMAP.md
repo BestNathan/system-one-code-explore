@@ -13,40 +13,46 @@ Build a general **System One Code Exploration Runtime** in which the harness own
 - **R05 — Sparse Phase0:** sparse sensing is viable; collapsing samples into a few coarse scores is not.
 - **R06 — Whole-file probability frontier:** represent relevance and uncertainty at file length.
 - **R07 — Posterior reconstruction:** separate durable observations from a replaceable, path-independent posterior estimator.
-- **R08 Phase A/B — Online posterior feedback:** posterior choice changes the online sampling path and improves the websocket fixture.
+- **R08 — Online posterior feedback and holdout search:** a better relevance posterior changed the online path, but its support-derived uncertainty failed holdout search generalization.
 
 Canonical details live in `docs/research/README.md`.
 
-## Current milestone — R08 Phase C holdout generalization
+## Current milestone — R09 uncertainty calibration and search policy
 
-Estimator parameters are frozen before holdout references are inspected.
+R08 identified a structural separation that the runtime must make explicit:
 
-Evaluate multiple files/tasks with materially different relevance geometry:
+```text
+relevance interpolation
+    !=
+epistemic need-to-observe
+```
 
-- localized implementation hotspot;
-- separated multi-peak implementation;
-- long mostly irrelevant tail/test region;
-- distant relevant regions in the same file.
+R09 keeps the multi-scale relevance reconstruction unchanged and introduces a
+conservative observation-distance lower bound for exploration uncertainty.
 
-For each holdout:
+The first R09 round is pre-registered on three fresh holdouts:
 
-1. create a fresh full-read System 2 reference;
-2. run the same frozen estimator variants;
-3. compare convergence curves and source-read budgets;
-4. report per-file and aggregate metrics;
-5. record failures instead of retuning against the same holdout set.
+- agent filesystem read/chunking safety;
+- tmux lifecycle and cleanup safety;
+- web terminal attach/reconnect lifecycle.
 
-Exit criteria:
+Primary success criteria are search-oriented:
 
-- improved average MAE/RMSE;
-- improved ranking/correlation on most holdouts rather than one fixture;
-- no systematic uncertainty collapse;
-- fewer probes to reach a target frontier quality;
-- deterministic reconstruction for a fixed observation set.
+- higher high-relevance recall AUC per probe;
+- higher relevance-mass recall AUC per probe;
+- better fixed-budget high-line recall;
+- improved useful-probe rate;
+- no uncertainty collapse in distant unread regions.
 
-## After R08
+R08 holdouts are diagnosis-only and cannot be used as R09 generalization
+evidence.
 
-If the posterior generalizes, promote it from a research candidate into the default frontier component and then resume broader exploration-runtime work. If it fails, open a new research iteration with an explicit train/validation split rather than tuning against R08 holdouts.
+## After R09
+
+If the uncertainty guard generalizes on fresh holdouts, promote the split
+relevance/uncertainty state model into the default probability frontier. If it
+does not, preserve the R09 data and open a new iteration rather than tuning on
+the same validation references.
 
 Longer-term runtime milestones remain:
 
