@@ -1521,6 +1521,18 @@ class OfflineChoiceRelevanceFrontierDecider(
 ):
     model = "offline-choice-relevance-frontier-fixture"
 
+    def score_frontier(self, goal, state):
+        scores = {}
+        for node in frontier_leaves(state):
+            if not node["observation_ids"]:
+                continue
+            text = " ".join(
+                state["observation_by_id"][oid]["content"]
+                for oid in node["observation_ids"]
+            )
+            scores[node["id"]] = 0.9 if "TARGET" in text else 0.55
+        return scores, empty_usage()
+
     def choose_next_action(self, goal, state, actions):
         ranked = sorted(
             actions,
