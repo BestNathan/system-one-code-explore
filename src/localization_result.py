@@ -603,6 +603,91 @@ def build_system_one_result(engine_result, model=None):
     return validate(result)
 
 
+
+def build_system_one_adaptive_zoom_result(engine_result, model=None):
+    """Build the canonical result from adaptive semantic zoom search."""
+    files = []
+    for item in engine_result.get("result_files", []):
+        path = item["path"]
+        evidence = []
+        for index, region in enumerate(item.get("evidence", []), 1):
+            evidence.append({
+                "id": f"{path}#evidence-{index}",
+                "start_line": int(region["start_line"]),
+                "end_line": int(region["end_line"]),
+                "confidence": confidence(
+                    region["score"],
+                    "noul_relevance",
+                    "post-navigation System One adaptive-zoom evidence relevance",
+                ),
+                "reason": (
+                    "Observed probe retained by adaptive semantic zoom because "
+                    "its post-navigation relevance met the evidence threshold."
+                ),
+                "content": region.get("content", ""),
+                "provenance": {
+                    "region_id": region.get("region_id"),
+                    "depth": region.get("depth"),
+                },
+            })
+
+        files.append({
+            "path": path,
+            "role": "relevant",
+            "confidence": confidence(
+                item["score"],
+                "derived_max_evidence_relevance",
+                "maximum retained adaptive-zoom evidence relevance for this file",
+            ),
+            "reason": (
+                "Adaptive semantic zoom retained at least one observed probe "
+                "from this file as relevant evidence."
+            ),
+            "evidence": evidence,
+            "provenance": {
+                "phase1_score": item.get("phase1_score"),
+                "termination": item.get("termination"),
+                "rounds": item.get("rounds", 0),
+            },
+        })
+
+    files.sort(
+        key=lambda item: (
+            -item["confidence"]["score"],
+            item["path"],
+        )
+    )
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": KIND,
+        "task": engine_result.get("query", ""),
+        "producer": {
+            "system": "system_one",
+            "model": model or engine_result.get("model"),
+            "confidence_semantics": (
+                "Evidence confidence is post-navigation System One Noul "
+                "relevance. File confidence is the maximum retained evidence "
+                "relevance."
+            ),
+            "algorithm": "adaptive_semantic_zoom_search",
+        },
+        "summary": {
+            "valuable_files": len(files),
+            "evidence_regions": sum(
+                len(item["evidence"]) for item in files
+            ),
+            "file_runtimes": (
+                engine_result.get("metrics") or {}
+            ).get("file_runtimes"),
+        },
+        "confidence": None,
+        "cost": system_one_cost(engine_result),
+        "files": files,
+    }
+    attach_subject(result, engine_result.get("subject"))
+    return validate(result)
+
+
 def build_system_one_range_result(engine_result, model=None):
     """Build the canonical result from the independent per-file range runtime."""
     files = []
