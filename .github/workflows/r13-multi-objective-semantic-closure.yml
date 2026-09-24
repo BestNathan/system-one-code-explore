@@ -1,0 +1,256 @@
+name: R13 multi-objective semantic closure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/multi_objective_evidence_acquisition.py"
+      - "src/multi_objective_evidence_benchmark.py"
+      - "tests/test_multi_objective_evidence_acquisition.py"
+      - ".github/workflows/r13-multi-objective-semantic-closure.yml"
+      - "docs/research/2026-09-25-r13-multi-objective-semantic-closure.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "36004833542"
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  run:
+    name: R13 / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }}
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+            goal: >-
+              Help me improve the agent-to-server reconnect lifecycle:
+              exponential backoff, registration after reconnect,
+              connected/sync-needed state transitions, and behavior of queued
+              outbound messages while disconnected.
+          - id: protocol_catalog_consistency
+            path: crates/nession-protocol-codegen/src/catalog.rs
+            goal: >-
+              Help me make protocol contract generation safer: locate the
+              catalog code that defines unit identity and wire/request/response
+              mappings and the checks that prevent missing, duplicate, or
+              non-self-contained generated contracts.
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+            goal: >-
+              I am debugging the server's agent command lifecycle. Locate the
+              integration-test code that exercises agent registration, command
+              request/response routing, disconnect or reconnect behavior, and
+              cleanup of pending work.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
+      REPEAT: ${{ matrix.repeat }}
+      ESTIMATOR: ${{ matrix.estimator }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download canonical R08 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Download canonical Phase0 trajectory
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
+          path: artifacts/phase0
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run R13 acquisition and semantic closure
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/multi_objective_evidence_acquisition.py             --source "subject/$FILE_PATH"             --goal "$GOAL"             --phase0-run "artifacts/phase0/$ESTIMATOR/run.json"             --tile-lines 32             --coverage-threshold 0.65             --utility-threshold 0.65             --completeness-threshold 0.70             --expansion-threshold 0.60             --max-rounds 12             --trace-file artifacts/out/trace.jsonl             --output artifacts/out/run.json
+
+      - name: Evaluate R13
+        run: |
+          python3 src/multi_objective_evidence_benchmark.py             --reference artifacts/reference/reference.json             --phase0-run "artifacts/phase0/$ESTIMATOR/run.json"             --run artifacts/out/run.json             --output-json artifacts/out/benchmark.json             --output-markdown artifacts/out/benchmark.md
+          cat artifacts/out/benchmark.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r13-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R13
+    needs: run
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r13-*
+          path: artifacts/all
+
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          rows = []
+          for path in sorted(Path("artifacts/all").glob("*/benchmark.json")):
+              root = path.parent
+              rows.append((
+                  json.loads((root / "run.json").read_text()),
+                  json.loads(path.read_text()),
+              ))
+
+          grouped = defaultdict(list)
+          for run, bench in rows:
+              grouped[
+                  run["phase0_source"]["posterior_estimator"]
+              ].append((run, bench))
+
+          out = {
+              "schema_version": 1,
+              "kind": "r13-multi-objective-semantic-closure-aggregate",
+              "source_phase0_run": 36004833542,
+              "runs": len(rows),
+              "estimators": {},
+          }
+
+          metric_names = (
+              "source_fraction",
+              "mean_reference_relevance",
+              "high_line_precision",
+              "high_line_recall",
+              "weighted_relevance_recall",
+              "phase0_high_frontier_coverage",
+              "mean_final_region_lines",
+              "closure_expansion_tiles",
+          )
+
+          for estimator, items in sorted(grouped.items()):
+              summary = {}
+              for name in metric_names:
+                  summary[name] = statistics.fmean(
+                      bench["metrics"][name]
+                      for _, bench in items
+                  )
+              complete = [
+                  bench["metrics"][
+                      "mean_final_system1_completeness"
+                  ]
+                  for _, bench in items
+                  if bench["metrics"][
+                      "mean_final_system1_completeness"
+                  ] is not None
+              ]
+              summary["mean_final_system1_completeness"] = (
+                  statistics.fmean(complete)
+                  if complete else None
+              )
+              summary["mean_selected_tiles"] = statistics.fmean(
+                  run["selected_count"]
+                  for run, _ in items
+              )
+              summary["mean_selected_lines"] = statistics.fmean(
+                  run["selected_lines"]
+                  for run, _ in items
+              )
+              summary["premature_hidden_cc_rate"] = (
+                  statistics.fmean(
+                      1.0
+                      if bench["stop"]["premature_by_hidden_cc"]
+                      else 0.0
+                      for _, bench in items
+                  )
+              )
+              summary["safety_cap_rate"] = statistics.fmean(
+                  1.0
+                  if run["termination"] == "safety_cap"
+                  else 0.0
+                  for run, _ in items
+              )
+              summary["mean_model_calls"] = statistics.fmean(
+                  run["usage"]["model_calls"]
+                  for run, _ in items
+              )
+              summary["mean_input_tokens"] = statistics.fmean(
+                  run["usage"]["input_tokens"]
+                  for run, _ in items
+              )
+              summary["terminations"] = dict(Counter(
+                  run["termination"]
+                  for run, _ in items
+              ))
+              out["estimators"][estimator] = summary
+
+          out["baselines"] = {
+              "r10": json.loads(
+                  Path(
+                      "fixtures/research/"
+                      "r10-final-evidence-quality-aggregate.json"
+                  ).read_text()
+              )["estimators"],
+              "r12": json.loads(
+                  Path(
+                      "fixtures/research/"
+                      "r12-dynamic-evidence-aggregate.json"
+                  ).read_text()
+              )["estimators"],
+          }
+
+          Path("aggregate.json").write_text(
+              json.dumps(out, indent=2) + "\n"
+          )
+          print(json.dumps(out, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r13-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
