@@ -89,3 +89,36 @@ cross-domain negatives.
 
 The prompt family remains frozen. Phase B may select a prompt candidate, but a
 generalization claim still requires unseen files/goals.
+
+
+## Phase B result
+
+Workflow run `36027079823` created useful same-file hard negatives, but the
+64-line reference projection is too coarse for 8-line student targets.
+
+The decisive counterexample is `extension_runtime_dispatch`: broad CC windows
+around lines 225–312 score highly because they contain the real dispatch path
+later in the window, but exact targets near 225–248 are duplicate-route
+validation. System One scores those exact targets low, which is semantically
+reasonable even though the projected label says high.
+
+Therefore the R11B prompt ranking is diagnostic only.
+
+## Phase C — exact micro-target teacher
+
+R11C keeps the narrow-goal hard-negative design but asks the full-read System 2
+teacher to score every exact 8-line target directly.
+
+This aligns teacher and student granularity:
+
+```text
+full-file System 2 + target identity -> exact micro-target label
+local-context System One + same target -> predicted probability
+```
+
+The broad 64/32 field remains appropriate for Phase0/search evaluation but is
+no longer used as fine-grained prompt-calibration ground truth.
+
+R11C also adds `direct_target_relevance`, a concise prompt that preserves the
+generic relevance formulation while explicitly denying relevance credit from
+nearby code, shared symbols, or file-level theme.
