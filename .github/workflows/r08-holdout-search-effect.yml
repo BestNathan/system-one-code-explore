@@ -2,6 +2,11 @@ name: R08 holdout search effect
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/r08-holdout-search-effect.yml"
 
 permissions:
   contents: read
@@ -13,8 +18,166 @@ env:
   TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
 
 jobs:
+  references:
+    name: Reference / ${{ matrix.case.id }}
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+            query: >-
+              Help me improve the agent-to-server reconnect lifecycle:
+              exponential backoff, registration after reconnect,
+              connected/sync-needed state transitions, and behavior of queued
+              outbound messages while disconnected.
+          - id: protocol_catalog_consistency
+            path: crates/nession-protocol-codegen/src/catalog.rs
+            query: >-
+              Help me make protocol contract generation safer: locate the
+              catalog code that defines unit identity and wire/request/response
+              mappings and the checks that prevent missing, duplicate, or
+              non-self-contained generated contracts.
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+            query: >-
+              I am debugging the server's agent command lifecycle. Locate the
+              integration-test code that exercises agent registration, command
+              request/response routing, disconnect or reconnect behavior, and
+              cleanup of pending work.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Prepare full-read reference prompt
+        run: |
+          set -euo pipefail
+          mkdir -p "artifacts/reference/$CASE_ID"
+          python3 src/full_read_relevance_baseline.py prepare \
+            --source "subject/$FILE_PATH" \
+            --query "$QUERY" \
+            --window-lines 64 \
+            --stride-lines 32 \
+            --output-prompt "artifacts/reference/$CASE_ID/prompt.txt" \
+            --output-manifest "artifacts/reference/$CASE_ID/prompt-manifest.json"
+
+      - name: Generate and validate full-read reference
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+          CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "1"
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_BASE_URL"
+          test -n "$ANTHROPIC_MODEL"
+          ROOT="artifacts/reference/$CASE_ID"
+          rm -f "$ROOT/reference.json"
+
+          for attempt in 1 2 3; do
+            echo "Full-read reference attempt $attempt"
+            claude -p \
+              --output-format text \
+              --max-turns 4 \
+              --permission-mode dontAsk \
+              --no-session-persistence \
+              --setting-sources '' \
+              --strict-mcp-config \
+              --mcp-config '{"mcpServers":{}}' \
+              --disable-slash-commands \
+              --tools '' \
+              --settings '{"disableAllHooks":true}' \
+              < "$ROOT/prompt.txt" \
+              > "$ROOT/output-attempt-$attempt.txt" || true
+
+            if python3 src/full_read_relevance_baseline.py normalize \
+              --source "subject/$FILE_PATH" \
+              --query "$QUERY" \
+              --window-lines 64 \
+              --stride-lines 32 \
+              --raw-output "$ROOT/output-attempt-$attempt.txt" \
+              --output "$ROOT/reference.json"; then
+              cp "$ROOT/output-attempt-$attempt.txt" "$ROOT/output.txt"
+              echo "$attempt" > "$ROOT/accepted-attempt.txt"
+              break
+            fi
+            rm -f "$ROOT/reference.json"
+          done
+
+          test -s "$ROOT/reference.json"
+
+      - name: Record reference provenance
+        env:
+          REFERENCE_MODEL: ${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path("artifacts/reference") / os.environ["CASE_ID"]
+          ref = json.loads((root / "reference.json").read_text())
+          provenance = {
+              "case_id": os.environ["CASE_ID"],
+              "task": os.environ["QUERY"],
+              "path": os.environ["FILE_PATH"],
+              "subject_repository": os.environ["SUBJECT_REPOSITORY"],
+              "subject_sha": os.environ["SUBJECT_SHA"],
+              "runtime": "claude-code",
+              "environment": "ds",
+              "model": os.environ["REFERENCE_MODEL"],
+              "line_count": ref["line_count"],
+              "range_count": len(ref["ranges"]),
+              "accepted_attempt": int(
+                  (root / "accepted-attempt.txt").read_text().strip()
+              ),
+          }
+          (root / "provenance.json").write_text(
+              json.dumps(provenance, indent=2, ensure_ascii=False) + "\n"
+          )
+          PY
+
+      - name: Upload reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference/${{ matrix.case.id }}/
+          if-no-files-found: error
+          retention-days: 90
+
   online:
-    if: github.event_name != 'pull_request'
+    needs: references
     name: Online / ${{ matrix.case.id }} / repeat-${{ matrix.repeat }}
     runs-on: ubuntu-24.04
     environment: typesafe
@@ -69,6 +232,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
+      - name: Download fixed reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference
 
       - name: Run sequential and frozen multi-scale policies
         env:
@@ -180,9 +349,9 @@ jobs:
           )"
 
           for estimator in sequential_exponential multi_scale_gaussian; do
-            python3 src/probability_frontier_benchmark.py               --reference "fixtures/research/r08-holdout-${CASE_ID}-reference.json"               --run "$BASE/$estimator/run.json"               --checkpoints "$CHECKPOINTS"               --high-threshold 0.70               --output-json "$BASE/$estimator/convergence.json"               --output-markdown "$BASE/$estimator/convergence.md"
+            python3 src/probability_frontier_benchmark.py               --reference artifacts/reference/reference.json               --run "$BASE/$estimator/run.json"               --checkpoints "$CHECKPOINTS"               --high-threshold 0.70               --output-json "$BASE/$estimator/convergence.json"               --output-markdown "$BASE/$estimator/convergence.md"
 
-            python3 src/search_effect_benchmark.py               --reference "fixtures/research/r08-holdout-${CASE_ID}-reference.json"               --run "$BASE/$estimator/run.json"               --high-threshold 0.70               --output-json "$BASE/$estimator/search-effect.json"               --output-markdown "$BASE/$estimator/search-effect.md"
+            python3 src/search_effect_benchmark.py               --reference artifacts/reference/reference.json               --run "$BASE/$estimator/run.json"               --high-threshold 0.70               --output-json "$BASE/$estimator/search-effect.json"               --output-markdown "$BASE/$estimator/search-effect.md"
           done
 
       - name: Build paired summary
