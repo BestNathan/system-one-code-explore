@@ -1,4 +1,3 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,14 +10,53 @@ from system_one_code_locator import empty_usage
 
 
 class FakeDecider:
-    def __init__(self, decisions):
-        self.decisions = list(decisions)
+    def __init__(self, rounds):
+        self.rounds = list(rounds)
 
-    def choose_next(self, goal, path, phase0_run, remaining, selected):
-        return self.decisions.pop(0), empty_usage()
+    def score_actions(
+        self,
+        goal,
+        path,
+        phase0_run,
+        remaining,
+        selected,
+        *,
+        batch_size,
+    ):
+        probabilities = self.rounds.pop(0)
+        scored = [
+            {
+                **action,
+                "noul_probability": float(
+                    probabilities.get(action["id"], 0.0)
+                ),
+            }
+            for action in remaining
+        ]
+        scored.sort(
+            key=lambda item: (
+                -item["noul_probability"],
+                item["start_line"],
+            )
+        )
+        return scored, empty_usage()
 
 
 class DynamicEvidenceAcquisitionTests(unittest.TestCase):
+    def phase0(self, line_count):
+        return {
+            "posterior_estimator": "demo",
+            "probes": 4,
+            "sample_lines": 8,
+            "subject": {"path": "demo.rs"},
+            "frontier": {
+                "line_count": line_count,
+                "relevance": [0.5] * line_count,
+                "uncertainty": [0.8] * line_count,
+                "observed": [False] * line_count,
+            },
+        }
+
     def test_partition_actions_cover_file_without_overlap(self):
         actions = partition_actions(70, tile_lines=32)
         self.assertEqual(
@@ -26,37 +64,16 @@ class DynamicEvidenceAcquisitionTests(unittest.TestCase):
             [(1, 32), (33, 64), (65, 70)],
         )
 
-    def test_reads_one_tile_then_stops_on_stop_anchor(self):
-        source = "\n".join(f"line {i}" for i in range(1, 65))
-        phase0 = {
-            "posterior_estimator": "demo",
-            "probes": 4,
-            "sample_lines": 8,
-            "subject": {"path": "demo.rs"},
-            "frontier": {
-                "line_count": 64,
-                "relevance": [0.5] * 64,
-                "uncertainty": [0.8] * 64,
-                "observed": [False] * 64,
-            },
-        }
+    def test_reads_all_actions_above_threshold_in_same_round(self):
+        source = "\n".join(f"line {i}" for i in range(1, 97))
         decider = FakeDecider([
             {
-                "choice": "tile_002",
-                "confidence": 0.8,
-                "probabilities": {
-                    "tile_001": 0.20,
-                    "tile_002": 0.65,
-                    "stop": 0.15,
-                },
+                "tile_001": 0.83,
+                "tile_002": 0.72,
+                "tile_003": 0.31,
             },
             {
-                "choice": "stop",
-                "confidence": 0.9,
-                "probabilities": {
-                    "tile_001": 0.25,
-                    "stop": 0.75,
-                },
+                "tile_003": 0.44,
             },
         ])
 
@@ -66,49 +83,62 @@ class DynamicEvidenceAcquisitionTests(unittest.TestCase):
             result = run_dynamic_evidence(
                 path,
                 "find target",
-                phase0,
+                self.phase0(96),
                 decider,
                 tile_lines=32,
-                minimum_lift=1.1,
+                threshold=0.65,
                 max_rounds=10,
             )
 
-        self.assertEqual(result["termination"], "stop_outweighs_best_read")
-        self.assertEqual(result["selected_count"], 1)
         self.assertEqual(
-            (
-                result["selected_evidence"][0]["start_line"],
-                result["selected_evidence"][0]["end_line"],
-            ),
-            (33, 64),
+            result["termination"],
+            "all_remaining_below_threshold",
+        )
+        self.assertEqual(result["selected_count"], 2)
+        self.assertEqual(result["rounds"], 2)
+        self.assertEqual(
+            [x["id"] for x in result["selected_evidence"]],
+            ["tile_001", "tile_002"],
         )
         self.assertEqual(
             [x["id"] for x in result["remaining_actions"]],
-            ["tile_001"],
+            ["tile_003"],
         )
 
-    def test_stops_when_choice_is_not_above_uniform_lift(self):
+    def test_selected_evidence_changes_next_round_action_set(self):
         source = "\n".join(f"line {i}" for i in range(1, 65))
-        phase0 = {
-            "posterior_estimator": "demo",
-            "probes": 4,
-            "sample_lines": 8,
-            "subject": {"path": "demo.rs"},
-            "frontier": {
-                "line_count": 64,
-                "relevance": [0.5] * 64,
-                "uncertainty": [0.8] * 64,
-                "observed": [False] * 64,
+        decider = FakeDecider([
+            {
+                "tile_001": 0.9,
+                "tile_002": 0.8,
             },
-        }
+        ])
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "demo.rs"
+            path.write_text(source + "\n", encoding="utf-8")
+            result = run_dynamic_evidence(
+                path,
+                "find target",
+                self.phase0(64),
+                decider,
+                tile_lines=32,
+                threshold=0.65,
+                max_rounds=10,
+            )
+
+        self.assertEqual(
+            result["termination"],
+            "action_space_exhausted",
+        )
+        self.assertEqual(result["selected_count"], 2)
+        self.assertEqual(result["remaining_actions"], [])
+
+    def test_stops_immediately_when_all_noul_scores_are_low(self):
+        source = "\n".join(f"line {i}" for i in range(1, 65))
         decider = FakeDecider([{
-            "choice": "tile_001",
-            "confidence": 0.4,
-            "probabilities": {
-                "tile_001": 0.35,
-                "tile_002": 0.34,
-                "stop": 0.31,
-            },
+            "tile_001": 0.52,
+            "tile_002": 0.61,
         }])
 
         with tempfile.TemporaryDirectory() as directory:
@@ -117,18 +147,19 @@ class DynamicEvidenceAcquisitionTests(unittest.TestCase):
             result = run_dynamic_evidence(
                 path,
                 "find target",
-                phase0,
+                self.phase0(64),
                 decider,
                 tile_lines=32,
-                minimum_lift=1.1,
+                threshold=0.65,
                 max_rounds=10,
             )
 
         self.assertEqual(
             result["termination"],
-            "no_read_above_uniform_lift",
+            "all_remaining_below_threshold",
         )
         self.assertEqual(result["selected_count"], 0)
+        self.assertEqual(result["rounds"], 1)
 
 
 if __name__ == "__main__":
