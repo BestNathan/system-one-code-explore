@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "kind": "r15-frontier-obligations-aggregate",
+  "canonical_run": 36077460697,
+  "source_phase0_run": 36004833542,
+  "runs": 8,
+  "estimators": {
+    "multi_scale_gaussian": {
+      "mean_obligation_count": 2.0,
+      "mean_satisfied_obligations": 1.25,
+      "mean_exhausted_obligations": 0.75,
+      "mean_seed_attempts_per_obligation": 3.5416666666666665,
+      "mean_anchor_count": 7.0,
+      "mean_retained_anchor_count": 1.25,
+      "mean_closure_expansion_tiles": 29.5,
+      "mean_anchor_span_lines": 161.23636363636365,
+      "mean_max_anchor_span_lines": 360.0,
+      "materialized_source_fraction": 0.27084349442641953,
+      "materialized_high_recall": 0.41041666666666665,
+      "retained_source_fraction": 0.1436054032275166,
+      "retained_mean_reference_relevance": 0.7908333333333333,
+      "retained_high_precision": 0.75,
+      "retained_high_recall": 0.25416666666666665,
+      "retained_weighted_relevance_recall": 0.18454876547540314,
+      "hidden_cc_high_regions_without_obligation": 2.0,
+      "closure_safety_cap_count": 0.5,
+      "mean_model_calls": 41.75,
+      "mean_input_tokens": 174606.25
+    },
+    "sequential_exponential": {
+      "mean_obligation_count": 3.25,
+      "mean_satisfied_obligations": 1.0,
+      "mean_exhausted_obligations": 2.25,
+      "mean_seed_attempts_per_obligation": 4.55,
+      "mean_anchor_count": 12.5,
+      "mean_retained_anchor_count": 1.0,
+      "mean_closure_expansion_tiles": 41.5,
+      "mean_anchor_span_lines": 134.8846153846154,
+      "mean_max_anchor_span_lines": 296.0,
+      "materialized_source_fraction": 0.36771847233708677,
+      "materialized_high_recall": 0.5166666666666666,
+      "retained_source_fraction": 0.06438068579426173,
+      "retained_mean_reference_relevance": 0.4342307692307692,
+      "retained_high_precision": 0.5,
+      "retained_high_recall": 0.19166666666666665,
+      "retained_weighted_relevance_recall": 0.13806195530244197,
+      "hidden_cc_high_regions_without_obligation": 2.5,
+      "closure_safety_cap_count": 0.75,
+      "mean_model_calls": 61.0,
+      "mean_input_tokens": 209294.5
+    }
+  }
+}
