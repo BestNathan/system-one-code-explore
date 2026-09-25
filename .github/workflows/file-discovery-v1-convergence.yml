@@ -1,0 +1,175 @@
+name: File Discovery V1 convergence
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/file_discovery_v1.py"
+      - "src/file_discovery_v1_benchmark.py"
+      - "src/file_discovery_v1_suite.py"
+      - "tests/test_file_discovery_v1.py"
+      - "fixtures/file-discovery/v1-primary-target-cases.json"
+      - "docs/domains/file-discovery-v1.md"
+      - ".github/workflows/file-discovery-v1-convergence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  suite:
+    name: File Discovery V1 / repeat ${{ matrix.repeat }}
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        repeat: [1, 2]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run File Discovery V1 suite
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          python3 src/file_discovery_v1_suite.py             --root subject             --cases fixtures/file-discovery/v1-primary-target-cases.json             --directory-threshold 0.50             --file-threshold 0.65             --transport-batch-size 64             --output-dir artifacts/repeat-${{ matrix.repeat }}
+          cat artifacts/repeat-${{ matrix.repeat }}/suite.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: file-discovery-v1-repeat-${{ matrix.repeat }}
+          path: artifacts/repeat-${{ matrix.repeat }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate File Discovery V1
+    needs: suite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: file-discovery-v1-repeat-*
+          path: artifacts
+
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import Counter
+          from pathlib import Path
+
+          suites = [
+              json.loads(path.read_text())
+              for path in sorted(Path("artifacts").glob("*/suite.json"))
+          ]
+          rows = [
+              row
+              for suite in suites
+              for row in suite["results"]
+          ]
+          failures = Counter(
+              row["failure"]["kind"]
+              for row in rows
+              if row["failure"] is not None
+          )
+
+          aggregate = {
+              "schema_version": 1,
+              "kind": "file-discovery-v1-convergence-aggregate",
+              "repository": "BestNathan/nession",
+              "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+              "repeats": len(suites),
+              "logical_case_runs": len(rows),
+              "all_primary_recovered_every_run": all(
+                  row["primary_recovered"] for row in rows
+              ),
+              "mean_primary_recall": statistics.fmean(
+                  suite["primary_recall"] for suite in suites
+              ),
+              "min_repeat_primary_recall": min(
+                  suite["primary_recall"] for suite in suites
+              ),
+              "mean_selected_files_per_case": statistics.fmean(
+                  row["selected_file_count"] for row in rows
+              ),
+              "max_selected_files_in_case": max(
+                  row["selected_file_count"] for row in rows
+              ),
+              "mean_model_calls_per_case": statistics.fmean(
+                  row["usage"]["model_calls"] for row in rows
+              ),
+              "mean_input_tokens_per_case": statistics.fmean(
+                  row["usage"]["input_tokens"] for row in rows
+              ),
+              "mean_model_wall_time_ms_per_case": statistics.fmean(
+                  row["usage"]["model_wall_time_ms"] for row in rows
+              ),
+              "mean_metadata_items_seen_per_case": statistics.fmean(
+                  row["usage"]["metadata_items_seen"] for row in rows
+              ),
+              "failure_kinds": dict(failures),
+              "repeats_detail": [
+                  {
+                      "primary_recall": suite["primary_recall"],
+                      "all_primary_recovered": suite["all_primary_recovered"],
+                      "mean_selected_files": suite["mean_selected_files"],
+                      "model_calls": suite["total_model_calls"],
+                      "input_tokens": suite["total_input_tokens"],
+                      "model_wall_time_ms": suite["total_model_wall_time_ms"],
+                  }
+                  for suite in suites
+              ],
+              "cases": [
+                  {
+                      "case_id": row["case_id"],
+                      "primary_file": row["primary_file"],
+                      "primary_recovered": row["primary_recovered"],
+                      "primary_score": row["primary_score"],
+                      "selected_file_count": row["selected_file_count"],
+                      "failure": row["failure"],
+                      "model_calls": row["usage"]["model_calls"],
+                      "input_tokens": row["usage"]["input_tokens"],
+                      "model_wall_time_ms": row["usage"]["model_wall_time_ms"],
+                  }
+                  for row in rows
+              ],
+          }
+          Path("aggregate.json").write_text(
+              json.dumps(aggregate, indent=2) + "\n"
+          )
+          print(json.dumps(aggregate, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: file-discovery-v1-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
