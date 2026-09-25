@@ -33,3 +33,17 @@ Primary hidden metrics:
 - obligation count.
 
 Parameters above are frozen before hidden-reference results are generated.
+
+
+## Phase B pre-registration
+
+After Phase A, basin span is no longer interpreted as the amount of source that
+must be materialized. Phase B tests narrow hybrid obligations:
+
+- keep q75 components;
+- add only secondary prominence peaks not already represented by a q75 basin;
+- secondary peak must be >= the file median tile relevance;
+- added secondary obligation width is exactly one 32-line tile;
+- compare local-prominence and multi-scale-persistent peak sources.
+
+No hidden CC labels participate in hybrid generation.
