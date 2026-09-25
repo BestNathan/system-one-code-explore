@@ -9,6 +9,7 @@ from pathlib import Path
 
 from claude_reference_trace import parse_stream, strip_json_fence
 from localization_result import claude_stage_cost
+from model_pricing import deepseek_flash_cost_range
 
 
 def load(path):
@@ -130,7 +131,23 @@ def normalize_result(raw, subject_root, case, model, steps, terminal):
         "turns": terminal.get("num_turns"),
         "usage": terminal.get("usage"),
         "model_usage": terminal.get("modelUsage"),
-        "provider_cost_usd": stage.get("provider_cost_usd"),
+        "claude_code_reported_cost_usd": stage.get("provider_cost_usd"),
+        "claude_code_cost_basis": (
+            terminal.get("modelUsage", {})
+            .get(model, {})
+            .get("costBasis")
+        ),
+        "official_model_cost": (
+            deepseek_flash_cost_range(
+                terminal.get("usage", {}).get("input_tokens", 0),
+                terminal.get("usage", {}).get(
+                    "cache_read_input_tokens", 0
+                ),
+                terminal.get("usage", {}).get("output_tokens", 0),
+            )
+            if model == "deepseek-flash"
+            else None
+        ),
     }
 
 
