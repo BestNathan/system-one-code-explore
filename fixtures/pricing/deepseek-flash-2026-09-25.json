@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "model_version": "DeepSeek-V4.1-Flash",
+  "snapshot_date": "2026-09-25",
+  "currency": "USD",
+  "prices_per_1m_tokens": {
+    "off_peak": {
+      "cache_hit_input": 0.003,
+      "cache_miss_input": 0.15,
+      "output": 0.6
+    },
+    "peak": {
+      "cache_hit_input": 0.006,
+      "cache_miss_input": 0.3,
+      "output": 1.2
+    }
+  },
+  "peak_schedule": {
+    "timezone": "UTC",
+    "weekdays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday"
+    ],
+    "ranges": [
+      "01:00-04:00",
+      "06:00-10:00"
+    ]
+  },
+  "source": "https://api-docs.deepseek.com/quick_start/pricing/"
+}
