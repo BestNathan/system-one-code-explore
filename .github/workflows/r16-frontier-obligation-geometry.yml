@@ -1,0 +1,172 @@
+name: R16 frontier obligation geometry
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/frontier_obligation_geometry.py"
+      - "tests/test_frontier_obligation_geometry.py"
+      - ".github/workflows/r16-frontier-obligation-geometry.yml"
+      - "docs/research/2026-09-25-r16-frontier-obligation-geometry.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "36004833542"
+
+jobs:
+  geometry:
+    name: Geometry / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        case:
+          - id: reconnect_lifecycle
+          - id: protocol_catalog_consistency
+          - id: full_stack_command_lifecycle
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download canonical R08 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Download canonical Phase0 trajectory
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
+          path: artifacts/phase0
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Compare obligation geometries
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/out
+          python3 src/frontier_obligation_geometry.py             --reference artifacts/reference/reference.json             --phase0-run "artifacts/phase0/${{ matrix.estimator }}/run.json"             --tile-lines 32             --output-json artifacts/out/result.json             --output-markdown artifacts/out/result.md
+          cat artifacts/out/result.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r16-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R16
+    needs: geometry
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r16-*
+          path: artifacts/all
+
+      - name: Aggregate geometry metrics
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = []
+          for path in sorted(Path("artifacts/all").glob("*/result.json")):
+              result = json.loads(path.read_text())
+              artifact = path.parent.name
+              rows.append((artifact, result))
+
+          methods = [
+              "q75_components",
+              "q60_components",
+              "local_prominence",
+              "multiscale_prominence",
+              "mass_diverse",
+          ]
+          metric_names = [
+              "obligation_count",
+              "source_coverage",
+              "hidden_high_region_recall",
+              "hidden_high_line_coverage",
+              "obligation_precision",
+              "mean_hidden_relevance",
+          ]
+
+          grouped = defaultdict(list)
+          for artifact, result in rows:
+              estimator = result["posterior_estimator"]
+              grouped[estimator].append((artifact, result))
+
+          aggregate = {
+              "schema_version": 1,
+              "kind": "r16-frontier-obligation-geometry-aggregate",
+              "source_phase0_run": 36004833542,
+              "runs": len(rows),
+              "estimators": {},
+              "overall": {},
+          }
+
+          def summarize(items):
+              summary = {}
+              for method in methods:
+                  method_rows = [
+                      result["methods"][method]["metrics"]
+                      for _, result in items
+                  ]
+                  summary[method] = {
+                      name: statistics.fmean(
+                          row[name] for row in method_rows
+                      )
+                      for name in metric_names
+                  }
+              return summary
+
+          for estimator, items in sorted(grouped.items()):
+              aggregate["estimators"][estimator] = summarize(items)
+          aggregate["overall"] = summarize(rows)
+
+          # Keep per-run rows so secondary-mode behavior can be inspected
+          # without redownloading every artifact.
+          aggregate["cases"] = []
+          for artifact, result in rows:
+              aggregate["cases"].append({
+                  "artifact": artifact,
+                  "estimator": result["posterior_estimator"],
+                  "methods": {
+                      method: result["methods"][method]["metrics"]
+                      for method in methods
+                  },
+              })
+
+          Path("aggregate.json").write_text(
+              json.dumps(aggregate, indent=2) + "\n"
+          )
+          print(json.dumps(aggregate, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r16-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
