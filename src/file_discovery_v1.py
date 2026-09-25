@@ -28,6 +28,7 @@ from system_one_code_locator import (
 DEFAULT_DIRECTORY_THRESHOLD = 0.50
 DEFAULT_FILE_THRESHOLD = 0.65
 DEFAULT_TRANSPORT_BATCH_SIZE = 64
+DEFAULT_MECHANICAL_EXPAND_DEPTH = 1
 
 
 def empty_usage():
@@ -180,6 +181,7 @@ def run(
     directory_threshold=DEFAULT_DIRECTORY_THRESHOLD,
     file_threshold=DEFAULT_FILE_THRESHOLD,
     transport_batch_size=DEFAULT_TRANSPORT_BATCH_SIZE,
+    mechanical_expand_depth=DEFAULT_MECHANICAL_EXPAND_DEPTH,
 ):
     root = Path(root).resolve()
     usage = empty_usage()
@@ -208,10 +210,33 @@ def run(
         if not newly_disclosed:
             continue
 
+        mechanical = []
+        semantic = []
+        for candidate in newly_disclosed:
+            depth = len(Path(candidate["path"]).parts)
+            if (
+                candidate["kind"] == "directory"
+                and depth <= int(mechanical_expand_depth)
+            ):
+                mechanical.append(candidate)
+            else:
+                semantic.append(candidate)
+
+        for item in mechanical:
+            node_scores[item["id"]] = {
+                "kind": item["kind"],
+                "path": item["path"],
+                "parent": item["parent"],
+                "score": None,
+                "decision": "mechanical_expand",
+            }
+            directory_status[item["path"]] = "mechanical_expand"
+            frontier.append(item["path"])
+
         scored = score_once(
             query,
             decider,
-            newly_disclosed,
+            semantic,
             usage,
             cache,
             batch_size=transport_batch_size,
@@ -223,6 +248,7 @@ def run(
                 "path": item["path"],
                 "parent": item["parent"],
                 "score": float(item["score"]),
+                "decision": "semantic_score",
             }
             if item["kind"] == "directory":
                 if item["score"] >= float(directory_threshold):
@@ -252,6 +278,7 @@ def run(
             "directory_threshold": float(directory_threshold),
             "file_threshold": float(file_threshold),
             "transport_batch_size": int(transport_batch_size),
+            "mechanical_expand_depth": int(mechanical_expand_depth),
             "stop_rule": "frontier_exhausted",
             "source_body_visible": False,
             "top_k": None,
@@ -285,6 +312,11 @@ def main(argv=None):
         type=int,
         default=DEFAULT_TRANSPORT_BATCH_SIZE,
     )
+    parser.add_argument(
+        "--mechanical-expand-depth",
+        type=int,
+        default=DEFAULT_MECHANICAL_EXPAND_DEPTH,
+    )
     parser.add_argument("--trace-file")
     parser.add_argument("--output", required=True)
     parser.add_argument(
@@ -314,6 +346,7 @@ def main(argv=None):
         directory_threshold=args.directory_threshold,
         file_threshold=args.file_threshold,
         transport_batch_size=args.transport_batch_size,
+        mechanical_expand_depth=args.mechanical_expand_depth,
     )
     Path(args.output).write_text(
         json.dumps(result, indent=2, ensure_ascii=False) + "\n",
