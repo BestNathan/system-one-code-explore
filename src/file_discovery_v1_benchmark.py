@@ -83,12 +83,19 @@ def evaluate(run, case):
         "expanded_directory_count": len(
             run.get("expanded_directories", [])
         ),
+        "mechanically_expanded_directory_count": sum(
+            item.get("kind") == "directory"
+            and item.get("decision") == "mechanical_expand"
+            for item in node_scores.values()
+        ),
         "scored_directory_count": sum(
             item.get("kind") == "directory"
+            and item.get("score") is not None
             for item in node_scores.values()
         ),
         "scored_file_count": sum(
             item.get("kind") == "file"
+            and item.get("score") is not None
             for item in node_scores.values()
         ),
         "selected_files": run.get("relevant_files", []),
@@ -109,6 +116,7 @@ def markdown(result):
         f"- primary score: {result['primary_score']}",
         f"- selected files: {result['selected_file_count']}",
         f"- expanded directories: {result['expanded_directory_count']}",
+        f"- mechanical directories: {result['mechanically_expanded_directory_count']}",
         f"- scored directories: {result['scored_directory_count']}",
         f"- scored files: {result['scored_file_count']}",
         "",
