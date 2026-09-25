@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import time
+import math
 from pathlib import Path
 
 from system_one_code_locator import (
@@ -26,6 +27,7 @@ from system_one_code_locator import (
 )
 
 DEFAULT_FILE_THRESHOLD = 0.65
+DEFAULT_RELATIVE_FALLBACK_FRACTION = 0.01
 DEFAULT_TRANSPORT_BATCH_SIZE = 64
 
 
@@ -143,6 +145,7 @@ def run(
     decider,
     *,
     file_threshold=DEFAULT_FILE_THRESHOLD,
+    relative_fallback_fraction=DEFAULT_RELATIVE_FALLBACK_FRACTION,
     transport_batch_size=DEFAULT_TRANSPORT_BATCH_SIZE,
 ):
     root = Path(root).resolve()
@@ -162,18 +165,41 @@ def run(
         batch_size=transport_batch_size,
     )
 
-    relevant_files = [
-        {
+    ordered = sorted(
+        scored,
+        key=lambda item: (-float(item["score"]), item["path"]),
+    )
+    fallback_fraction = max(0.0, float(relative_fallback_fraction))
+    fallback_count = (
+        max(1, math.ceil(len(ordered) * fallback_fraction))
+        if ordered and fallback_fraction > 0.0
+        else 0
+    )
+    fallback_cutoff = (
+        float(ordered[fallback_count - 1]["score"])
+        if fallback_count else None
+    )
+
+    relevant_files = []
+    for item in ordered:
+        absolute = float(item["score"]) >= float(file_threshold)
+        relative = (
+            fallback_cutoff is not None
+            and float(item["score"]) >= fallback_cutoff
+        )
+        if not (absolute or relative):
+            continue
+        reasons = []
+        if absolute:
+            reasons.append("absolute_threshold")
+        if relative:
+            reasons.append("relative_recall_guard")
+        relevant_files.append({
             "path": item["path"],
             "score": float(item["score"]),
             "parent_directory": item["parent"],
-        }
-        for item in scored
-        if item["score"] >= float(file_threshold)
-    ]
-    relevant_files.sort(
-        key=lambda item: (-item["score"], item["path"])
-    )
+            "selection_reasons": reasons,
+        })
 
     file_scores = {
         item["path"]: float(item["score"])
@@ -188,6 +214,9 @@ def run(
         "root": str(root),
         "policy": {
             "file_threshold": float(file_threshold),
+            "relative_fallback_fraction": fallback_fraction,
+            "relative_fallback_cutoff": fallback_cutoff,
+            "relative_fallback_min_count": fallback_count,
             "transport_batch_size": int(transport_batch_size),
             "directory_semantic_pruning": False,
             "stop_rule": "all_file_metadata_scored",
@@ -211,6 +240,11 @@ def main(argv=None):
         "--file-threshold",
         type=float,
         default=DEFAULT_FILE_THRESHOLD,
+    )
+    parser.add_argument(
+        "--relative-fallback-fraction",
+        type=float,
+        default=DEFAULT_RELATIVE_FALLBACK_FRACTION,
     )
     parser.add_argument(
         "--transport-batch-size",
@@ -244,6 +278,7 @@ def main(argv=None):
         args.query,
         decider,
         file_threshold=args.file_threshold,
+        relative_fallback_fraction=args.relative_fallback_fraction,
         transport_batch_size=args.transport_batch_size,
     )
     Path(args.output).write_text(
