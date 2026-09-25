@@ -9,6 +9,7 @@ from frontier_obligation_geometry import (
     local_prominence,
     mass_diverse,
     multiscale_prominence,
+    q75_plus_secondary_peaks,
     quantile_components,
     tile_actions,
 )
@@ -129,6 +130,77 @@ class R16GeometryTests(unittest.TestCase):
             len(metadata["clusters"]),
             1,
         )
+
+    def test_hybrid_adds_narrow_secondary_peak(self):
+        actions = self.actions([
+            0.80,
+            0.78,
+            0.76,
+            0.74,
+            0.20,
+            0.18,
+            0.42,
+            0.46,
+            0.43,
+            0.17,
+            0.15,
+            0.14,
+        ])
+        q75 = quantile_components(
+            actions,
+            0.75,
+            "q75_components",
+        )
+        _, metadata = local_prominence(actions)
+        hybrid, hybrid_meta = q75_plus_secondary_peaks(
+            actions,
+            q75,
+            metadata["candidate_peaks"],
+            method="q75_plus_local_seed",
+        )
+        ranges = [
+            item["tile_index_range"]
+            for item in hybrid
+        ]
+        self.assertIn([7, 7], ranges)
+        self.assertGreaterEqual(
+            hybrid_meta["secondary_count"],
+            1,
+        )
+
+    def test_hybrid_rejects_bottom_half_local_peak(self):
+        actions = self.actions([
+            0.90,
+            0.88,
+            0.86,
+            0.84,
+            0.82,
+            0.80,
+            0.10,
+            0.25,
+            0.10,
+            0.79,
+            0.78,
+            0.77,
+        ])
+        q75 = quantile_components(
+            actions,
+            0.75,
+            "q75_components",
+        )
+        _, metadata = local_prominence(actions)
+        hybrid, _ = q75_plus_secondary_peaks(
+            actions,
+            q75,
+            metadata["candidate_peaks"],
+            method="q75_plus_local_seed",
+        )
+        ids = {
+            tile_id
+            for obligation in hybrid
+            for tile_id in obligation["tile_ids"]
+        }
+        self.assertNotIn("tile_008", ids)
 
     def test_mass_diverse_has_deterministic_cap(self):
         actions = self.actions([
