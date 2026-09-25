@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-v1-primary-target-cases",
+  "repository": "BestNathan/nession",
+  "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+  "note": "Primary-target recovery fixture derived from already frozen evidence-localization tasks. This is not a complete multi-file relevance gold set.",
+  "cases": [
+    {
+      "id": "reconnect_lifecycle",
+      "goal": "Help me improve the agent-to-server reconnect lifecycle: exponential backoff, registration after reconnect, connected/sync-needed state transitions, and behavior of queued outbound messages while disconnected.",
+      "primary_file": "crates/nession-agent/src/connection/server_client.rs"
+    },
+    {
+      "id": "protocol_catalog_consistency",
+      "goal": "Help me make protocol contract generation safer: locate the catalog code that defines unit identity and wire/request/response mappings and the checks that prevent missing, duplicate, or non-self-contained generated contracts.",
+      "primary_file": "crates/nession-protocol-codegen/src/catalog.rs"
+    },
+    {
+      "id": "full_stack_command_lifecycle",
+      "goal": "I am debugging the server's agent command lifecycle. Locate the integration-test code that exercises agent registration, command request/response routing, disconnect or reconnect behavior, and cleanup of pending work.",
+      "primary_file": "crates/nession-server/tests/integration/full_stack.rs"
+    },
+    {
+      "id": "fs_symlink_delete_semantics",
+      "goal": "I am reviewing file-operation path semantics around deleting symlinks and creating non-existent paths. Locate the code that decides when the final symlink component is followed versus preserved, how parent symlinks and non-existent ancestors are resolved, how duplicated root-name paths fall back, and the tests that prevent a delete from operating on a symlink target.",
+      "primary_file": "crates/nession-agent/src/fs/sandbox.rs"
+    },
+    {
+      "id": "tmux_env_session_lifecycle",
+      "goal": "I want to harden tmux session creation and teardown. Locate the code that filters inherited TERM/LANG/LC_ALL/TMUX environment, applies caller overrides, creates sessions with fixed geometry and timeouts, and cleans up session environment scripts when a session is killed.",
+      "primary_file": "crates/nession-agent/src/tmux/manager.rs"
+    },
+    {
+      "id": "manifest_union_wire_routing",
+      "goal": "I need to verify protocol-manifest composition and routing semantics. Locate the code that omits retired units, unions duplicate protocol IDs across versions and wire types deterministically, keeps older manifests without wire projections safe, and resolves a wire message type back to the protocol unit that carries it.",
+      "primary_file": "crates/nession-protocol/src/kernel/manifest.rs"
+    }
+  ]
+}
