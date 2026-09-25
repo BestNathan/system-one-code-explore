@@ -13,7 +13,17 @@ PROFILES = (
     "baseline_v1",
     "instruction_v2",
     "enriched_state_v3",
+    "compact_state_v4",
 )
+
+DECISION_CONTRACT = [
+    "Judge each exact file independently; multiple files may all be relevant.",
+    "Estimate whether the file itself likely contains primary implementation evidence or directly necessary supporting implementation for the task.",
+    "Use the full repository-relative path compositionally: specific leaf directories and filenames are stronger evidence than generic container names.",
+    "Do not require exact task keywords when architecture conventions strongly imply ownership.",
+    "Do not lower a file because another candidate may be better; this is independent multi-label relevance, not ranking or Choice.",
+    "Tests, contracts, configuration, and adapters count only when the task materially depends on them.",
+]
 
 
 def tokenize_path(path):
@@ -62,6 +72,12 @@ def enriched_candidate_payload(candidate):
     return payload
 
 
+def compact_candidate_payload(candidate):
+    payload = dict(candidate["payload"])
+    payload["semantic_tokens"] = tokenize_path(payload["path"])
+    return payload
+
+
 class ProfiledFileDiscoveryDecider(SystemOneDecider):
     def __init__(
         self,
@@ -86,31 +102,35 @@ class ProfiledFileDiscoveryDecider(SystemOneDecider):
             return [], empty_usage()
 
         questions = {}
+        compact = self.profile == "compact_state_v4"
         for index, candidate in enumerate(candidates):
-            payload = (
-                enriched_candidate_payload(candidate)
-                if self.profile == "enriched_state_v3"
-                else candidate["payload"]
-            )
-            questions[f"candidate_{index}"] = {
-                "type": "noul",
-                "instructions": {
+            if self.profile == "enriched_state_v3":
+                payload = enriched_candidate_payload(candidate)
+            elif compact:
+                payload = compact_candidate_payload(candidate)
+            else:
+                payload = candidate["payload"]
+
+            if compact:
+                instructions = {
+                    "file": payload,
+                    "question": "How likely is this exact file to contain material task evidence?",
+                }
+                criteria = {
+                    "true": "Material implementation/supporting evidence is likely.",
+                    "false": "Material implementation/supporting evidence is unlikely.",
+                }
+            else:
+                instructions = {
                     "task": query,
                     "file": payload,
-                    "decision_contract": [
-                        "Judge this exact file independently; multiple files may all be relevant.",
-                        "Estimate whether this file itself is likely to contain primary implementation evidence or directly necessary supporting implementation for the task.",
-                        "Use the full repository-relative path compositionally: specific leaf directories and filenames are stronger evidence than generic container names.",
-                        "Do not require exact task keywords when architecture conventions strongly imply the responsibility.",
-                        "Do not lower a file merely because another candidate may be better; this is independent multi-label relevance, not ranking or Choice.",
-                        "Tests, protocol/contracts, configuration, and adapters count only when the task materially depends on them.",
-                    ],
+                    "decision_contract": DECISION_CONTRACT,
                     "question": (
                         "How likely is this exact file to contain material "
                         "source evidence needed to investigate the task?"
                     ),
-                },
-                "criteria": {
+                }
+                criteria = {
                     "true": (
                         "The file is likely to directly implement the requested "
                         "behavior or provide a necessary supporting implementation "
@@ -121,7 +141,12 @@ class ProfiledFileDiscoveryDecider(SystemOneDecider):
                         "evidence for this task; a name/path coincidence alone is "
                         "not enough."
                     ),
-                },
+                }
+
+            questions[f"candidate_{index}"] = {
+                "type": "noul",
+                "instructions": instructions,
+                "criteria": criteria,
             }
 
         state = {
@@ -135,8 +160,14 @@ class ProfiledFileDiscoveryDecider(SystemOneDecider):
                 "independent_probabilities": True,
             },
         }
-        if self.profile == "enriched_state_v3":
+        if self.profile in {"enriched_state_v3", "compact_state_v4"}:
             state["repository_metadata"] = self.repository_context
+        if compact:
+            state["decision_contract"] = DECISION_CONTRACT
+            state["prompt_placement"] = (
+                "shared decision contract appears once in batch state; "
+                "candidate questions contain only file-local delta"
+            )
 
         response, usage = self.send(
             f"file_discovery_{self.profile}",
