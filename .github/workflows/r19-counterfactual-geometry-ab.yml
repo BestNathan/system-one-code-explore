@@ -1,0 +1,327 @@
+name: R19 counterfactual-safe geometry AB
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/counterfactual_geometry_pair.py"
+      - "tests/test_counterfactual_geometry_pair.py"
+      - ".github/workflows/r19-counterfactual-geometry-ab.yml"
+      - "docs/research/2026-09-25-r19-counterfactual-safe-geometry-ab.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "36082601509"
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  pair:
+    name: Pair / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }}
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        case:
+          - id: fs_symlink_delete_semantics
+            path: crates/nession-agent/src/fs/sandbox.rs
+            query: >-
+              I am reviewing file-operation path semantics around deleting
+              symlinks and creating non-existent paths. Locate the code that
+              decides when the final symlink component is followed versus
+              preserved, how parent symlinks and non-existent ancestors are
+              resolved, how duplicated root-name paths fall back, and the
+              tests that prevent a delete from operating on a symlink target.
+          - id: tmux_env_session_lifecycle
+            path: crates/nession-agent/src/tmux/manager.rs
+            query: >-
+              I want to harden tmux session creation and teardown. Locate the
+              code that filters inherited TERM/LANG/LC_ALL/TMUX environment,
+              applies caller overrides, creates sessions with fixed geometry
+              and timeouts, and cleans up session environment scripts when a
+              session is killed.
+          - id: manifest_union_wire_routing
+            path: crates/nession-protocol/src/kernel/manifest.rs
+            query: >-
+              I need to verify protocol-manifest composition and routing
+              semantics. Locate the code that omits retired units, unions
+              duplicate protocol IDs across versions and wire types
+              deterministically, keeps older manifests without wire
+              projections safe, and resolves a wire message type back to the
+              protocol unit that carries it.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      REPEAT: ${{ matrix.repeat }}
+      ESTIMATOR: ${{ matrix.estimator }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download frozen R18 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r18-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Download frozen R18 Phase0
+        uses: actions/download-artifact@v4
+        with:
+          name: r18-phase0-${{ matrix.case.id }}-r${{ matrix.repeat }}
+          path: artifacts/phase0
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Run paired counterfactual geometry
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/counterfactual_geometry_pair.py \
+            --source "subject/$FILE_PATH" \
+            --goal "$QUERY" \
+            --phase0-run "artifacts/phase0/$ESTIMATOR/run.json" \
+            --tile-lines 32 \
+            --frontier-quantile 0.75 \
+            --expansion-threshold 0.60 \
+            --final-utility-threshold 0.65 \
+            --max-anchor-tiles 12 \
+            --output-dir artifacts/out
+
+      - name: Evaluate both arms
+        run: |
+          set -euo pipefail
+          for arm in baseline hybrid; do
+            python3 src/frontier_obligation_benchmark.py \
+              --reference artifacts/reference/reference.json \
+              --phase0-run "artifacts/phase0/$ESTIMATOR/run.json" \
+              --run "artifacts/out/$arm/run.json" \
+              --output-json "artifacts/out/$arm/benchmark.json" \
+              --output-markdown "artifacts/out/$arm/benchmark.md"
+          done
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("artifacts/out")
+          pair = json.loads((root / "pair.json").read_text())
+          b = json.loads((root / "baseline/benchmark.json").read_text())
+          h = json.loads((root / "hybrid/benchmark.json").read_text())
+
+          def values(bench, run):
+              return {
+                  "retained_high_recall":
+                      bench["metrics"]["retained"]["high_line_recall"],
+                  "retained_weighted_relevance_recall":
+                      bench["metrics"]["retained"][
+                          "weighted_relevance_recall"
+                      ],
+                  "retained_mean_reference_relevance":
+                      bench["metrics"]["retained"][
+                          "mean_reference_relevance"
+                      ],
+                  "retained_high_precision":
+                      bench["metrics"]["retained"]["high_line_precision"],
+                  "hidden_high_regions_without_obligation":
+                      bench["metrics"][
+                          "hidden_cc_high_regions_without_phase0_obligation"
+                      ],
+                  "materialized_source_fraction":
+                      bench["metrics"]["materialized"]["source_fraction"],
+                  "logical_model_calls": run["usage"]["model_calls"],
+                  "logical_input_tokens": run["usage"]["input_tokens"],
+              }
+
+          br = json.loads((root / "baseline/run.json").read_text())
+          hr = json.loads((root / "hybrid/run.json").read_text())
+          bv = values(b, br)
+          hv = values(h, hr)
+
+          summary = {
+              "posterior_estimator": pair["posterior_estimator"],
+              "secondary_obligation_count":
+                  pair["secondary_obligation_count"],
+              "identical_when_no_secondary":
+                  pair["identical_when_no_secondary"],
+              "cache": pair["cache"],
+              "baseline": bv,
+              "hybrid": hv,
+              "delta": {
+                  key: hv[key] - bv[key]
+                  for key in bv
+              },
+              "baseline_regions": br["final_regions"],
+              "hybrid_regions": hr["final_regions"],
+              "baseline_geometry": br["frontier_geometry"],
+              "hybrid_geometry": hr["frontier_geometry"],
+          }
+          (root / "summary.json").write_text(
+              json.dumps(summary, indent=2) + "\n"
+          )
+          print(json.dumps(summary, indent=2))
+          PY
+          cat artifacts/out/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r19-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R19
+    needs: pair
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r19-*
+          path: artifacts/all
+
+      - name: Aggregate causal paired deltas
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = []
+          for path in sorted(Path("artifacts/all").glob("*/summary.json")):
+              artifact = path.parent.name
+              row = json.loads(path.read_text())
+              row["artifact"] = artifact
+              rows.append(row)
+
+          metrics = (
+              "retained_high_recall",
+              "retained_weighted_relevance_recall",
+              "retained_mean_reference_relevance",
+              "retained_high_precision",
+              "hidden_high_regions_without_obligation",
+              "materialized_source_fraction",
+              "logical_model_calls",
+              "logical_input_tokens",
+          )
+
+          def summarize(items):
+              result = {}
+              for metric in metrics:
+                  vals = [item["delta"][metric] for item in items]
+                  result[metric] = {
+                      "mean_delta": statistics.fmean(vals),
+                      "wins": sum(x > 1e-12 for x in vals),
+                      "ties": sum(abs(x) <= 1e-12 for x in vals),
+                      "losses": sum(x < -1e-12 for x in vals),
+                  }
+              return result
+
+          no_secondary = [
+              row for row in rows
+              if row["secondary_obligation_count"] == 0
+          ]
+          if not all(
+              row["identical_when_no_secondary"] is True
+              for row in no_secondary
+          ):
+              raise SystemExit(
+                  "counterfactual sanity failed for no-secondary pair"
+              )
+
+          with_secondary = [
+              row for row in rows
+              if row["secondary_obligation_count"] > 0
+          ]
+
+          by_estimator = {}
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ):
+              subset = [
+                  row for row in rows
+                  if row["posterior_estimator"] == estimator
+              ]
+              by_estimator[estimator] = summarize(subset)
+
+          physical = {
+              "model_calls": sum(
+                  row["cache"]["physical_usage"]["model_calls"]
+                  for row in rows
+              ),
+              "input_tokens": sum(
+                  row["cache"]["physical_usage"]["input_tokens"]
+                  for row in rows
+              ),
+              "output_tokens": sum(
+                  row["cache"]["physical_usage"]["output_tokens"]
+                  for row in rows
+              ),
+              "cache_hits": sum(
+                  row["cache"]["hits"] for row in rows
+              ),
+              "cache_misses": sum(
+                  row["cache"]["misses"] for row in rows
+              ),
+          }
+
+          out = {
+              "schema_version": 1,
+              "kind": "r19-counterfactual-safe-geometry-ab-aggregate",
+              "source_r18_run": 36082601509,
+              "pairs": len(rows),
+              "no_secondary_pairs": len(no_secondary),
+              "with_secondary_pairs": len(with_secondary),
+              "all_no_secondary_pairs_identical": True,
+              "overall": summarize(rows),
+              "secondary_only": summarize(with_secondary)
+                  if with_secondary else {},
+              "estimators": by_estimator,
+              "physical_execution": physical,
+              "cases": rows,
+          }
+          Path("aggregate.json").write_text(
+              json.dumps(out, indent=2) + "\n"
+          )
+          print(json.dumps(out, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r19-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
