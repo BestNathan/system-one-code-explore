@@ -1,11 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "kind": "file-discovery-system1-system2-cases",
-  "repository": "BestNathan/nession",
-  "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
   "cases": [
     {
-      "id": "backend_reconnect_lifecycle",
+      "id": "nession_backend_reconnect_lifecycle",
+      "repository": "BestNathan/nession",
+      "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
       "domain": "backend networking / lifecycle",
       "language": "Rust",
       "goal": "I need to debug the agent-to-server reconnect lifecycle. Find the files that materially implement exponential reconnect/backoff, registration after reconnect, connection state transitions, sync-needed behavior, and handling of queued outbound messages while disconnected.",
@@ -14,7 +14,9 @@
       ]
     },
     {
-      "id": "filesystem_symlink_delete_safety",
+      "id": "nession_filesystem_symlink_delete_safety",
+      "repository": "BestNathan/nession",
+      "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
       "domain": "filesystem correctness / safety",
       "language": "Rust",
       "goal": "I am reviewing filesystem safety semantics. Find the files that materially implement delete behavior around symlinks, parent-symlink resolution, non-existent ancestors, and the rule that deleting a symlink must not delete the symlink target.",
@@ -23,12 +25,80 @@
       ]
     },
     {
-      "id": "frontend_request_correlation",
+      "id": "nession_frontend_request_correlation",
+      "repository": "BestNathan/nession",
+      "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
       "domain": "frontend realtime messaging",
       "language": "TypeScript",
       "goal": "I am debugging frontend WebSocket request correlation and disconnect handling. Find the files that materially implement request IDs, pending request tracking, request timeouts, routing incoming responses back to callers, and failing pending requests when the socket disconnects.",
       "primary_files": [
         "web/src/platform/socket/MessageRouter.ts"
+      ]
+    },
+    {
+      "id": "openclaw_gateway_ws_dispatch",
+      "repository": "openclaw/openclaw",
+      "revision": "932abb0a841b522ebaa5b81921119a61b6a80b21",
+      "domain": "gateway websocket / authentication / RPC dispatch",
+      "language": "TypeScript",
+      "goal": "I am debugging OpenClaw Gateway WebSocket request handling. Find the files that materially validate incoming frames, distinguish connect handshakes from normal RPC requests, coordinate authentication or pairing during connect, attach the authenticated session, dispatch gateway methods, and send protocol responses.",
+      "primary_files": [
+        "src/gateway/server/ws-connection/message-handler.ts"
+      ]
+    },
+    {
+      "id": "openclaw_skill_source_precedence",
+      "repository": "openclaw/openclaw",
+      "revision": "932abb0a841b522ebaa5b81921119a61b6a80b21",
+      "domain": "skills discovery / source precedence",
+      "language": "TypeScript",
+      "goal": "I need to understand OpenClaw workspace skill discovery precedence. Find the files that materially decide which skill roots are searched, how workspace and extra skill directories are combined, how agent-scoped or plugin-provided roots participate, and how source precedence is represented before skills are loaded.",
+      "primary_files": [
+        "src/skills/loading/workspace-skill-sources.ts"
+      ]
+    },
+    {
+      "id": "openclaw_memory_hybrid_search",
+      "repository": "openclaw/openclaw",
+      "revision": "932abb0a841b522ebaa5b81921119a61b6a80b21",
+      "domain": "memory retrieval / hybrid search",
+      "language": "TypeScript",
+      "goal": "I am debugging OpenClaw built-in memory retrieval. Find the files that materially orchestrate memory search across vector and keyword retrieval, query embeddings, search deadlines or fallbacks, source filtering, and the assembly of results returned to callers.",
+      "primary_files": [
+        "extensions/memory-core/src/memory/manager-search-orchestration.ts"
+      ]
+    },
+    {
+      "id": "codex_approval_routing",
+      "repository": "openai/codex",
+      "revision": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+      "domain": "command approvals / guardian routing",
+      "language": "Rust",
+      "goal": "I am reviewing Codex command approval semantics. Find the files that materially implement the central approval-policy stage, command canonicalization for approval, exec-policy rejection, guardian or reviewer routing, permission hooks, and the final approval decision used before execution.",
+      "primary_files": [
+        "codex-rs/core/src/tools/approvals.rs"
+      ]
+    },
+    {
+      "id": "codex_mcp_tool_approval",
+      "repository": "openai/codex",
+      "revision": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+      "domain": "MCP tool invocation / approval",
+      "language": "Rust",
+      "goal": "I am debugging Codex MCP tool invocation. Find the files that materially coordinate MCP tool calls with approval mode, guardian review context or annotations, tool-argument rewriting, server-specific behavior, and handling of the MCP call result.",
+      "primary_files": [
+        "codex-rs/core/src/mcp_tool_call.rs"
+      ]
+    },
+    {
+      "id": "codex_thread_resume_persistence",
+      "repository": "openai/codex",
+      "revision": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+      "domain": "thread lifecycle / persistence",
+      "language": "Rust",
+      "goal": "I need to understand Codex thread creation, resume, and persistence boundaries. Find the files that materially create or resume thread handles, choose and wire thread-store persistence, restore session state, manage fork persistence, and coordinate persisted state with live thread lifecycle.",
+      "primary_files": [
+        "codex-rs/core/src/thread_manager.rs"
       ]
     }
   ]
