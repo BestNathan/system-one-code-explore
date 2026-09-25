@@ -22,7 +22,6 @@ def main(argv=None):
     parser.add_argument("--root", required=True)
     parser.add_argument("--cases", required=True)
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--directory-threshold", type=float, default=0.50)
     parser.add_argument("--file-threshold", type=float, default=0.65)
     parser.add_argument("--transport-batch-size", type=int, default=64)
     parser.add_argument(
@@ -58,7 +57,6 @@ def main(argv=None):
             args.root,
             case["goal"],
             decider,
-            directory_threshold=args.directory_threshold,
             file_threshold=args.file_threshold,
             transport_batch_size=args.transport_batch_size,
         )
@@ -84,7 +82,6 @@ def main(argv=None):
         "repository": fixture["repository"],
         "revision": fixture["revision"],
         "policy": {
-            "directory_threshold": args.directory_threshold,
             "file_threshold": args.file_threshold,
             "transport_batch_size": args.transport_batch_size,
         },
