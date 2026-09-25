@@ -2,7 +2,7 @@
 
 ## Status
 
-**Converged mechanism candidate. Final validation gate running on the frozen six-case primary-target suite.**
+**Mechanically converged V1. Canonical validation gate passed.**
 
 This document closes open-ended File Discovery architecture exploration. Future work may calibrate, optimize, or falsify this V1, but should not invent new traversal semantics unless V1 fails for a structural reason.
 
@@ -248,3 +248,109 @@ Only these questions remain inside File Discovery:
 4. future cross-file expansion created by grounded Evidence Localization observations.
 
 These are calibration, efficiency, and composition questions—not new File Discovery architecture questions.
+
+## Canonical convergence result
+
+Canonical workflow: `36104786728`.
+
+Frozen subject:
+
+`BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`
+
+Six primary-target cases x two repeats:
+
+```text
+12 / 12 target runs recovered
+primary recall = 100%
+ancestor-pruned failures = impossible by construction
+other failures = 0
+```
+
+Average per task:
+
+| metric | value |
+| --- | ---: |
+| repository files scored | 1,096 |
+| selected files | 16.5 |
+| max selected files | 35 |
+| System One calls | 18 |
+| input tokens | 212,584 |
+| model wall time | 6.61 s |
+
+The current transport batch size is 64, so 1,096 file questions require 18
+physical requests. This is an efficiency parameter, not a semantic one.
+
+### Why the relative guard is retained
+
+The all-file scorer exposed the previous failure clearly:
+
+`crates/nession-agent/src/fs/sandbox.rs`
+
+was always reachable and ranked very highly, but its absolute score was only
+0.46-0.47.
+
+Across the diagnostic score fields, all six primary targets ranked within the
+top 9 of 1,096 files in both repeats.
+
+Selection replay on the exact same score fields:
+
+| selection rule | primary recall | mean selected files | max selected |
+| --- | ---: | ---: | ---: |
+| strict score >= 0.65 | 83.3% | 12.7 | 35 |
+| strict score >= 0.45 | 100% | 47.4 | 116 |
+| score >= 0.65 OR top-1% relative guard | **100%** | **16.5** | **35** |
+
+Therefore the project does **not** globally lower the probability threshold to
+repair one under-calibrated task. It keeps high-confidence multi-hit selection
+and adds a small rank-based recall guard.
+
+The guard is additive, not a top-k cap: every file above the absolute threshold
+is retained even when there are more than 1% of the repository.
+
+### Cost conclusion
+
+V1 is dramatically cleaner than the original 598-call / 5.77M-token
+file+line locator, but it is not yet cost-optimal.
+
+Current full file-metadata scoring costs about 212k input tokens / 18 calls per
+task on this 1,096-file repository.
+
+This cost is now isolated and deterministic. Future optimizations may reduce
+physical calls/tokens through:
+
+- larger transport batches;
+- semantic score caching;
+- cheap deterministic indexing;
+- reusable repository metadata encodings;
+- eventually a recall-safe prefilter proven against a broader benchmark.
+
+Such optimizations must preserve the logical all-file coverage contract.
+
+## Final research decision
+
+For the first problem domain, the architecture is now considered **closed at
+V1**:
+
+```text
+mechanically enumerate files
+        ->
+independent System One file scores
+        ->
+absolute high-confidence selection
++ small relative recall guard
+        ->
+RelevantFile[]
+```
+
+Do not return to semantic directory pruning unless new evidence demonstrates a
+recall-safe monotonic directory representation.
+
+The next File Discovery work is no longer architecture exploration. It is:
+
+1. reduce the 18-call / 212k-token execution cost without changing the logical
+   score field;
+2. validate the frozen V1 on fresh multi-file tasks and additional
+   repositories/languages;
+3. build complete primary/supporting file references so precision can be
+   measured honestly;
+4. compose V1 with Evidence Localization and measure end-to-end cost.
