@@ -120,5 +120,19 @@ class ScalingTests(unittest.TestCase):
         self.assertGreater(result["deferred_module_count"], 0)
 
 
+class ScalingReportTests(unittest.TestCase):
+    def test_report_preserves_failed_arm_and_expected_count(self):
+        self.assertIsNotNone(importlib.util.find_spec("file_discovery_scaling_benchmark"),
+                             "missing feature: scaling benchmark report")
+        from file_discovery_scaling_benchmark import render_report
+        report = render_report({"run_url": "https://example.test/run", "code_sha": "abc",
+                                "expected_rows": 2, "rows": [
+                                    {"case_id": "case-a", "arm": "hybrid", "status": "failed",
+                                     "error": "missing answer"}]})
+        self.assertIn("missing answer", report)
+        self.assertIn("1/2", report)
+        self.assertIn("https://example.test/run", report)
+
+
 if __name__ == "__main__":
     unittest.main()
