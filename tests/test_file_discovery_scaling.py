@@ -1,0 +1,124 @@
+import importlib.util
+import sys
+import threading
+import time
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+
+def candidate(path):
+    return {"id": f"file:{path}", "path": path, "kind": "file",
+            "payload": {"path": path, "filename": Path(path).name,
+                        "extension": Path(path).suffix, "size_bytes": 1}}
+
+
+class FakeDecider:
+    model = "fake"
+    profile = "baseline_v1"
+    endpoint = "offline"
+
+    def __init__(self, route=0.1, uncertainty=0.1, file_score=0.9):
+        self.route = route
+        self.uncertainty = uncertainty
+        self.file_score = file_score
+        self.active = 0
+        self.peak = 0
+        self.calls = 0
+        self.lock = threading.Lock()
+
+    def score_candidates(self, query, stage, candidates):
+        with self.lock:
+            self.active += 1
+            self.calls += 1
+            self.peak = max(self.peak, self.active)
+        time.sleep(0.01)
+        with self.lock:
+            self.active -= 1
+        return [dict(c, score=self.route if stage == "route" else self.file_score,
+                     uncertainty=self.uncertainty) for c in reversed(candidates)], {
+                         "model_calls": 1, "input_tokens": len(candidates) * 10,
+                         "output_tokens": len(candidates)}
+
+
+class ScalingTests(unittest.TestCase):
+    def setUp(self):
+        for name in ("file_discovery_scoring", "file_discovery_adaptive"):
+            self.assertIsNotNone(importlib.util.find_spec(name), f"missing feature: {name}")
+        from file_discovery_scoring import BatchScorer
+        from file_discovery_adaptive import discover
+        self.Scorer = BatchScorer
+        self.discover = discover
+
+    def test_concurrency_preserves_every_candidate_and_stable_order(self):
+        items = [candidate(f"src/item_{i:03}.py") for i in range(40)]
+        decider = FakeDecider()
+        scorer = self.Scorer("task", decider, workers=4, batch_size=3)
+        result = scorer.score("file", list(reversed(items)))
+        self.assertEqual([x["id"] for x in result], sorted(x["id"] for x in items))
+        self.assertGreater(decider.peak, 1)
+        self.assertLessEqual(decider.peak, 4)
+        self.assertEqual(scorer.usage["input_tokens"], 400)
+
+    def test_cache_reuses_identical_batches_but_not_changed_query(self):
+        cache = {}
+        decider = FakeDecider()
+        items = [candidate("src/example.py")]
+        first = self.Scorer("alpha", decider, cache=cache)
+        first.score("file", items)
+        second = self.Scorer("alpha", decider, cache=cache)
+        second.score("file", items)
+        self.assertEqual(second.usage["model_calls"], 0)
+        self.assertEqual(second.usage["logical_input_tokens"], 10)
+        self.Scorer("beta", decider, cache=cache).score("file", items)
+        self.assertEqual(decider.calls, 2)
+
+    def test_missing_answer_fails_instead_of_silently_dropping_file(self):
+        class Missing(FakeDecider):
+            def score_candidates(self, query, stage, candidates):
+                return [], {"model_calls": 1}
+        with self.assertRaises(ValueError):
+            self.Scorer("task", Missing()).score("file", [candidate("a.py")])
+
+    def test_nonfinite_answer_fails(self):
+        with self.assertRaises(ValueError):
+            self.Scorer("task", FakeDecider(file_score=float("nan"))).score(
+                "file", [candidate("a.py")])
+
+    def test_more_than_2000_files_are_not_capped(self):
+        items = [candidate(f"src/area{i}/reconnect.py") for i in range(2051)]
+        scorer = self.Scorer("reconnect", FakeDecider(), batch_size=64)
+        result = self.discover(items, "reconnect", scorer, policy="lexical")
+        self.assertEqual(result["scored_file_count"], 2051)
+
+    def test_global_lexical_rescue_bypasses_low_scoring_parent(self):
+        items = [candidate("opaque/deep/reconnect.py"), candidate("other/unrelated.py")]
+        scorer = self.Scorer("reconnect", FakeDecider(route=0.01))
+        result = self.discover(items, "reconnect", scorer, policy="hybrid")
+        self.assertIn("opaque/deep/reconnect.py", result["file_scores"])
+
+    def test_uncertain_route_expands_instead_of_pruning(self):
+        items = [candidate("opaque/hidden.py"), candidate("different/other.py")]
+        scorer = self.Scorer("network lifecycle", FakeDecider(route=0.01, uncertainty=0.9))
+        result = self.discover(items, "network lifecycle", scorer, policy="hierarchy")
+        self.assertEqual(result["scored_file_count"], 2)
+        self.assertGreater(result["route_scored_count"], 0)
+
+    def test_hybrid_follows_siblings_until_no_new_candidates(self):
+        items = [candidate("pkg/reconnect.py"), candidate("pkg/opaque.py"),
+                 candidate("other/unrelated.py")]
+        scorer = self.Scorer("reconnect", FakeDecider(route=0.01))
+        result = self.discover(items, "reconnect", scorer, policy="hybrid")
+        self.assertIn("pkg/opaque.py", result["file_scores"])
+        self.assertNotIn("other/unrelated.py", result["file_scores"])
+
+    def test_no_targets_produces_explicit_empty_result(self):
+        scorer = self.Scorer("quux", FakeDecider(route=0.01))
+        result = self.discover([candidate("src/other.py")], "quux", scorer, policy="hierarchy")
+        self.assertEqual(result["scored_file_count"], 0)
+        self.assertGreater(result["deferred_module_count"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

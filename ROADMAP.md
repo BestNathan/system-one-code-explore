@@ -49,13 +49,27 @@ global Stop are rejected.
 The frozen six-case gate recovered 12/12 primary targets across two repeats with
 a score>=0.65 plus top-1% relative recall guard.
 
-Current work is no longer architecture discovery. It is:
+V1 remains the full-scoring reference. Large-repository measurements reopen the
+candidate-shaping question: scoring every file is too expensive at scale.
 
-- reduce the ~18 calls / ~212k input tokens per 1,096-file task without changing
-  logical all-file coverage;
-- build complete primary/supporting/incidental file references;
-- validate on multiple repositories/languages and true multi-file tasks;
-- study deterministic/cached pre-indexing only if it is recall-safe.
+Next research combines independent-request concurrency with algorithmic
+candidate reduction, tested separately before composition:
+
+- impose no cumulative file/directory count caps, fixed top-k, or channel quotas;
+  measure whether the algorithm naturally reduces scoring by an order of magnitude;
+- explore global metadata retrieval, adaptive module summaries, on-demand
+  hierarchical routing, and relation-driven recovery;
+- study evidence- and uncertainty-based continuation/stopping while retaining
+  unresolved coverage and measuring omissions;
+- keep request payloads and concurrency manageable through batching and queuing,
+  without dropping logical candidates;
+- use the frozen Nession, Codex, and OpenClaw tasks for controlled experiments,
+  then add fresh multi-file tasks within those repositories;
+- measure file and directory scoring together with cold/warm index cost,
+  primary/supporting recall, tokens/cost, latency tails, and failures.
+
+All execution belongs in GitHub Actions, with a research report for every run.
+See the [algorithm scaling research plan](docs/research/2026-09-25-file-discovery-algorithm-scaling-plan.md).
 
 ## Milestone 4 — End-to-end localization
 
@@ -103,7 +117,8 @@ The objective is to identify which localization work can move reliably to System
 1. Finish R19 counterfactual-safe comparison methodology.
 2. Standardize Usage and wall-time accounting across all experiments.
 3. Optimize evidence-localization calls/tokens without changing semantics.
-4. Optimize and broaden the converged File Discovery V1 benchmark.
+4. Research concurrent File Discovery with algorithmic file/directory reduction,
+   evaluated on Nession, Codex, and OpenClaw without candidate-count caps.
 5. Compose File Discovery V1 with Evidence Localization, then expand end-to-end datasets.
 
 ## Evaluation rule

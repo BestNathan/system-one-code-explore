@@ -4,6 +4,13 @@
 
 Mechanism diagnosis after the Nession / OpenClaw / Codex large-repository benchmark.
 
+Follow-up: [algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md)
+revises the next research direction: no cumulative file/directory count caps or
+fixed candidate quotas. Study natural reduction through retrieval and adaptive
+routing, plus independent-request concurrency, on Nession, Codex, and OpenClaw.
+The numeric ranges and budget-driven refinement below are historical proposals,
+superseded by the follow-up; they are not validated results or active limits.
+
 ## 1. Why Codex System2 cost appeared higher than OpenClaw
 
 The difference is not explained by repository file count. System2 searches source selectively.

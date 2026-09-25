@@ -41,6 +41,11 @@ Rxx IDs are chronological experiments, not the architecture.
 | R18 | [Fresh hybrid generalization](2026-09-25-r18-fresh-hybrid-generalization.md) | completed fresh validation | Raw gains were confounded by independent System One decision noise; fresh secondary obligations did not show attributable retained-evidence gain. |
 | R19 | [Counterfactual-safe geometry A/B](2026-09-25-r19-counterfactual-safe-geometry-ab.md) | current methodology | Identical semantic states must share cached System One decisions; separate logical policy cost from physical cached execution cost. |
 
+## File Discovery scaling follow-up
+
+- [Large-repository scaling diagnosis](file-discovery-large-repo-scaling-diagnosis.md) — observed all-file scoring and corrected System2 cost interpretation.
+- [Algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md) — planned research on Nession, Codex, and OpenClaw; reduce file and directory scoring through retrieval and adaptive routing without count caps, and test independent-request concurrency. No new experimental results yet.
+
 ## Current conceptual architecture
 
 ```text
