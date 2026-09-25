@@ -1,92 +1,99 @@
 # Research Log
 
-This directory is the canonical research history for **System One Code Explorer**.
+This directory is the canonical chronological history for **System One Code Explore**.
 
-The repository is intentionally in a research phase. Implementation is expected
-to change quickly and may be replaced entirely. The durable artifact is the
-research path: what problem was studied, what hypothesis was tested, what the
-experiment showed, what was rejected, and what should be tested next.
+The project is intentionally experimental. Implementations may be replaced; the durable artifact is the research path: question, hypothesis, controlled setup, evidence, result, rejected ideas, and next direction.
 
-## Working rule
+For the problem-oriented view, read `../research-path.md` first.
 
-Every meaningful research iteration should leave a record here before or with
-the implementation change.
+## Project question
 
-Each record should answer:
+> Can a System One harness locate task-relevant files and concrete source evidence with quality close enough to a stronger System Two reference, while using materially fewer calls, tokens, and less wall time?
 
-1. **Question** — what are we trying to learn?
-2. **Hypothesis** — what do we believe before the experiment?
-3. **Design** — what state/action/model/runtime design is being tested?
-4. **Controlled setup** — what is held fixed?
-5. **Evidence** — what data or traces were collected?
-6. **Result** — what happened?
-7. **Interpretation** — what does the result mean?
-8. **Rejected ideas** — what should we stop carrying forward?
-9. **Next direction** — what variable should be isolated next?
+The research is organized conceptually around two problem domains:
 
-Raw benchmark details may live under `docs/experiments/`, but every experiment
-that changes our understanding should be linked from a research record.
+1. file discovery;
+2. evidence localization inside a file.
+
+Rxx IDs are chronological experiments, not the architecture.
 
 ## Research path
 
 | ID | Research | Status | Main conclusion |
 | --- | --- | --- | --- |
-| R01 | [Range runtime baseline](2026-09-24-r01-range-runtime-baseline.md) | historical | System One can drive bounded code reads, but geometry and evidence shaping dominate quality. |
-| R02 | [Adaptive relevance frontier](2026-09-24-r02-adaptive-relevance-frontier.md) | superseded | Coarse-to-fine frontier search is useful as an experiment, but region scores are the wrong Phase0 state abstraction. |
-| R03 | [Full-read System 2 reference field](2026-09-24-r03-full-read-system2-reference.md) | active benchmark | A fixed CC full-read relevance field gives us a distribution-level target instead of only final evidence overlap. |
-| R04 | [Choice policy and evidence closure](2026-09-24-r04-choice-and-evidence-closure.md) | retained partially | Choice is appropriate for policy selection; isolated fine-fragment keep/drop is not. |
-| R05 | [Sparse Phase0 sensing](2026-09-24-r05-sparse-phase0.md) | superseded | Sparse reads are correct, but collapsing them into four coarse region scores destroys the global relevance shape. |
-| R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | baseline | Phase0 should reconstruct a file-length relevance distribution from sparse observations. |
-| R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | completed | Path-independent posterior reconstruction recovers much more of the local System One signal than sequential propagation. |
-| R08 | [Online posterior feedback and holdout generalization](2026-09-24-r08-online-posterior-generalization.md) | completed | Single-fixture relevance gains did not generalize to search; support-derived uncertainty collapsed in sparse unread regions and degraded probe selection. |
-| R09 | [Uncertainty calibration and search policy](2026-09-24-r09-uncertainty-calibration-search-policy.md) | current | Keep multi-scale relevance fixed, decouple exploration uncertainty from adaptive-kernel support, and validate search on fresh holdouts. |
-| R10 | [Phase0 to final evidence quality](2026-09-25-r10-final-evidence-quality.md) | completed baseline | Phase0 already yields concentrated concrete evidence, but the fixed top-score selector still retains meaningful false positives. |
-| R11 | [System One relevance prompt calibration](2026-09-25-r11-system-one-prompt-calibration.md) | current parallel — Phase C | Hard negatives exposed 64-line→8-line label leakage; Phase C uses a full-read teacher to score exact micro-targets before comparing System One prompts. |
+| R01 | [Range runtime baseline](2026-09-24-r01-range-runtime-baseline.md) | historical | System One can drive bounded reads, but geometry and evidence shaping dominate quality. |
+| R02 | [Adaptive relevance frontier](2026-09-24-r02-adaptive-relevance-frontier.md) | superseded | Coarse region scores are the wrong state abstraction. |
+| R03 | [Full-read System 2 reference](2026-09-24-r03-full-read-system2-reference.md) | active benchmark | Use a stronger full-read relevance field as reference, not ground truth. |
+| R04 | [Choice and evidence closure](2026-09-24-r04-choice-and-evidence-closure.md) | partially retained | Choice suits relative policy decisions; isolated fine-fragment keep/drop is insufficient. |
+| R05 | [Sparse Phase0](2026-09-24-r05-sparse-phase0.md) | superseded | Sparse sensing is viable; collapsing it into a few coarse scores loses the global shape. |
+| R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | retained baseline | Represent relevance/uncertainty over the whole file. |
+| R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | completed | Path-independent reconstruction preserves sparse local relevance better than sequential propagation. |
+| R08 | [Online posterior generalization](2026-09-24-r08-online-posterior-generalization.md) | completed | Better posterior reconstruction changes the online path, but support-derived uncertainty can fail search generalization. |
+| R09 | [Uncertainty calibration/search policy](2026-09-24-r09-uncertainty-calibration-search-policy.md) | completed diagnosis | Relevance interpolation and epistemic need-to-observe must be separated. |
+| R10 | [Final evidence quality](2026-09-25-r10-final-evidence-quality.md) | completed baseline | Phase0 contains useful evidence, but fixed top-N evidence is artificial and retains false positives. |
+| R11 | [System One prompt calibration](2026-09-25-r11-system-one-prompt-calibration.md) | completed calibration line | Prompt/calibration effects matter, but label construction and hard negatives must be controlled. |
+| R12 | [Dynamic evidence acquisition](2026-09-25-r12-dynamic-evidence-acquisition.md) | completed diagnosis | Independent Noul multi-select removes fixed evidence count; one marginal-evidence score causes premature stopping. |
+| R13 | [Multi-objective semantic closure](2026-09-25-r13-multi-objective-semantic-closure.md) | completed diagnosis | Separating coverage/utility/completeness improves recall, but merged-region closure runs away. |
+| R14 | [Anchor-centered closure](2026-09-25-r14-anchor-semantic-closure.md) | completed diagnosis | Anchor-local closure fixes giant regions; scalar completeness and pre-closure utility are poor control signals. |
+| R15 | [Frontier obligations + directional closure](2026-09-25-r15-frontier-obligations-directional-closure.md) | completed diagnosis | Coverage should be durable Harness state; close anchors with before/after and score utility after closure. |
+| R16 | [Frontier obligation geometry](2026-09-25-r16-frontier-obligation-geometry.md) | completed diagnosis | Prominence finds some secondary modes; wide basins are too broad and narrow peaks recover only a subset of misses. |
+| R17 | [Hybrid obligations end-to-end](2026-09-25-r17-hybrid-obligations-end-to-end.md) | completed mechanism test | Narrow persistent secondary peaks can become retained evidence, but add false-positive/cost overhead. |
+| R18 | [Fresh hybrid generalization](2026-09-25-r18-fresh-hybrid-generalization.md) | completed fresh validation | Raw gains were confounded by independent System One decision noise; fresh secondary obligations did not show attributable retained-evidence gain. |
+| R19 | [Counterfactual-safe geometry A/B](2026-09-25-r19-counterfactual-safe-geometry-ab.md) | current methodology | Identical semantic states must share cached System One decisions; separate logical policy cost from physical cached execution cost. |
 
-## Current research architecture
+## Current conceptual architecture
 
 ```text
-durable sparse observations
-        |
-        v
-PosteriorEstimator
-        |
-        +--> relevance[N]
-        |
-        +--> interpolation support
-        |
-ObservationGeometry
-        |
-        +--> coverage / exploration uncertainty[N]
-        |
-        v
-System One Choice over diverse legal probes
-        |
-        v
-new observations
-        |
-        +--------------------------+
-                                   |
-                                   v
-                            posterior recompute
-
-evaluation:
-  every checkpoint -> fixed System 2 full-read relevance field
+Repository + Task
+    |
+    +--> File Discovery
+    |       -> RelevantFile[]
+    |
+    +--> Evidence Localization per file
+            -> sparse observations
+            -> relevance / uncertainty state
+            -> coverage obligations
+            -> evidence anchors
+            -> directional closure
+            -> final EvidenceSpan[]
 ```
+
+System Two remains the stronger reference and possible escalation path.
+
+## Working rule
+
+Every meaningful research iteration should record:
+
+1. Question;
+2. Hypothesis;
+3. Design / controlled variable;
+4. Frozen setup;
+5. Quality metrics;
+6. Calls, tokens, wall time, and source/metadata cost;
+7. Evidence and repeated-run/counterfactual controls;
+8. Result;
+9. Interpretation and rejected ideas;
+10. Next variable to isolate.
+
+Raw benchmark details live under `docs/experiments/`; durable conclusions belong here. Important aggregate/reference artifacts should be pinned under `fixtures/research/` when practical.
+
+## Methodological guardrails
+
+- Do not call the System Two reference ground truth.
+- Do not tune on a hidden reference and then claim generalization on it.
+- Keep repeatedly inspected mechanism cases separate from fresh holdouts.
+- In policy A/B, identical semantic states must share decisions.
+- Report localization quality together with model/source cost.
+- Preserve historical algorithms as regression evidence when removal would make prior results hard to reproduce.
 
 ## Repository workflow
 
-During the research phase:
+Research changes may be committed directly to `main`; unstable implementation churn is acceptable. The durable interfaces and benchmark contract should become more stable over time even while experimental algorithms change.
 
-- research changes may be committed directly to `main`;
-- pull requests are not required for research iterations;
-- unstable APIs and implementation churn are acceptable;
-- `docs/research/` is the durable record of decisions and learning;
-- benchmark fixtures that define a research conclusion should be copied into
-  this repository when practical, rather than depend indefinitely on external
-  workflow artifacts;
-- external benchmark/reference provenance should still be pinned by repository,
-  revision, workflow run, and model/runtime configuration.
+See:
 
-| R16 | [Frontier obligation geometry](2026-09-25-r16-frontier-obligation-geometry.md) | completed diagnosis | Prominence recovers secondary modes, but wide basins are too broad; narrow persistent multiscale seeds are the promoted mechanism candidate. |
-| R17 | [Hybrid obligations end-to-end](2026-09-25-r17-hybrid-obligations-end-to-end.md) | completed diagnosis | Narrow persistent secondary peaks can become retained evidence, especially on sequential Phase0, but add false-positive/cost overhead and need fresh validation. |
+- `../benchmark.md`
+- `../research-path.md`
+- `../domains/file-discovery.md`
+- `../domains/evidence-localization.md`
+- `../../ROADMAP.md`
