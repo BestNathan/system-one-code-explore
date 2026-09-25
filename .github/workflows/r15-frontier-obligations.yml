@@ -1,0 +1,243 @@
+name: R15 frontier obligations directional closure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/frontier_obligation_runtime.py"
+      - "src/frontier_obligation_benchmark.py"
+      - "tests/test_frontier_obligation_runtime.py"
+      - ".github/workflows/r15-frontier-obligations.yml"
+      - "docs/research/2026-09-25-r15-frontier-obligations-directional-closure.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "36004833542"
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  run:
+    name: R15 / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }}
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        case:
+          - id: reconnect_lifecycle
+            path: crates/nession-agent/src/connection/server_client.rs
+            goal: >-
+              Help me improve the agent-to-server reconnect lifecycle:
+              exponential backoff, registration after reconnect,
+              connected/sync-needed state transitions, and behavior of queued
+              outbound messages while disconnected.
+          - id: full_stack_command_lifecycle
+            path: crates/nession-server/tests/integration/full_stack.rs
+            goal: >-
+              I am debugging the server's agent command lifecycle. Locate the
+              integration-test code that exercises agent registration, command
+              request/response routing, disconnect or reconnect behavior, and
+              cleanup of pending work.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      GOAL: ${{ matrix.case.goal }}
+      REPEAT: ${{ matrix.repeat }}
+      ESTIMATOR: ${{ matrix.estimator }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download canonical R08 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Download canonical Phase0 trajectory
+        uses: actions/download-artifact@v4
+        with:
+          name: r08-holdout-result-${{ matrix.case.id }}-repeat-${{ matrix.repeat }}
+          path: artifacts/phase0
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run R15
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/frontier_obligation_runtime.py             --source "subject/$FILE_PATH"             --goal "$GOAL"             --phase0-run "artifacts/phase0/$ESTIMATOR/run.json"             --tile-lines 32             --frontier-quantile 0.75             --expansion-threshold 0.60             --final-utility-threshold 0.65             --max-anchor-tiles 12             --trace-file artifacts/out/trace.jsonl             --output artifacts/out/run.json
+
+      - name: Evaluate R15
+        run: |
+          python3 src/frontier_obligation_benchmark.py             --reference artifacts/reference/reference.json             --phase0-run "artifacts/phase0/$ESTIMATOR/run.json"             --run artifacts/out/run.json             --output-json artifacts/out/benchmark.json             --output-markdown artifacts/out/benchmark.md
+          cat artifacts/out/benchmark.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r15-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R15
+    needs: run
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r15-*
+          path: artifacts/all
+
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = []
+          for path in sorted(Path("artifacts/all").glob("*/benchmark.json")):
+              root = path.parent
+              rows.append((
+                  json.loads((root / "run.json").read_text()),
+                  json.loads(path.read_text()),
+              ))
+
+          grouped = defaultdict(list)
+          for run, bench in rows:
+              grouped[
+                  run["phase0_source"]["posterior_estimator"]
+              ].append((run, bench))
+
+          out = {
+              "schema_version": 1,
+              "kind": "r15-frontier-obligations-aggregate",
+              "source_phase0_run": 36004833542,
+              "runs": len(rows),
+              "estimators": {},
+          }
+
+          for estimator, items in sorted(grouped.items()):
+              def mean(path):
+                  values = []
+                  for _, bench in items:
+                      value = bench
+                      for key in path:
+                          value = value[key]
+                      values.append(value)
+                  return statistics.fmean(values)
+
+              out["estimators"][estimator] = {
+                  "mean_obligation_count": mean(
+                      ["metrics", "obligation_count"]
+                  ),
+                  "mean_satisfied_obligations": mean(
+                      ["metrics", "satisfied_obligations"]
+                  ),
+                  "mean_exhausted_obligations": mean(
+                      ["metrics", "exhausted_obligations"]
+                  ),
+                  "mean_seed_attempts_per_obligation": mean(
+                      ["metrics", "mean_seed_attempts_per_obligation"]
+                  ),
+                  "mean_anchor_count": mean(
+                      ["metrics", "anchor_count"]
+                  ),
+                  "mean_retained_anchor_count": mean(
+                      ["metrics", "retained_anchor_count"]
+                  ),
+                  "mean_closure_expansion_tiles": mean(
+                      ["metrics", "closure_expansion_tiles"]
+                  ),
+                  "mean_anchor_span_lines": mean(
+                      ["metrics", "mean_anchor_span_lines"]
+                  ),
+                  "mean_max_anchor_span_lines": mean(
+                      ["metrics", "max_anchor_span_lines"]
+                  ),
+                  "materialized_source_fraction": mean(
+                      ["metrics", "materialized", "source_fraction"]
+                  ),
+                  "materialized_high_recall": mean(
+                      ["metrics", "materialized", "high_line_recall"]
+                  ),
+                  "retained_source_fraction": mean(
+                      ["metrics", "retained", "source_fraction"]
+                  ),
+                  "retained_mean_reference_relevance": mean(
+                      ["metrics", "retained", "mean_reference_relevance"]
+                  ),
+                  "retained_high_precision": mean(
+                      ["metrics", "retained", "high_line_precision"]
+                  ),
+                  "retained_high_recall": mean(
+                      ["metrics", "retained", "high_line_recall"]
+                  ),
+                  "retained_weighted_relevance_recall": mean(
+                      ["metrics", "retained", "weighted_relevance_recall"]
+                  ),
+                  "hidden_cc_high_regions_without_obligation": mean(
+                      [
+                          "metrics",
+                          "hidden_cc_high_regions_without_phase0_obligation",
+                      ]
+                  ),
+                  "closure_safety_cap_count": mean(
+                      ["metrics", "closure_safety_cap_count"]
+                  ),
+                  "mean_model_calls": statistics.fmean(
+                      run["usage"]["model_calls"]
+                      for run, _ in items
+                  ),
+                  "mean_input_tokens": statistics.fmean(
+                      run["usage"]["input_tokens"]
+                      for run, _ in items
+                  ),
+              }
+
+          Path("aggregate.json").write_text(
+              json.dumps(out, indent=2) + "\n"
+          )
+          print(json.dumps(out, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r15-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
