@@ -1,3 +1,17 @@
+> **Historical design note**
+>
+> This document records an earlier two-phase locator/range-runtime design.
+> It is preserved for research provenance, but it is **not the current project architecture**.
+>
+> Start from:
+>
+> - [`README.md`](../README.md)
+> - [`docs/architecture.md`](architecture.md)
+> - [`docs/domains/file-discovery.md`](domains/file-discovery.md)
+> - [`docs/domains/evidence-localization.md`](domains/evidence-localization.md)
+> - [`docs/benchmark.md`](benchmark.md)
+
+---
 # Two-Phase Code Localization with System One
 
 ## Research question
