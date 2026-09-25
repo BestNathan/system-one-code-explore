@@ -134,6 +134,33 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             0.64,
         )
 
+    def test_relative_recall_guard_recovers_low_absolute_score(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.make_repo(root)
+            decider = FakeDecider({
+                "src/net/client.rs": 0.47,
+                "src/net/retry.rs": 0.40,
+                "src/db/store.rs": 0.30,
+                "docs/notes.md": 0.10,
+            })
+            result = run(
+                root,
+                "connection",
+                decider,
+                file_threshold=0.65,
+                relative_fallback_fraction=0.25,
+            )
+
+        self.assertEqual(
+            [item["path"] for item in result["relevant_files"]],
+            ["src/net/client.rs"],
+        )
+        self.assertEqual(
+            result["relevant_files"][0]["selection_reasons"],
+            ["relative_recall_guard"],
+        )
+
     def test_transport_batches_do_not_change_semantics(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
