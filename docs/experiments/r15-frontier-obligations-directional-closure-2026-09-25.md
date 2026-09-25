@@ -23,3 +23,31 @@ Primary success criterion:
 
 > compared with R14, reduce hidden-reference premature coverage failure without
 > recreating R13's giant merged-region expansion.
+
+
+## Canonical execution
+
+Workflow run: `36077460697`.
+
+All eight discriminative jobs succeeded:
+
+- reconnect lifecycle x 2 repeats x 2 Phase0 posterior arms;
+- full-stack command lifecycle x 2 repeats x 2 Phase0 posterior arms.
+
+The experiment confirms the structural R15 invariants:
+
+- obligations cannot disappear because evidence already feels sufficient;
+- anchors close through need-before / need-after only;
+- utility is evaluated only after closure;
+- low-utility seeds cause another representative attempt rather than deleting
+  the obligation.
+
+Primary remaining failure is Phase0-to-obligation geometry. On full-stack
+sequential, hidden command-core regions never enter an obligation because
+their Phase0 scores are below the global q75 threshold. Multi-scale exposes
+those regions and R15 then retains useful evidence.
+
+Canonical pinned outputs:
+
+- `fixtures/research/r15-frontier-obligations-aggregate.json`;
+- `fixtures/research/r15-phase0-obligation-coverage-diagnostic.json`.
