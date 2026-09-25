@@ -28,7 +28,10 @@ from system_one_code_locator import (
 DEFAULT_DIRECTORY_THRESHOLD = 0.50
 DEFAULT_FILE_THRESHOLD = 0.65
 DEFAULT_TRANSPORT_BATCH_SIZE = 64
-DEFAULT_MECHANICAL_EXPAND_DEPTH = 1
+IMPLEMENTATION_SUFFIXES = {
+    ".py", ".rs", ".go", ".java", ".ts", ".tsx",
+    ".js", ".jsx", ".vue", ".proto", ".sql", ".sh",
+}
 
 
 def empty_usage():
@@ -73,6 +76,12 @@ def directory_candidate(root, path, parent):
         for item in entries
         if item.is_file() and item.suffix.lower() in SUFFIXES
     ]
+    implementation_files = [
+        item.name
+        for item in entries
+        if item.is_file()
+        and item.suffix.lower() in IMPLEMENTATION_SUFFIXES
+    ]
     rel = path.relative_to(root).as_posix()
     return {
         "id": f"dir:{rel}",
@@ -85,6 +94,10 @@ def directory_candidate(root, path, parent):
             "name": path.name,
             "child_directories": child_directories[:24],
             "direct_files": direct_files[:40],
+            "implementation_files": implementation_files[:40],
+            "structural_container": (
+                bool(child_directories) and not implementation_files
+            ),
         },
     }
 
@@ -181,7 +194,6 @@ def run(
     directory_threshold=DEFAULT_DIRECTORY_THRESHOLD,
     file_threshold=DEFAULT_FILE_THRESHOLD,
     transport_batch_size=DEFAULT_TRANSPORT_BATCH_SIZE,
-    mechanical_expand_depth=DEFAULT_MECHANICAL_EXPAND_DEPTH,
 ):
     root = Path(root).resolve()
     usage = empty_usage()
@@ -213,10 +225,9 @@ def run(
         mechanical = []
         semantic = []
         for candidate in newly_disclosed:
-            depth = len(Path(candidate["path"]).parts)
             if (
                 candidate["kind"] == "directory"
-                and depth <= int(mechanical_expand_depth)
+                and candidate["payload"].get("structural_container")
             ):
                 mechanical.append(candidate)
             else:
@@ -278,7 +289,10 @@ def run(
             "directory_threshold": float(directory_threshold),
             "file_threshold": float(file_threshold),
             "transport_batch_size": int(transport_batch_size),
-            "mechanical_expand_depth": int(mechanical_expand_depth),
+            "structural_container_rule": (
+                "mechanically expand directories with child directories "
+                "and no direct implementation files"
+            ),
             "stop_rule": "frontier_exhausted",
             "source_body_visible": False,
             "top_k": None,
@@ -312,11 +326,6 @@ def main(argv=None):
         type=int,
         default=DEFAULT_TRANSPORT_BATCH_SIZE,
     )
-    parser.add_argument(
-        "--mechanical-expand-depth",
-        type=int,
-        default=DEFAULT_MECHANICAL_EXPAND_DEPTH,
-    )
     parser.add_argument("--trace-file")
     parser.add_argument("--output", required=True)
     parser.add_argument(
@@ -346,7 +355,6 @@ def main(argv=None):
         directory_threshold=args.directory_threshold,
         file_threshold=args.file_threshold,
         transport_batch_size=args.transport_batch_size,
-        mechanical_expand_depth=args.mechanical_expand_depth,
     )
     Path(args.output).write_text(
         json.dumps(result, indent=2, ensure_ascii=False) + "\n",
