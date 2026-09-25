@@ -73,8 +73,6 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             root = Path(d)
             self.make_repo(root)
             decider = FakeDecider({
-                "src": 0.95,
-                "docs": 0.10,
                 "src/net": 0.92,
                 "src/db": 0.80,
                 "src/net/client.rs": 0.91,
@@ -112,14 +110,40 @@ class FileDiscoveryV1Tests(unittest.TestCase):
         )
         self.assertIsNone(result["policy"]["top_k"])
 
+    def test_top_level_directory_is_mechanically_expanded(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.make_repo(root)
+            decider = FakeDecider({
+                "src/net": 0.90,
+                "src/db": 0.10,
+                "src/net/client.rs": 0.90,
+                "src/net/retry.rs": 0.10,
+            })
+            result = run(
+                root,
+                "connection",
+                decider,
+                directory_threshold=0.50,
+                file_threshold=0.65,
+            )
+
+        self.assertEqual(
+            result["directory_status"]["src"],
+            "mechanical_expand",
+        )
+        self.assertIn(
+            "src/net/client.rs",
+            {item["path"] for item in result["relevant_files"]},
+        )
+
     def test_pruned_ancestor_hides_descendants(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             self.make_repo(root)
             decider = FakeDecider({
-                "src": 0.40,
-                "docs": 0.10,
-                "src/net": 0.95,
+                "src/net": 0.40,
+                "src/db": 0.10,
                 "src/net/client.rs": 0.99,
             })
             result = run(
@@ -131,9 +155,13 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             )
 
         self.assertEqual(result["relevant_files"], [])
-        self.assertNotIn(
-            "dir:src/net",
-            result["node_scores"],
+        self.assertEqual(
+            result["directory_status"]["src"],
+            "mechanical_expand",
+        )
+        self.assertEqual(
+            result["directory_status"]["src/net"],
+            "pruned",
         )
         self.assertNotIn(
             "file:src/net/client.rs",
@@ -145,8 +173,6 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             root = Path(d)
             self.make_repo(root)
             decider = FakeDecider({
-                "src": 0.90,
-                "docs": 0.10,
                 "src/net": 0.90,
                 "src/db": 0.10,
                 "src/net/client.rs": 0.90,
