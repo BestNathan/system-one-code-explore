@@ -1,8 +1,7 @@
 {
   "schema_version": 1,
   "kind": "r16-frontier-obligation-geometry-aggregate",
-  "canonical_phase_a_run": 36081359100,
-  "canonical_phase_b_run": 36081607170,
+  "canonical_run": 36081607170,
   "source_phase0_run": 36004833542,
   "runs": 12,
   "overall": {
@@ -63,36 +62,62 @@
       "mean_hidden_relevance": 0.7262694902319903
     }
   },
-  "estimators": {
-    "multi_scale_gaussian": {
-      "q75_components": {
-        "source_coverage": 0.2623778370556125,
-        "hidden_high_region_recall": 0.6666666666666666,
-        "obligation_precision": 0.9444444444444445
-      },
-      "q75_plus_multiscale_seed": {
-        "source_coverage": 0.2711545445280748,
-        "hidden_high_region_recall": 0.7000000000000001,
-        "obligation_precision": 0.8333333333333334
-      }
+  "sequential_exponential": {
+    "q75_components": {
+      "obligation_count": 3.3333333333333335,
+      "source_coverage": 0.2623778370556125,
+      "hidden_high_region_recall": 0.5777777777777778,
+      "hidden_high_line_coverage": 0.3542726128989538,
+      "obligation_precision": 0.7166666666666667,
+      "mean_hidden_relevance": 0.7058580187928015
     },
-    "sequential_exponential": {
-      "q75_components": {
-        "source_coverage": 0.2623778370556125,
-        "hidden_high_region_recall": 0.5777777777777778,
-        "obligation_precision": 0.7166666666666667
-      },
-      "q75_plus_local_seed": {
-        "source_coverage": 0.29920221270515823,
-        "hidden_high_region_recall": 0.6333333333333333,
-        "obligation_precision": 0.6091269841269841
-      },
-      "q75_plus_multiscale_seed": {
-        "source_coverage": 0.28611143203392464,
-        "hidden_high_region_recall": 0.6333333333333333,
-        "obligation_precision": 0.6507936507936508
-      }
+    "q75_plus_local_seed": {
+      "obligation_count": 5.5,
+      "source_coverage": 0.29920221270515823,
+      "hidden_high_region_recall": 0.6333333333333333,
+      "hidden_high_line_coverage": 0.3805812144086876,
+      "obligation_precision": 0.6091269841269841,
+      "mean_hidden_relevance": 0.6909592592592593
+    },
+    "q75_plus_multiscale_seed": {
+      "obligation_count": 4.833333333333333,
+      "source_coverage": 0.28611143203392464,
+      "hidden_high_region_recall": 0.6333333333333333,
+      "hidden_high_line_coverage": 0.37422444047146075,
+      "obligation_precision": 0.6507936507936508,
+      "mean_hidden_relevance": 0.6947734126984128
     }
   },
-  "conclusion": "Prominence is useful as mode detection but full basins are too broad. q75 plus narrow persistent multiscale secondary seeds gives a modest high-region recall gain at small candidate-span cost. It cannot repair Phase0 regions that form neither a high-rank component nor a stable relevance mode."
+  "multi_scale_gaussian": {
+    "q75_components": {
+      "obligation_count": 2.0,
+      "source_coverage": 0.2623778370556125,
+      "hidden_high_region_recall": 0.6666666666666666,
+      "hidden_high_line_coverage": 0.4348281684545093,
+      "obligation_precision": 0.9444444444444445,
+      "mean_hidden_relevance": 0.765218983914636
+    },
+    "q75_plus_local_seed": {
+      "obligation_count": 2.6666666666666665,
+      "source_coverage": 0.2711545445280748,
+      "hidden_high_region_recall": 0.7000000000000001,
+      "hidden_high_line_coverage": 0.4435621109786783,
+      "obligation_precision": 0.8333333333333334,
+      "mean_hidden_relevance": 0.7577655677655678
+    },
+    "q75_plus_multiscale_seed": {
+      "obligation_count": 2.6666666666666665,
+      "source_coverage": 0.2711545445280748,
+      "hidden_high_region_recall": 0.7000000000000001,
+      "hidden_high_line_coverage": 0.4435621109786783,
+      "obligation_precision": 0.8333333333333334,
+      "mean_hidden_relevance": 0.7577655677655678
+    }
+  },
+  "diagnosis": {
+    "phase_a": "prominence detects more hidden high-value modes but half-prominence basins are too broad",
+    "phase_b": "narrow prominence seeds preserve q75 footprint but recover only a minority of missed regions",
+    "key_failure": "some hidden core regions are not represented by a distinct Phase0 local maximum at all; peak detection cannot recover a mode absent from the Phase0 field",
+    "next_direction": "study obligation generation from unresolved relevance mass / uncertainty / slope or valley-to-plateau evidence, not peak detection alone"
+  }
 }
