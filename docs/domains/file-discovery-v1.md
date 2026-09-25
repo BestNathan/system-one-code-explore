@@ -2,108 +2,92 @@
 
 ## Status
 
-**Converged mechanism baseline.**
+**Converged mechanism candidate. Final validation gate running on the frozen six-case primary-target suite.**
 
-This document closes the open-ended File Discovery design exploration and defines the one V1 architecture that future work should validate, optimize, or falsify.
-
-Do not open new file-discovery architectures unless V1 fails a frozen benchmark for a structural reason.
+This document closes open-ended File Discovery architecture exploration. Future work may calibrate, optimize, or falsify this V1, but should not invent new traversal semantics unless V1 fails for a structural reason.
 
 ## Research question
 
-> Can System One recover the task-relevant file set from repository structure and metadata, under progressive disclosure, without reading source bodies and without asking System Two to search the whole repository?
+> Can System One identify task-relevant files from repository file metadata alone, at materially lower cost than System Two repository exploration, while preserving the files needed by downstream Evidence Localization?
 
-## What the historical experiments already establish
+## Final V1 conclusion
 
-The early nession websocket pilots provide enough mechanism evidence to reject several designs.
+File Discovery is **not a semantic directory-traversal problem**.
 
-### Rejected
+It is a multi-label file classification problem over a mechanically enumerated repository file set.
 
-1. **Flatten the whole tree into the model prompt.** It scales context with repository size.
-2. **Recursively walk selected directories again.** It reintroduces descendants that a previous directory decision already rejected.
-3. **Per-line/source scoring during file discovery.** File discovery should end before source localization begins.
-4. **Transport batching as semantic progress.** The original implementation reached 598 calls / 5.77M input tokens because candidate batching and per-file line scoring multiplied calls without adding new semantic state.
-5. **Fixed top-k files.** Multi-file tasks are multi-hit; top-k is a Harness-imposed semantic cap.
-6. **Fixed file batches/order.** Batch order is transport, not task semantics.
-7. **Use one activation threshold as both scheduling and global stop.** 'Read now' and 'all relevant files have been covered' are different questions.
-8. **Continuously rescore unchanged nodes.** If a node's semantic input has not changed, repeated scoring adds model variance and cost rather than information.
+```text
+Repository
+   -> Harness mechanically enumerates supported file metadata
+   -> System One independently Noul-scores every file once
+   -> threshold selects RelevantFile[]
+   -> Evidence Localization handles source
+```
 
-### Retained
+Directory paths remain useful metadata and transport structure, but directories do not semantically prune descendants.
 
-1. Directory and file relevance are naturally **independent Noul judgments** because several nodes can be relevant simultaneously.
-2. Directory pruning must expose **direct children only**.
-3. Source bodies remain hidden during File Discovery.
-4. The Harness owns traversal, visibility, budgets, caching, and termination.
-5. System One supplies bounded semantic relevance judgments.
-6. File false positives are not free: each promoted file can trigger an expensive Evidence Localization runtime.
+## Why directory pruning is rejected
 
-Historical cost evidence:
+The convergence gates produced the same failure repeatedly for the fs symlink/delete task.
 
-- early all-tree / per-line implementation: 598 calls, 5.77M input tokens;
-- stabilized three-stage metadata baseline: directory 380 -> 91 and file 272 -> 82 with three total model calls for the full three-stage run, 168,697 input tokens overall;
-- later global reader pilot: Phase1 retained 18 files, only three were actually read; the end-to-end run used 12 calls / 195,977 input tokens, demonstrating that fixed top-k/batch ordering was unnecessary.
+Target:
 
-These numbers are mechanism evidence only; they are not a modern File Discovery quality benchmark.
+`crates/nession-agent/src/fs/sandbox.rs`
+
+### Gate 1 — semantic pruning from the repository root
+
+Two repeats both recovered 5/6 primary files.
+
+`crates` scored only 0.41 / 0.38 and the entire target subtree was pruned.
+
+### Gate 2 — mechanically expand only top-level directories
+
+The same failure moved down one namespace layer.
+
+`crates/nession-agent` scored 0.22 in both repeats.
+
+### Gate 3 — mechanically collapse directories with no direct implementation files
+
+The same failure moved to:
+
+`crates/nession-agent/src` -> 0.40 / 0.44
+
+even though its child names included the genuinely relevant `fs` directory.
+
+This establishes a structural property:
+
+> High relevance of a descendant file does not imply high relevance of shallow parent-directory metadata.
+
+Directory relevance is therefore not safely monotonic and cannot be used as a hard pruning invariant.
+
+Lowering the directory threshold only moves the false-negative boundary and makes correctness depend on repository naming depth.
+
+## Historical designs formally rejected
+
+1. Whole-tree semantic directory scoring as a pruning stage.
+2. Recursive re-walking of selected directories.
+3. Per-line/source scoring during File Discovery.
+4. Fixed top-k file caps.
+5. Fixed file batches as semantic ordering.
+6. Repeated rescoring of unchanged files.
+7. A model-controlled global Stop for file discovery.
+8. Any architecture where a parent directory rejection can make a relevant file permanently unreachable.
+
+Historical cost evidence also rejects combining file discovery with line-level reading: the original implementation reached 598 calls and 5.77M input tokens largely because candidate batching and per-file line scoring multiplied semantic calls.
 
 ## V1 scope
 
-V1 answers exactly one question:
+V1 answers exactly:
 
 > Which files should be handed to Evidence Localization?
 
-V1 is **metadata-only**.
-
-It does not:
-
-- inspect source contents;
-- perform range reads;
-- follow callers/callees/imports discovered from source;
-- schedule evidence reads;
-- decide whether enough final code evidence exists.
-
-Those belong to Evidence Localization or a future cross-file expansion stage.
-
-## V1 repository state
-
-```text
-FileDiscoveryState {
-  task
-  root
-  disclosed_nodes
-  unresolved_directories
-  directory_scores
-  file_scores
-  promoted_files
-  usage
-}
-```
-
-Node states are mechanical:
-
-```text
-undisclosed
-disclosed
-expanded        # directory
-pruned          # directory below expand threshold
-promoted        # file above file threshold
-rejected        # file below file threshold
-```
-
-There is no semantic global Stop action.
+V1 does not read source bodies, reason about line ranges, follow callers/callees, or decide whether final code evidence is sufficient.
 
 ## Repository view
 
-The Harness may build a cheap filesystem index internally, but the model sees only progressively disclosed node metadata.
+The Harness recursively enumerates supported files using deterministic ignore and extension rules.
 
-Directory payload:
-
-```text
-path
-name
-direct child directory names
-direct file names
-```
-
-File payload:
+System One sees only:
 
 ```text
 path
@@ -112,100 +96,64 @@ extension
 size_bytes
 ```
 
-No source body, AST, symbol graph, embeddings, or LSP semantics are part of V1.
+No source body, AST, symbol graph, embedding, LSP result, or hidden semantic summary is part of V1.
 
-## State transition
+## Decision primitive
 
-Start by expanding the repository root mechanically.
-
-Before semantic scoring, the Harness also collapses **structural container directories**:
-
-```text
-has child directories
-AND
-has no direct implementation files
-```
-
-Such a directory is expanded mechanically rather than semantically pruned.
-
-Examples include namespace/package containers such as `crates/` or a crate/package root whose only direct files are manifests/configuration and whose implementation lives under `src/`.
-
-The purpose is not to guess a fixed depth. It is to avoid asking System One to infer a deep task from semantically weak namespace labels such as `crates`, `packages`, or `nession-agent`.
-
-Once a directory exposes direct implementation files, it becomes a semantic frontier and is Noul-scored normally.
-
-For every newly disclosed semantic node, ask System One exactly once:
-
-### Directory Noul
-
-> How likely is this directory/subtree to contain or directly lead to source files materially relevant to the task?
-
-### File Noul
+For each file, independently ask Noul:
 
 > How likely is this file itself to contain material source evidence relevant to the task?
 
-Scores do not compete or sum to one.
+Files do not compete and probabilities do not sum to one.
 
-Transition:
+This is intentionally multi-hit: several files can all be relevant.
+
+## State transition
 
 ```text
-root
-  -> disclose direct children
-  -> independently score each child once
-
-structural container directory
-  -> expand mechanically
-
-semantic directory score >= directory_threshold
-  -> expand directory
-  -> disclose its direct children
-
-directory score < directory_threshold
-  -> prune subtree
-
-file score >= file_threshold
-  -> promote RelevantFile
-
-file score < file_threshold
-  -> reject file
-
-repeat until no expandable directory remains
+mechanically enumerate all supported files
+        |
+        v
+score every file exactly once
+        |
+        +--> score >= file_threshold -> RelevantFile
+        |
+        +--> score <  file_threshold -> rejected
+        |
+        v
+all file metadata scored
+        |
+        v
+terminate
 ```
 
-Termination is therefore deterministic:
-
-> **frontier exhausted under the frozen directory expansion policy**.
-
-The model does not decide global completion.
+There is no directory threshold, top-k, or semantic global Stop.
 
 ## Batching and caching
 
-Transport batching may group independent Noul questions, but batch boundaries must not change semantics.
+Transport batching is allowed only as an execution detail.
 
-A node score is cacheable by:
-
-```text
-hash(task + canonical node metadata + prompt version + model)
-```
-
-If the semantic request is unchanged, the node must not be rescored in the same run.
-
-This both reduces cost and removes model-noise-driven traversal differences.
-
-## V1 thresholds
-
-The initial validation baseline freezes the historical values:
+A file score is cacheable by:
 
 ```text
-directory_threshold = 0.50
-file_threshold      = 0.65
+hash(task + canonical file metadata + prompt version + model)
 ```
 
-These values are **baseline parameters, not proven optima**.
+Changing batch size must not change the logical candidate set or selection semantics.
 
-Threshold calibration is allowed only through a frozen File Discovery benchmark. Do not invent new traversal semantics merely because one threshold misses a file.
+When two policies reuse an identical file scoring request, counterfactual A/B must share the same cached System One response.
 
-Because file discovery is recall-sensitive, threshold studies should prefer a Pareto curve over one magic value.
+## Threshold
+
+The initial canonical gate freezes:
+
+`file_threshold = 0.65`
+
+This is a baseline operating point, not a universally optimal threshold.
+
+Because all file scores exist independently of traversal, future threshold calibration is cheap and deterministic: replay 0.50/0.55/0.60/0.65/0.70 against the same score field without new model calls.
+
+Threshold research therefore becomes a quality-cost Pareto analysis rather than a new architecture.
 
 ## Output
 
@@ -213,44 +161,37 @@ Because file discovery is recall-sensitive, threshold studies should prefer a Pa
 RelevantFile {
   path
   score
-  provenance: {
-    parent_directory
-    directory_path_scores
-  }
+  parent_directory
 }
 ```
 
-All promoted files are passed to Evidence Localization. V1 has no top-k truncation.
+All files above threshold are passed downstream. There is no top-k truncation.
 
 ## Failure attribution
 
-A missed primary file should be classified before changing the algorithm.
+V1 has only two meaningful miss classes.
 
-### Ancestor-pruned miss
+### File rejected
 
-An ancestor directory scored below the directory threshold, so the file was never disclosed.
+The target file was enumerated and scored below threshold.
 
-Interpretation: directory recall/calibration failure.
+This is a calibration/model-quality failure and can be studied from the same score field.
 
-### File-rejected miss
+### Unsupported/not enumerated
 
-The file was disclosed but scored below the file threshold.
+The file is absent because of deterministic ignore/extension policy.
 
-Interpretation: file relevance/calibration failure.
+This is a Harness coverage bug or unsupported-file-type policy issue.
 
-### Unsupported-view miss
+`ancestor_pruned` is impossible by construction.
 
-Required evidence cannot be inferred from path/metadata alone.
+## Canonical primary-target benchmark
 
-Interpretation: V1 metadata-only boundary; consider a future grounded cross-file expansion mechanism rather than hiding source semantics inside the locator.
+The first gate uses six already frozen tasks on:
 
-## Minimal canonical benchmark
+`BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`
 
-The first gate reuses six already frozen evidence-localization tasks and asks only whether File Discovery recovers their known primary target files.
-
-This is intentionally a **primary-target recovery benchmark**, not a complete multi-file relevance gold set.
-
-Cases:
+Targets:
 
 1. reconnect lifecycle -> `crates/nession-agent/src/connection/server_client.rs`
 2. protocol catalog consistency -> `crates/nession-protocol-codegen/src/catalog.rs`
@@ -259,89 +200,51 @@ Cases:
 5. tmux environment/session lifecycle -> `crates/nession-agent/src/tmux/manager.rs`
 6. manifest union/wire routing -> `crates/nession-protocol/src/kernel/manifest.rs`
 
-All use frozen `BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`.
+The suite runs twice.
 
-Primary metrics:
+This is a **primary-target recovery benchmark**, not a complete multi-file relevance gold set, so selected-file count is a selectivity/cost measure rather than true precision.
+
+Metrics:
 
 - primary target recall;
+- target score;
 - selected file count;
-- scored directory/file count;
-- metadata nodes disclosed;
-- model calls/tokens/wall time;
-- failure attribution for every miss.
+- enumerated file count;
+- model calls;
+- input/output tokens;
+- model wall time;
+- deterministic miss classification.
 
-Because supporting-file labels are incomplete, **do not claim precision from this benchmark**. Selected-file count is a cost/selectivity measure only.
+## Acceptance gate
 
-## V1 acceptance gate
+V1 is considered mechanically converged when:
 
-Mechanism V1 is considered usable for composition with Evidence Localization when, on the frozen primary-target benchmark:
+1. every primary target is enumerated;
+2. every target is recovered in both canonical repeats at the frozen 0.65 threshold, or any miss is shown to be only threshold calibration rather than structural reachability;
+3. no result depends on directory pruning, top-k, or model global Stop;
+4. every file has one auditable score;
+5. quality and cost are reported together.
 
-1. all primary target files are recovered in two canonical repeats;
-2. no result depends on fixed top-k or model global Stop;
-3. every selected/rejected node has one auditable score and ancestry path;
-4. all model/source costs are reported;
-5. reruns use semantic caching or shared decisions when policies are compared.
-
-If target recall is below 100%, diagnose ancestor-pruned vs file-rejected vs unsupported-view before changing structure.
+If a target scores below 0.65, the next allowed experiment is an offline threshold Pareto replay on the same score field, not a new traversal architecture.
 
 ## What is now closed
 
-The following are no longer open architecture questions for V1:
+- directory semantics -> **not used for hard pruning**;
+- hierarchical vs flat semantic locator -> **flat file-level semantic scoring over mechanically enumerated metadata**;
+- Choice vs Noul -> **independent Noul**;
+- top-k -> **none**;
+- fixed semantic batches -> **none; batching is transport-only**;
+- source body visibility -> **none**;
+- repeated rescoring -> **none for unchanged semantic state**;
+- global model Stop -> **none; terminate after the finite file set is scored**.
 
-- flat vs hierarchical repository traversal -> **hierarchical direct-child disclosure**;
-- fixed depth vs namespace handling -> **mechanically collapse structural containers until a semantic-bearing directory frontier**;
-- Choice vs Noul for sibling relevance -> **independent Noul**;
-- top-k vs multi-hit -> **no top-k**;
-- fixed batch order -> **transport-only batching**;
-- source body in File Discovery -> **not allowed**;
-- repeated rescoring -> **cache unchanged semantic states**;
-- global semantic Stop -> **not used; frontier exhaustion terminates**.
+## Remaining legitimate research
 
-## What remains legitimately open
+Only these questions remain inside File Discovery:
 
-Only three research questions remain inside this domain:
+1. threshold calibration on a larger frozen benchmark;
+2. benchmark breadth across repositories/languages and true multi-file tasks;
+3. whether cheap deterministic pre-indexing or caching can reduce scoring cost without changing the logical all-file coverage;
+4. future cross-file expansion created by grounded Evidence Localization observations.
 
-1. **Calibration:** what directory/file thresholds occupy the best recall-cost Pareto frontier?
-2. **Benchmark breadth:** does V1 generalize to multi-file tasks, misleading names, and other repositories/languages?
-3. **Cross-file expansion:** when metadata is insufficient, what grounded observation from Evidence Localization may create new File Discovery actions without collapsing the two domains?
-
-Everything else should be treated as implementation optimization, not a new File Discovery architecture.
-
-## Convergence gate history
-
-### Gate 1 — strict semantic pruning from repository root
-
-Policy:
-
-```text
-directory_threshold = 0.50
-file_threshold      = 0.65
-```
-
-Two repeats both recovered 5/6 primary files.
-
-The same case failed both times:
-
-`fs_symlink_delete_semantics -> crates/nession-agent/src/fs/sandbox.rs`
-
-Failure was `ancestor_pruned` before the target file was ever disclosed.
-
-### Gate 2 — mechanically expand only top-level directories
-
-The failure moved one level deeper:
-
-```text
-crates/nession-agent
-score = 0.22
-threshold = 0.50
-```
-
-in both repeats.
-
-This falsifies fixed-depth expansion as the underlying solution. Generic namespace/package containers do not carry enough task semantics for reliable pruning.
-
-### Structural conclusion
-
-Directory pruning must begin at a **semantic-bearing frontier**, not at a fixed path depth.
-
-V1 therefore mechanically collapses directories with child directories but no direct implementation files, and only then applies System One directory relevance.
+These are calibration, efficiency, and composition questions—not new File Discovery architecture questions.
