@@ -1,0 +1,27 @@
+{
+  "experiment": "uncapped-adaptive-discovery-diagnostic-v1",
+  "repeats": 1,
+  "profile": "baseline_v1",
+  "batch_size": 64,
+  "route_threshold": 0.5,
+  "uncertainty_threshold": 0.5,
+  "file_threshold": 0.65,
+  "arms": [
+    {"name": "all_c1_cold", "policy": "all", "workers": 1},
+    {"name": "all_c4_cold", "policy": "all", "workers": 4},
+    {"name": "lexical_c4_quality", "policy": "lexical", "workers": 4, "cache_group": "quality"},
+    {"name": "hierarchy_c4_quality", "policy": "hierarchy", "workers": 4, "cache_group": "quality"},
+    {"name": "hybrid_c4_quality", "policy": "hybrid", "workers": 4, "cache_group": "quality"},
+    {"name": "hybrid_c4_cold", "policy": "hybrid", "workers": 4}
+  ],
+  "notes": [
+    "No cumulative file or directory candidate cap, no top-k candidate truncation.",
+    "Hierarchy virtual grouping width is 32; all children retained. Summary samples do not cap candidates.",
+    "Lexical rescue: two informative query tokens, or a token present in <=2% of paths; a single-token query retains every exact match.",
+    "Final selection uses the same >=0.65 OR top-1%-with-ties rule as V1, applied after scoring, not as a candidate cap.",
+    "Transport max_candidate_bytes=48000 is a batch payload partition, not a logical candidate budget.",
+    "Cold arms have independent calls; quality arms share exact semantic batch responses. Do not compare cached wall time as standalone latency.",
+    "First-repeat diagnostic; further repeats chosen after inspecting algorithmic failure modes. No stability claims.",
+    "Same-directory neighbor closure is the first metadata-only relation ablation; learned relations and calibrated stopping remain future work."
+  ]
+}

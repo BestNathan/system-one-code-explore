@@ -8,9 +8,9 @@
 
 ## 1. Remote red/green validation
 
-- [ ] Add `tests/test_file_discovery_scaling.py` covering concurrency, failure propagation, deterministic merge, cache identity, routing uncertainty, global rescue, and candidate populations above 2,000.
-- [ ] Push the test-only commit to the research branch. Verify the existing CI fails on the missing feature, using `gh run view --log-failed`.
-- [ ] Implement `src/file_discovery_scoring.py` and `src/file_discovery_adaptive.py`; run the same tests through CI and inspect failures before paid execution.
+- [x] Add `tests/test_file_discovery_scaling.py` covering concurrency, failure propagation, deterministic merge, cache identity, routing uncertainty, global rescue, and candidate populations above 2,000.
+- [x] Push the test-only commit to the research branch. CI [36154615282](https://github.com/BestNathan/system-one-code-explore/actions/runs/36154615282) failed on the missing feature as expected.
+- [x] Implement `src/file_discovery_scoring.py` and `src/file_discovery_adaptive.py`; core CI [36154997859](https://github.com/BestNathan/system-one-code-explore/actions/runs/36154997859) passed all 133 tests. Additional report/accounting regressions were verified failing before their implementation.
 
 Scoring interface: `BatchScorer(query, decider, workers=4, batch_size=64, cache=None).score(stage, candidates)`. Responses retain candidate IDs; incomplete/non-finite responses fail rather than becoming low scores. Shared cache identities include ordered batch payloads, stage and model/profile identity.
 
@@ -28,7 +28,7 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 
 - [ ] Add `src/file_discovery_scaling_benchmark.py` to run/evaluate the frozen cases, checkpoint every arm, continue after individual failures, and emit JSON plus Markdown.
 - [ ] Add `.github/workflows/file-discovery-scaling.yml`, branch-scoped automatic start when the experiment config changes, with the existing owner/environment controls, CI gating and artifact upload on failure.
-- [ ] Freeze `fixtures/file-discovery/scaling-experiment.json`: first repeat, nine cases, `all/c1`, `all/c4`, `lexical/c4`, `hierarchy/c4`, `hybrid/c4`, baseline V1 file prompts, thresholds before seeing results. Run jobs sequentially to isolate credential-level concurrency.
+- [ ] Freeze `fixtures/file-discovery/scaling-experiment.json`: first repeat, nine cases, `all/c1`, `all/c4`, `lexical/c4`, `hierarchy/c4`, `hybrid/c4`, plus an independent cold `hybrid/c4` latency arm. Baseline V1 file prompts, route/uncertainty thresholds 0.5, file threshold 0.65, all frozen before seeing results. Run jobs sequentially to isolate credential-level concurrency.
 - [ ] Report original inputs, candidate recall before file scoring, final primary recall, file/card counts, token/call usage, costs, request latency sum versus wall time, failures, retries, and unresolved subtrees. Reuse the frozen System2 reference only as historical context, not a new paid arm.
 - [ ] Download Workflow reports, review failure traces and summarize findings in `docs/research/`; link artifacts and commit IDs. A first-repeat diagnostic is not a stability/generalization claim. Use results to choose further repeats rather than blindly rerunning all expensive baselines.
 

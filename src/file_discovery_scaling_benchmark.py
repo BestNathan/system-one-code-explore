@@ -37,6 +37,7 @@ def render_report(payload):
              "- 文件/目录无数量上限、无固定 top-k、无通道配额。",
              "- 此轮为既有九任务诊断；主要目标标签并非完整支持文件真值。单次结果不证明稳定性。",
              "- quality 组复用完全相同的批次决策；其实际耗时包含缓存收益，不能视作独立运行延迟。",
+             "- 不同候选集合会改变分批，公共文件不一定共享同一次判断；本轮不是逐文件严格配对的因果比较。",
              "- cold 组不共享缓存，适合观察真实端到端耗时；不同请求的模型噪声仍可能影响结果。",
              "- 逻辑 tokens/费用包括缓存命中；物理 tokens/费用来自响应 usage，包含已返回但解析失败的响应。",
              "- 未返回 usage 的失败请求费用未知；HTTP attempts 是 send 数与重试事件数之和。", "",
@@ -157,12 +158,14 @@ def benchmark(args):
                                 ("output_tokens", trace.output_tokens)):
                 usage[f"logical_{key}"] += max(0, actual - usage[key])
                 usage[key] = actual
-            usage.update(request_time_sum_ms=trace.response_time_sum_ms,
+            usage.pop("request_time_sum_ms", None)
+            usage.update(returned_response_time_sum_ms=trace.response_time_sum_ms,
                          logical_sends=trace.requests, http_attempts=trace.requests + trace.retries,
                          retry_events=trace.retries, rate_limit_retry_events=trace.rate_limits,
                          max_request_bytes=trace.max_request_bytes,
                          returned_models=sorted(trace.returned_models))
             row["usage"], row["stage_usage"] = usage, scorer.stages
+            row["stage_usage_complete"] = row["status"] == "success"
             row["physical_pricing"] = jev_cost_record(usage["input_tokens"], usage["output_tokens"])
             row["logical_pricing"] = jev_cost_record(usage["logical_input_tokens"], usage["logical_output_tokens"])
             write_json(folder / "metrics.json", row)
