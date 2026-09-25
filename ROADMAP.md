@@ -38,19 +38,24 @@ Before calling this domain stable, reduce cost tails:
 - add adaptive Phase0 stopping based on frontier/obligation stability;
 - report p50/max calls, tokens, and wall time in every canonical run.
 
-## Milestone 3 — File-discovery benchmark and runtime
+## Milestone 3 — File Discovery V1
 
-File discovery is currently the less mature problem domain.
+Status: **mechanism converged**.
 
-Build a repository-level benchmark with:
+Canonical V1 mechanically enumerates supported file metadata and independently
+Noul-scores every file. Semantic directory pruning, top-k truncation, and model
+global Stop are rejected.
 
-- multiple relevant files per task;
-- primary/supporting/incidental reference labels;
-- misleading names and same-symbol distractors;
-- test/implementation/configuration splits;
-- repository-level System Two reference or carefully frozen human/reference sets.
+The frozen six-case gate recovered 12/12 primary targets across two repeats with
+a score>=0.65 plus top-1% relative recall guard.
 
-Then build a canonical progressive-disclosure runtime with file-level relevance, uncertainty, and coverage obligations.
+Current work is no longer architecture discovery. It is:
+
+- reduce the ~18 calls / ~212k input tokens per 1,096-file task without changing
+  logical all-file coverage;
+- build complete primary/supporting/incidental file references;
+- validate on multiple repositories/languages and true multi-file tasks;
+- study deterministic/cached pre-indexing only if it is recall-safe.
 
 ## Milestone 4 — End-to-end localization
 
@@ -98,8 +103,8 @@ The objective is to identify which localization work can move reliably to System
 1. Finish R19 counterfactual-safe comparison methodology.
 2. Standardize Usage and wall-time accounting across all experiments.
 3. Optimize evidence-localization calls/tokens without changing semantics.
-4. Start the canonical file-discovery benchmark/runtime.
-5. Only then expand end-to-end datasets.
+4. Optimize and broaden the converged File Discovery V1 benchmark.
+5. Compose File Discovery V1 with Evidence Localization, then expand end-to-end datasets.
 
 ## Evaluation rule
 
