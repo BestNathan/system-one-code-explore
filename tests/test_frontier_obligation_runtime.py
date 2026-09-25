@@ -128,7 +128,7 @@ class R15Tests(unittest.TestCase):
         )
         self.assertEqual(
             obligations[1]["tile_ids"],
-            ["tile_007", "tile_008"],
+            ["tile_008"],
         )
 
     def test_directional_closure_happens_before_utility(self):
