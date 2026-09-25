@@ -17,6 +17,11 @@ import time
 import math
 from pathlib import Path
 
+from file_discovery_profiles import (
+    PROFILES,
+    ProfiledFileDiscoveryDecider,
+    repository_metadata_context,
+)
 from model_pricing import jev_cost_record
 from system_one_code_locator import (
     API_URL,
@@ -217,6 +222,7 @@ def run(
         "kind": "file-discovery-v1",
         "goal": query,
         "root": str(root),
+        "profile": getattr(decider, "profile", "baseline_v1"),
         "policy": {
             "file_threshold": float(file_threshold),
             "relative_fallback_fraction": fallback_fraction,
@@ -256,6 +262,11 @@ def main(argv=None):
         type=int,
         default=DEFAULT_TRANSPORT_BATCH_SIZE,
     )
+    parser.add_argument(
+        "--profile",
+        choices=PROFILES,
+        default="baseline_v1",
+    )
     parser.add_argument("--trace-file")
     parser.add_argument("--output", required=True)
     parser.add_argument(
@@ -272,11 +283,16 @@ def main(argv=None):
     if not key:
         raise SystemExit("TYPESAFE_API_KEY is required")
 
-    decider = SystemOneDecider(
+    precomputed_candidates = enumerate_files(args.root)
+    decider = ProfiledFileDiscoveryDecider(
         key,
         Trace(args.trace_file),
-        args.typesafe_endpoint,
-        args.model,
+        profile=args.profile,
+        repository_context=repository_metadata_context(
+            precomputed_candidates
+        ),
+        endpoint=args.typesafe_endpoint,
+        model=args.model,
     )
     result = run(
         args.root,
