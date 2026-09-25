@@ -1,0 +1,607 @@
+name: R18 fresh hybrid generalization
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/r18-fresh-hybrid-generalization.yml"
+      - "docs/research/2026-09-25-r18-fresh-hybrid-generalization.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+
+jobs:
+  references:
+    name: Reference / ${{ matrix.case.id }}
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case:
+          - id: fs_symlink_delete_semantics
+            path: crates/nession-agent/src/fs/sandbox.rs
+            query: >-
+              I am reviewing file-operation path semantics around deleting
+              symlinks and creating non-existent paths. Locate the code that
+              decides when the final symlink component is followed versus
+              preserved, how parent symlinks and non-existent ancestors are
+              resolved, how duplicated root-name paths fall back, and the
+              tests that prevent a delete from operating on a symlink target.
+          - id: tmux_env_session_lifecycle
+            path: crates/nession-agent/src/tmux/manager.rs
+            query: >-
+              I want to harden tmux session creation and teardown. Locate the
+              code that filters inherited TERM/LANG/LC_ALL/TMUX environment,
+              applies caller overrides, creates sessions with fixed geometry
+              and timeouts, and cleans up session environment scripts when a
+              session is killed.
+          - id: manifest_union_wire_routing
+            path: crates/nession-protocol/src/kernel/manifest.rs
+            query: >-
+              I need to verify protocol-manifest composition and routing
+              semantics. Locate the code that omits retired units, unions
+              duplicate protocol IDs across versions and wire types
+              deterministically, keeps older manifests without wire
+              projections safe, and resolves a wire message type back to the
+              protocol unit that carries it.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+
+      - name: Prepare reference prompt
+        run: |
+          set -euo pipefail
+          mkdir -p "artifacts/reference/$CASE_ID"
+          python3 src/full_read_relevance_baseline.py prepare \
+            --source "subject/$FILE_PATH" \
+            --query "$QUERY" \
+            --window-lines 64 \
+            --stride-lines 32 \
+            --output-prompt "artifacts/reference/$CASE_ID/prompt.txt" \
+            --output-manifest "artifacts/reference/$CASE_ID/prompt-manifest.json"
+
+      - name: Generate and validate fresh reference
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN || secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.CLAUDE_MODEL || 'deepseek-flash' }}
+          CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT: "1"
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_BASE_URL"
+          test -n "$ANTHROPIC_MODEL"
+          ROOT="artifacts/reference/$CASE_ID"
+          rm -f "$ROOT/reference.json"
+
+          for attempt in 1 2 3; do
+            echo "Reference attempt $attempt"
+            claude -p \
+              --output-format text \
+              --max-turns 4 \
+              --permission-mode dontAsk \
+              --no-session-persistence \
+              --setting-sources '' \
+              --strict-mcp-config \
+              --mcp-config '{"mcpServers":{}}' \
+              --disable-slash-commands \
+              --tools '' \
+              --settings '{"disableAllHooks":true}' \
+              < "$ROOT/prompt.txt" \
+              > "$ROOT/output-attempt-$attempt.txt" || true
+
+            if python3 src/full_read_relevance_baseline.py normalize \
+              --source "subject/$FILE_PATH" \
+              --query "$QUERY" \
+              --window-lines 64 \
+              --stride-lines 32 \
+              --raw-output "$ROOT/output-attempt-$attempt.txt" \
+              --output "$ROOT/reference.json"; then
+              cp "$ROOT/output-attempt-$attempt.txt" "$ROOT/output.txt"
+              echo "$attempt" > "$ROOT/accepted-attempt.txt"
+              break
+            fi
+            rm -f "$ROOT/reference.json"
+          done
+
+          test -s "$ROOT/reference.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r18-reference-${{ matrix.case.id }}
+          path: artifacts/reference/${{ matrix.case.id }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  phase0:
+    name: Phase0 / ${{ matrix.case.id }} / r${{ matrix.repeat }}
+    needs: references
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        case:
+          - id: fs_symlink_delete_semantics
+            path: crates/nession-agent/src/fs/sandbox.rs
+            query: >-
+              I am reviewing file-operation path semantics around deleting
+              symlinks and creating non-existent paths. Locate the code that
+              decides when the final symlink component is followed versus
+              preserved, how parent symlinks and non-existent ancestors are
+              resolved, how duplicated root-name paths fall back, and the
+              tests that prevent a delete from operating on a symlink target.
+          - id: tmux_env_session_lifecycle
+            path: crates/nession-agent/src/tmux/manager.rs
+            query: >-
+              I want to harden tmux session creation and teardown. Locate the
+              code that filters inherited TERM/LANG/LC_ALL/TMUX environment,
+              applies caller overrides, creates sessions with fixed geometry
+              and timeouts, and cleans up session environment scripts when a
+              session is killed.
+          - id: manifest_union_wire_routing
+            path: crates/nession-protocol/src/kernel/manifest.rs
+            query: >-
+              I need to verify protocol-manifest composition and routing
+              semantics. Locate the code that omits retired units, unions
+              duplicate protocol IDs across versions and wire types
+              deterministically, keeps older manifests without wire
+              projections safe, and resolves a wire message type back to the
+              protocol unit that carries it.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      REPEAT: ${{ matrix.repeat }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build frozen Phase0 fields
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p "artifacts/phase0/$CASE_ID/r$REPEAT"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("src").resolve()))
+          from system_one_code_locator import Trace
+          from system_one_probability_frontier import (
+              ProbabilityFrontierDecider,
+              phase0_probability_frontier,
+          )
+
+          root = Path("subject")
+          source_path = os.environ["FILE_PATH"]
+          line_count = sum(
+              1 for _ in (root / source_path).open("r", encoding="utf-8")
+          )
+          sample_lines = 8
+          probe_budget = max(
+              8,
+              min(32, round(line_count * 0.085 / sample_lines)),
+          )
+          base = (
+              Path("artifacts/phase0")
+              / os.environ["CASE_ID"]
+              / f"r{os.environ['REPEAT']}"
+          )
+
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ):
+              out = base / estimator
+              out.mkdir(parents=True, exist_ok=True)
+              decider = ProbabilityFrontierDecider(
+                  os.environ["TYPESAFE_API_KEY"],
+                  Trace(out / "trace.jsonl"),
+                  os.environ["TYPESAFE_API_URL"],
+                  os.environ["TYPESAFE_MODEL"],
+              )
+              started = time.perf_counter()
+              result, usage = phase0_probability_frontier(
+                  root,
+                  os.environ["QUERY"],
+                  source_path,
+                  line_count,
+                  decider,
+                  sample_lines=sample_lines,
+                  max_epochs=40,
+                  max_actions=16,
+                  max_batch=4,
+                  probability_threshold=None,
+                  max_total_probes=probe_budget,
+                  respect_stop=False,
+                  posterior_estimator=estimator,
+              )
+              result.update({
+                  "query": os.environ["QUERY"],
+                  "model": os.environ["TYPESAFE_MODEL"],
+                  "repeat": int(os.environ["REPEAT"]),
+                  "subject": {
+                      "repository": os.environ["SUBJECT_REPOSITORY"],
+                      "revision": os.environ["SUBJECT_SHA"],
+                      "path": source_path,
+                  },
+                  "usage": usage,
+                  "elapsed_ms": round(
+                      (time.perf_counter() - started) * 1000.0, 3
+                  ),
+                  "probe_budget": probe_budget,
+              })
+              (out / "run.json").write_text(
+                  json.dumps(result, indent=2, ensure_ascii=False) + "\n"
+              )
+
+          (base / "budget.json").write_text(
+              json.dumps({
+                  "line_count": line_count,
+                  "sample_lines": sample_lines,
+                  "probe_budget": probe_budget,
+                  "target_source_fraction": 0.085,
+              }, indent=2) + "\n"
+          )
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r18-phase0-${{ matrix.case.id }}-r${{ matrix.repeat }}
+          path: artifacts/phase0/${{ matrix.case.id }}/r${{ matrix.repeat }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  evidence:
+    name: Evidence / ${{ matrix.case.id }} / r${{ matrix.repeat }} / ${{ matrix.estimator }} / ${{ matrix.geometry }}
+    needs: phase0
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repeat: [1, 2]
+        estimator:
+          - sequential_exponential
+          - multi_scale_gaussian
+        geometry:
+          - q75_components
+          - q75_plus_multiscale_seed
+        case:
+          - id: fs_symlink_delete_semantics
+            path: crates/nession-agent/src/fs/sandbox.rs
+            query: >-
+              I am reviewing file-operation path semantics around deleting
+              symlinks and creating non-existent paths. Locate the code that
+              decides when the final symlink component is followed versus
+              preserved, how parent symlinks and non-existent ancestors are
+              resolved, how duplicated root-name paths fall back, and the
+              tests that prevent a delete from operating on a symlink target.
+          - id: tmux_env_session_lifecycle
+            path: crates/nession-agent/src/tmux/manager.rs
+            query: >-
+              I want to harden tmux session creation and teardown. Locate the
+              code that filters inherited TERM/LANG/LC_ALL/TMUX environment,
+              applies caller overrides, creates sessions with fixed geometry
+              and timeouts, and cleans up session environment scripts when a
+              session is killed.
+          - id: manifest_union_wire_routing
+            path: crates/nession-protocol/src/kernel/manifest.rs
+            query: >-
+              I need to verify protocol-manifest composition and routing
+              semantics. Locate the code that omits retired units, unions
+              duplicate protocol IDs across versions and wire types
+              deterministically, keeps older manifests without wire
+              projections safe, and resolves a wire message type back to the
+              protocol unit that carries it.
+    env:
+      CASE_ID: ${{ matrix.case.id }}
+      FILE_PATH: ${{ matrix.case.path }}
+      QUERY: ${{ matrix.case.query }}
+      REPEAT: ${{ matrix.repeat }}
+      ESTIMATOR: ${{ matrix.estimator }}
+      GEOMETRY: ${{ matrix.geometry }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download fresh reference
+        uses: actions/download-artifact@v4
+        with:
+          name: r18-reference-${{ matrix.case.id }}
+          path: artifacts/reference
+
+      - name: Download frozen Phase0
+        uses: actions/download-artifact@v4
+        with:
+          name: r18-phase0-${{ matrix.case.id }}-r${{ matrix.repeat }}
+          path: artifacts/phase0
+
+      - name: Run frozen R15/R17 evidence runtime
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p artifacts/out
+          python3 src/frontier_obligation_runtime.py \
+            --source "subject/$FILE_PATH" \
+            --goal "$QUERY" \
+            --phase0-run "artifacts/phase0/$ESTIMATOR/run.json" \
+            --tile-lines 32 \
+            --frontier-quantile 0.75 \
+            --obligation-geometry "$GEOMETRY" \
+            --expansion-threshold 0.60 \
+            --final-utility-threshold 0.65 \
+            --max-anchor-tiles 12 \
+            --trace-file artifacts/out/trace.jsonl \
+            --output artifacts/out/run.json
+
+      - name: Evaluate fresh evidence
+        run: |
+          python3 src/frontier_obligation_benchmark.py \
+            --reference artifacts/reference/reference.json \
+            --phase0-run "artifacts/phase0/$ESTIMATOR/run.json" \
+            --run artifacts/out/run.json \
+            --output-json artifacts/out/benchmark.json \
+            --output-markdown artifacts/out/benchmark.md
+          cat artifacts/out/benchmark.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r18-${{ matrix.case.id }}-r${{ matrix.repeat }}-${{ matrix.estimator }}-${{ matrix.geometry }}
+          path: artifacts/out/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate R18
+    needs: evidence
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r18-*
+          path: artifacts/all
+
+      - name: Aggregate paired fresh holdouts
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          rows = []
+          for path in sorted(Path("artifacts/all").glob("*/benchmark.json")):
+              root = path.parent
+              run = json.loads((root / "run.json").read_text())
+              bench = json.loads(path.read_text())
+              artifact = root.name
+              parts = artifact.split("-")
+              geometry = run["policy"]["obligation_geometry"]
+              estimator = run["phase0_source"]["posterior_estimator"]
+              rows.append({
+                  "artifact": artifact,
+                  "run": run,
+                  "bench": bench,
+                  "geometry": geometry,
+                  "estimator": estimator,
+              })
+
+          by_pair = defaultdict(dict)
+          for row in rows:
+              # artifact format contains the case/repeat but geometry is safer
+              # to strip by suffix because case ids themselves contain '_'.
+              key = (
+                  row["run"]["subject"]["path"],
+                  row["run"]["goal"],
+                  row["run"]["phase0_source"]["posterior_estimator"],
+                  row["run"]["subject"].get("revision"),
+                  next(
+                      (
+                          a["selected_round"]
+                          for a in row["run"].get(
+                              "materialized_evidence", []
+                          )
+                          if "selected_round" in a
+                      ),
+                      None,
+                  ),
+              )
+              # repeat isn't retained by R15 runtime, recover it from artifact.
+              repeat = 1 if "-r1-" in row["artifact"] else 2
+              key = key + (repeat,)
+              by_pair[key][row["geometry"]] = row
+
+          baseline_name = "q75_components"
+          candidate_name = "q75_plus_multiscale_seed"
+
+          metrics = (
+              "retained_high_recall",
+              "retained_weighted_relevance_recall",
+              "retained_mean_reference_relevance",
+              "retained_high_precision",
+              "hidden_cc_high_regions_without_obligation",
+              "materialized_source_fraction",
+              "model_calls",
+              "input_tokens",
+          )
+
+          pairs = []
+          for key, arms in sorted(by_pair.items(), key=lambda item: str(item[0])):
+              if baseline_name not in arms or candidate_name not in arms:
+                  raise SystemExit(
+                      f"missing paired geometry for {key}: {list(arms)}"
+                  )
+              b = arms[baseline_name]
+              h = arms[candidate_name]
+
+              def extract(row):
+                  bench = row["bench"]
+                  run = row["run"]
+                  return {
+                      "retained_high_recall":
+                          bench["metrics"]["retained"]["high_line_recall"],
+                      "retained_weighted_relevance_recall":
+                          bench["metrics"]["retained"][
+                              "weighted_relevance_recall"
+                          ],
+                      "retained_mean_reference_relevance":
+                          bench["metrics"]["retained"][
+                              "mean_reference_relevance"
+                          ],
+                      "retained_high_precision":
+                          bench["metrics"]["retained"][
+                              "high_line_precision"
+                          ],
+                      "hidden_cc_high_regions_without_obligation":
+                          bench["metrics"][
+                              "hidden_cc_high_regions_without_phase0_obligation"
+                          ],
+                      "materialized_source_fraction":
+                          bench["metrics"]["materialized"]["source_fraction"],
+                      "model_calls": run["usage"]["model_calls"],
+                      "input_tokens": run["usage"]["input_tokens"],
+                      "obligation_count":
+                          bench["metrics"]["obligation_count"],
+                      "retained_anchor_count":
+                          bench["metrics"]["retained_anchor_count"],
+                  }
+
+              bv = extract(b)
+              hv = extract(h)
+              pairs.append({
+                  "key": {
+                      "path": key[0],
+                      "goal": key[1],
+                      "estimator": key[2],
+                      "repeat": key[-1],
+                  },
+                  "baseline": bv,
+                  "hybrid": hv,
+                  "delta": {
+                      name: hv[name] - bv[name]
+                      for name in metrics
+                  },
+                  "hybrid_geometry": h["run"]["frontier_geometry"],
+                  "baseline_regions": b["run"]["final_regions"],
+                  "hybrid_regions": h["run"]["final_regions"],
+              })
+
+          def summarize(items):
+              summary = {}
+              for name in metrics:
+                  deltas = [item["delta"][name] for item in items]
+                  summary[name] = {
+                      "mean_delta": statistics.fmean(deltas),
+                      "wins": sum(x > 1e-12 for x in deltas),
+                      "ties": sum(abs(x) <= 1e-12 for x in deltas),
+                      "losses": sum(x < -1e-12 for x in deltas),
+                  }
+              return summary
+
+          by_estimator = {}
+          for estimator in (
+              "sequential_exponential",
+              "multi_scale_gaussian",
+          ):
+              subset = [
+                  item for item in pairs
+                  if item["key"]["estimator"] == estimator
+              ]
+              by_estimator[estimator] = summarize(subset)
+
+          out = {
+              "schema_version": 1,
+              "kind": "r18-fresh-hybrid-generalization-aggregate",
+              "pairs": len(pairs),
+              "overall": summarize(pairs),
+              "estimators": by_estimator,
+              "cases": pairs,
+          }
+          Path("aggregate.json").write_text(
+              json.dumps(out, indent=2, ensure_ascii=False) + "\n"
+          )
+          print(json.dumps(out, indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r18-aggregate-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
