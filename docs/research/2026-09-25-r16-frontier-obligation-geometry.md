@@ -162,3 +162,71 @@ frontier:
 - without q60-like source-coverage inflation;
 - stable across sequential and multi-scale Phase0 fields;
 - sane behavior on the flat catalog control.
+
+
+## Phase A result
+
+Canonical workflow: `36081359100`.
+
+Overall geometry-only results across 12 frozen Phase0 fields:
+
+| method | obligations | candidate source span | hidden high-region recall | high-line coverage | obligation precision | hidden relevance |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| q75 components | 2.67 | **26.2%** | 62.2% | 39.5% | 83.1% | **0.736** |
+| q60 components | 3.50 | 41.9% | 75.6% | 53.1% | 79.2% | 0.680 |
+| local prominence | 3.67 | 50.6% | **83.3%** | 58.7% | 76.8% | 0.648 |
+| multi-scale prominence | 2.83 | 57.1% | **83.3%** | **63.6%** | 82.8% | 0.644 |
+| mass diverse | **2.25** | 41.0% | 69.4% | 53.4% | **83.8%** | 0.726 |
+
+The important estimator-specific result is on sequential Phase0:
+
+- q75 high-region recall: 57.8%;
+- local prominence: 85.6%;
+- multi-scale prominence: 85.6%.
+
+So local prominence does recover secondary modes that q75 misses.
+
+However converting the complete half-prominence basin directly into an
+obligation range is too broad. Local prominence candidate span rises to ~50%
+of the file and multi-scale to ~59% on sequential fields.
+
+This does **not** mean R15 would necessarily read half the file: obligations
+are candidate domains, and R15 materializes representative seeds. But broad
+candidate domains cause expensive exhaustion when an obligation is a false
+positive.
+
+The useful signal from Phase A is therefore peak discovery, not basin width.
+
+## Phase B pre-registration
+
+Phase B separates **mode detection** from **candidate width**.
+
+Two hybrid geometries are added:
+
+### q75 + local-prominence seed
+
+1. keep the original q75 connected components unchanged;
+2. detect local-prominence candidates with the already frozen 10% relative
+   prominence rule;
+3. ignore a prominence candidate whose basin overlaps an existing q75
+   component, because q75 already represents that mode;
+4. require a secondary peak to be at or above the file median tile relevance;
+5. for each remaining secondary mode, add exactly the peak's 32-line tile as a
+   new obligation candidate.
+
+### q75 + multi-scale-prominence seed
+
+Same rule, but secondary candidates come from persistent multi-scale peak
+clusters.
+
+The median guard is a Phase0-only robust-height floor. It prevents an isolated
+local maximum in the bottom half of the file relevance distribution from
+becoming an obligation solely because its surrounding valley is even lower.
+
+Phase B remains mechanism diagnosis on the same data and is not a fresh
+generalization test.
+
+Primary question:
+
+> Can prominence add the secondary modes missed by q75 while preserving the
+> narrow source/candidate footprint and precision of the q75 baseline?
