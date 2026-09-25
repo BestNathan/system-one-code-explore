@@ -17,6 +17,7 @@ import time
 import math
 from pathlib import Path
 
+from model_pricing import jev_cost_record
 from system_one_code_locator import (
     API_URL,
     MODEL,
@@ -206,6 +207,10 @@ def run(
         for item in scored
     }
     wall_time_ms = (time.perf_counter() - started) * 1000.0
+    usage["pricing"] = jev_cost_record(
+        usage["input_tokens"],
+        usage["output_tokens"],
+    )
 
     return {
         "schema_version": 2,
