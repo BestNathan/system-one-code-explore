@@ -1,119 +1,368 @@
-# System One Code Explorer
+# System One Code Explore
 
-A research runtime for using **System One models as fast policies over progressively disclosed code-exploration state and action spaces**.
+Researching whether a **System One model, when placed inside a constrained
+harness, can replace or approximate System Two code search/localization well
+enough to find the files and concrete source evidence required by an engineering
+task — at materially lower latency and cost**.
 
-This repository continues the code-localization research originally developed in `BestNathan/narness-engineering`. The implementation is intentionally experimental; the durable artifact is the research path captured under `docs/research/`.
+This repository is not primarily a code-search product. It is an experimental
+repository for discovering a reusable **System One code-localization pattern**.
 
-## Core idea
+## Research goal
 
-System One is not treated as a small ReAct agent. The harness owns state, legal actions, effects, budgets, traces, and lifecycle. The model performs fast local decisions inside that bounded state machine.
-
-```text
-State
-  ↓
-Harness builds a bounded ActionSpace
-  ↓
-System One policy / utility decisions
-  ↓
-Effect → Observation → State transition
-  ↺
-```
-
-## Current research architecture
-
-The active line of research is no longer the original head/middle/tail range runtime. Phase0 now treats code exploration as sparse sensing plus whole-file posterior reconstruction:
+Given a repository and a natural-language engineering task:
 
 ```text
-durable sparse observations
-        ↓
-PosteriorEstimator
-        ├── relevance[N]
-        └── uncertainty[N]
-        ↓
-System One Choice over diverse legal probes
-        ↓
-new observations
-        ↓
-posterior recompute
+Repository + Task
+        |
+        v
+ System One Harness
+        |
+        +--> Which files are relevant?
+        |
+        +--> Which exact source spans are evidence?
+        |
+        v
+ Localization Result
 ```
 
-Key properties:
+The central question is:
 
-- sparse micro-probes rather than coarse full-region reads;
-- a file-length relevance and uncertainty frontier;
-- Choice probabilities consumed as a policy distribution, including multi-probe batches;
-- posterior reconstruction is replaceable and recomputable from durable observations;
-- reference evaluation uses a fixed full-read System 2 relevance field rather than treating final overlap as ground truth.
+> Can a fast System One model, operating over progressively disclosed,
+> harness-controlled state and action spaces, locate task-relevant files and
+> task-relevant code evidence with quality close enough to a stronger System
+> Two reference, while using fewer tokens, fewer model calls, and less wall
+> time?
 
-## Current status
+The project is therefore about **localization**, not code generation.
 
-The canonical research log is `docs/research/README.md`. The current iteration is **R08 — Online Posterior Feedback and Holdout Generalization**.
+Downstream coding, planning, fixing, and review are intentionally outside the
+primary benchmark. Their quality may be used later as blind downstream
+validation of the evidence produced here.
 
-R07 isolated posterior reconstruction from probe selection and showed that path-independent reconstruction preserved substantially more of the sparse local relevance signal than the historical sequential propagation baseline.
+## Two problem domains
 
-R08 then integrated the posterior into the online feedback loop. On the frozen websocket fixture, the multi-scale posterior improved the final frontier at the same 32 × 8-line read budget and materially changed the probe trajectory. The active phase is now holdout generalization with estimator parameters frozen before new references are inspected.
+System One code localization currently has two first-class problem domains.
 
-See:
+### 1. File discovery
 
-- `docs/research/2026-09-24-r07-posterior-reconstruction.md`
-- `docs/research/2026-09-24-r08-online-posterior-generalization.md`
-- `docs/experiments/r08-online-posterior-ab-2026-09-24.md`
+Find the repository files that deserve inspection.
 
-## Historical baseline
+```text
+repository structure / metadata
+        |
+        v
+progressively disclosed file state
+        |
+        v
+System One policy
+        |
+        v
+RelevantFile[]
+```
 
-The earlier adaptive range runtime remains useful as a historical control and regression baseline. It established that a fast System One model can drive bounded code reads and terminate without a free-form ReAct loop, but later experiments showed that coarse region state and sequential frontier propagation lose too much information.
+Questions include:
 
-The old range-runtime benchmark and raw reports are intentionally retained under `docs/experiments/`; they should not be read as the current algorithm.
+- how to search large repository trees without enumerating every file into the
+  model context;
+- how to expose directories/files progressively;
+- how to represent file relevance, uncertainty, and unresolved search mass;
+- how to follow newly discovered files/symbol relations without turning the
+  harness into a semantic search engine;
+- how to stop without silently missing an independent relevant file;
+- how to batch decisions and cache repeated semantic states;
+- how file recall/precision trades against calls, tokens, latency, and metadata
+  scanned.
 
-## Repository layout
+See [File discovery](docs/domains/file-discovery.md).
 
-- `src/system_one_probability_frontier.py` — online sparse-probe probability-frontier runtime.
-- `src/posterior_reconstruction.py` — replaceable posterior estimators.
-- `src/posterior_reconstruction_benchmark.py` — controlled estimator comparison.
-- `src/posterior_synthetic_benchmark.py` — model-free estimator geometry sanity checks.
-- `src/system_one_sparse_phase0.py` — retained sparse Phase0 predecessor.
-- `src/system_one_relevance_frontier.py` — retained relevance-frontier predecessor.
-- `src/system_one_range_runtime.py` — historical adaptive range baseline.
-- `src/full_read_relevance_baseline.py` — full-read System 2 reference-field construction.
-- `src/compare_to_full_read_baseline.py` — frontier/reference comparison.
-- `tests/` — deterministic regression tests, including historical algorithm invariants.
-- `fixtures/research/` — pinned research trajectories and references.
-- `docs/research/` — canonical research history and decisions.
-- `docs/experiments/` — raw experiment reports.
-- `ROADMAP.md` — current and longer-term research milestones.
+### 2. Evidence localization inside a file
 
-## Running offline tests
+Given a candidate file, find the literal source spans that can serve as
+evidence for the task.
+
+```text
+candidate file
+    |
+    v
+sparse observations / probability frontier
+    |
+    v
+coverage obligations
+    |
+    v
+evidence anchors
+    |
+    v
+directional semantic closure
+    |
+    v
+EvidenceSpan[]
+```
+
+Questions include:
+
+- how to reconstruct a useful whole-file relevance state from sparse reads;
+- how to turn that field into durable coverage obligations;
+- how to avoid both premature stopping and whole-file reading;
+- how to recover secondary modes, shoulders, or under-observed relevant areas;
+- how to turn a relevant 32-line hit into a semantically complete function,
+  branch, state transition, or local behavior;
+- how to separate navigation value from final evidence value;
+- how to reduce closure calls, repeated context, tokens, and tail latency.
+
+See [Evidence localization](docs/domains/evidence-localization.md).
+
+## System One / System Two comparison
+
+System Two is used as a **reference and benchmark**, not as unquestionable
+ground truth.
+
+The current reference protocol lets a stronger model inspect the complete
+target scope before assigning relevance to overlapping source ranges. System
+One then has to recover useful localization while seeing only progressively
+disclosed state.
+
+```text
+                     +-------------------------+
+Repository + Task -->| System Two full-read    |
+                     | reference localization  |
+                     +------------+------------+
+                                  |
+                                  | reference field / evidence
+                                  v
+                     +------------+------------+
+Repository + Task -->| System One harness      |
+                     | sparse / progressive    |
+                     +------------+------------+
+                                  |
+                                  v
+                         compare quality + cost
+```
+
+We deliberately do **not** optimize only for overlap with the reference.
+Relevant evidence can be non-unique, and System Two itself can be noisy.
+Reference metrics are paired with case-level inspection and, where useful,
+blind downstream validation.
+
+See [Benchmark contract](docs/benchmark.md).
+
+## What counts as success
+
+A System One pattern is interesting only if it occupies a useful
+**quality–cost Pareto frontier**.
+
+Quality metrics include:
+
+- relevant-file recall and precision;
+- hidden high-relevance region recall;
+- high-line recall and precision;
+- retained evidence relevance;
+- relevance-mass recall;
+- semantic completeness of retained evidence;
+- missed independent relevance modes.
+
+Cost metrics include:
+
+- model calls;
+- input/output tokens;
+- model wall time;
+- source lines read;
+- repository metadata inspected;
+- cache hits/misses;
+- p50/p95 tail cost where repeated runs exist.
+
+A method that gains recall by reading most of the repository is not a win.
+A method that is cheap because it stops before finding independent evidence is
+also not a win.
+
+## Current working model
+
+The strongest architectural conclusions so far are structural rather than a
+single final algorithm:
+
+1. **The harness owns mechanics.** State, legal actions, effects, budgets,
+   durability, caching, and stopping invariants belong outside the model.
+2. **System One supplies bounded semantic judgments.** It should choose among
+   or score concrete actions instead of running an unconstrained ReAct loop.
+3. **Progressive disclosure matters.** Do not eagerly inject the repository,
+   full files, symbols, or all possible actions into context.
+4. **Relevance and epistemic uncertainty are different state variables.**
+5. **Coverage is durable state.** Finding some useful evidence must not erase
+   unresolved high-value regions.
+6. **Evidence closure is anchor-local and directional.** Ask whether more source
+   is needed before/after the same local construct; do not rely on one abstract
+   completeness score.
+7. **Final utility is evaluated after local closure.** A truncated fragment can
+   look useless because the important continuation is not visible yet.
+8. **Identical semantic states must share decisions in policy A/B tests.**
+   Independent model noise must not be mistaken for policy improvement.
+9. **Cost is a first-class outcome.** Calls, tokens, source reads, and latency
+   are measured alongside localization quality.
+
+## Benchmark data
+
+The canonical benchmark corpus is intentionally small and version-pinned while
+the research mechanics are still changing.
+
+Current data families:
+
+- **R08 mechanism/holdout set** — three tasks on the frozen
+  `BestNathan/nession@7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df`
+  revision. These established the probability-frontier and obligation
+  experiments.
+- **R18 fresh holdout set** — three additional files/tasks chosen before hidden
+  System Two references were generated. These are used to test whether a
+  mechanism survives beyond diagnostic cases.
+- **Pinned reference/aggregate fixtures** under `fixtures/research/` — durable
+  results required to reproduce research conclusions.
+
+The benchmark is not yet broad enough to claim general code-search
+generalization. Expanding it across repositories, languages, file sizes, and
+task classes is a project milestone, not an already solved problem.
+
+See [Benchmark contract](docs/benchmark.md).
+
+## Research path
+
+The research history is intentionally preserved, but experiment IDs are not
+the architecture.
+
+The path so far can be read as four stages:
+
+```text
+Stage A — bounded System One exploration
+R01-R05
+  range runtime -> progressive disclosure -> sparse observations
+
+Stage B — reconstruct useful global state
+R06-R09
+  probability frontier -> posterior reconstruction -> uncertainty separation
+
+Stage C — turn probability state into evidence
+R10-R17
+  evidence quality -> dynamic acquisition -> coverage obligations
+  -> anchor-local directional closure -> obligation geometry
+
+Stage D — validate causally and on fresh tasks
+R18-R19
+  fresh holdouts -> discover A/B decision-noise problem
+  -> shared semantic-decision cache / counterfactual-safe comparison
+```
+
+The canonical chronological log remains in
+[docs/research/README.md](docs/research/README.md).
+
+See [Research path](docs/research-path.md) for the problem-oriented view.
+
+## Target project structure
+
+The repository is converging toward this logical structure:
+
+```text
+system-one-code-explore/
+├── README.md
+├── ROADMAP.md
+├── docs/
+│   ├── benchmark.md
+│   ├── project-structure.md
+│   ├── research-path.md
+│   ├── domains/
+│   │   ├── file-discovery.md
+│   │   └── evidence-localization.md
+│   ├── research/          # canonical chronological research records
+│   ├── experiments/       # experiment protocols/results
+│   └── pilots/            # early exploratory traces
+├── src/
+│   ├── ...                # current research implementations; still flat
+│   └──                    # migrate by domain only after interfaces stabilize
+├── tests/
+├── fixtures/
+│   ├── repository/        # synthetic/local fixtures
+│   └── research/          # pinned references and canonical aggregates
+└── .github/workflows/     # reproducible experiment runners
+```
+
+The current `src/` is intentionally **not** mass-moved yet. Many workflows and
+historical tests import the flat modules directly. The target module split is
+defined in [Project structure](docs/project-structure.md); migration should
+happen behind stable interfaces instead of breaking historical reproducibility.
+
+## Canonical interfaces
+
+The project should converge on a small number of durable artifacts independent
+of any particular Rxx implementation:
+
+```text
+Task
+RepositoryView
+
+FileDiscoveryState
+RelevantFile
+
+FileEvidenceState
+EvidenceAnchor
+EvidenceSpan
+
+LocalizationResult
+
+Usage
+  model_calls
+  input_tokens
+  output_tokens
+  model_wall_time_ms
+  source_lines_read
+  metadata_items_seen
+  cache_hits
+  cache_misses
+```
+
+Experimental algorithms may be replaced. These concepts should remain stable
+enough to compare algorithms across generations.
+
+## Research discipline
+
+Every meaningful experiment must state:
+
+1. the question and hypothesis;
+2. the frozen task, repository revision, model, and runtime parameters;
+3. the controlled variable;
+4. the System Two reference protocol, if used;
+5. quality metrics;
+6. calls, tokens, wall time, and source-read cost;
+7. repeated-run variance or shared-decision controls where relevant;
+8. whether parameters were frozen before hidden references/results were seen;
+9. the result, failure mode, and next variable to isolate.
+
+Do not:
+
+- call a reference model ground truth;
+- retune on the same hidden reference and then claim generalization;
+- compare two policies with independent model judgments for identical semantic
+  states;
+- report recall without its source/model cost;
+- treat a wide candidate basin as equivalent to source actually materialized.
+
+## Running tests
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-## Research discipline
+## Where to start
 
-The long-term question is:
+For the purpose and benchmark:
 
-> How strong can a harness become when it progressively discloses state and legal actions, while a fast System One model only chooses how to advance the state machine?
+- [Benchmark contract](docs/benchmark.md)
+- [File discovery](docs/domains/file-discovery.md)
+- [Evidence localization](docs/domains/evidence-localization.md)
 
-During the research phase:
+For architecture and repository organization:
 
-- implementation may change or be replaced entirely;
-- rejected algorithms may remain as regression baselines;
-- every meaningful iteration should preserve its question, controlled setup, evidence, result, rejected ideas, and next direction in `docs/research/`;
-- raw workflow artifacts are not the durable source of truth; important evidence should be pinned in the repository when practical;
-- holdout references must not be used to retune a frozen estimator during the same evaluation round.
+- [Project structure](docs/project-structure.md)
+- [Roadmap](ROADMAP.md)
 
-See `docs/research/README.md`, `docs/research-summary.md`, and `ROADMAP.md`.
+For the full experimental record:
 
-## Full-read System 2 reference baseline
-
-`src/full_read_relevance_baseline.py` builds a canonical overlapping grid and prepares a prompt in which the reference model sees the complete target file before scoring every range. The resulting field is reference data, not ground truth.
-
-`src/compare_to_full_read_baseline.py` projects a candidate frontier/localization result onto that field and reports distribution- and coverage-level metrics.
-
-The intended evaluation stack is:
-
-1. full-read System 2 reference field: what relevant content is visible with the complete file;
-2. System One sparse exploration: how efficiently that field can be reconstructed;
-3. blind downstream quality: whether selected evidence is useful for engineering work.
-
-See `docs/experiments/full-read-claude-baseline-2026-09-24.md`.
+- [Research path](docs/research-path.md)
+- [Chronological research log](docs/research/README.md)
