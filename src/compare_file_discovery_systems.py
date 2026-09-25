@@ -42,11 +42,14 @@ def compare(system_one, system_two, case):
         "schema_version": 1,
         "kind": "file-discovery-system1-vs-system2-comparison",
         "case_id": case["id"],
+        "repository": case.get("repository"),
+        "revision": case.get("revision"),
         "domain": case["domain"],
         "language": case["language"],
         "goal": case["goal"],
         "primary_files": sorted(primary),
         "system_one": {
+            "profile": system_one.get("profile", "baseline_v1"),
             "primary_recall": (
                 len(primary & one_files) / len(primary)
                 if primary else 1.0
