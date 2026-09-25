@@ -274,3 +274,193 @@ threshold after both directional expansion needs are already low.
 R15 can reuse R08/R13/R14 cases for mechanism debugging, but threshold/geometry
 choices selected from those results must later be frozen and validated on fresh
 files/goals before any generalization claim.
+
+
+## Canonical result
+
+Canonical workflow: `36077460697`.
+
+The run covers the two discriminative R08 holdouts only:
+
+- reconnect lifecycle;
+- full-stack command lifecycle;
+
+with two repeats and both sequential/multi-scale Phase0 posterior arms.
+
+All eight jobs and the aggregate completed successfully.
+
+### Aggregate
+
+| metric | sequential | multi-scale |
+| --- | ---: | ---: |
+| mean obligations | 3.25 | 2.00 |
+| mean satisfied obligations | 1.00 | 1.25 |
+| mean exhausted obligations | 2.25 | 0.75 |
+| mean seed attempts / obligation | 4.55 | 3.54 |
+| mean anchor count | 12.5 | 7.0 |
+| mean retained anchors | 1.0 | 1.25 |
+| materialized source fraction | 36.8% | 27.1% |
+| materialized high recall | 51.7% | 41.0% |
+| retained source fraction | 6.4% | 14.4% |
+| retained CC relevance | 0.434* | 0.791 |
+| retained high precision | 0.50* | 0.75 |
+| retained high recall | 19.2% | 25.4% |
+| mean anchor span | 135 lines | 161 lines |
+| mean max anchor span | 296 lines | 360 lines |
+| hidden CC high regions without obligation | 2.5 | 2.0 |
+| closure safety caps / run | 0.75 | 0.50 |
+
+`*` Sequential aggregate retained metrics are depressed by the two full-stack
+runs that retained no final evidence. On reconnect, retained evidence is much
+stronger.
+
+### Reconnect: the intended behavior appears
+
+Sequential repeat 1 is the clearest example.
+
+The Phase0 geometry creates four obligations:
+
+- `1-320`: hidden CC mean 0.815, satisfied;
+- `417-704`: hidden CC mean 0.794, satisfied;
+- `1761-1824`: hidden CC mean 0.190, exhausted;
+- `1921-1984`: hidden CC mean 0.050, exhausted.
+
+The two retained anchors are:
+
+- seed `161-192`, closed to `161-320`, final utility 0.77;
+- seed `513-544`, closed to `481-640`, final utility 0.81.
+
+Final retained evidence:
+
+- 320 source lines;
+- CC mean relevance 0.86;
+- high-line precision 1.00;
+- high-line recall 0.333.
+
+This is qualitatively the R15 target behavior:
+
+```text
+Phase0 frontier
+  -> explicit obligations
+  -> representative seeds
+  -> directional local closure
+  -> post-closure utility
+  -> retain true regions
+  -> exhaust false-positive regions
+```
+
+Evidence sufficiency never deletes an unresolved obligation.
+
+### Directional closure fixes the R13/R14 control-flow issue
+
+R15 no longer uses scalar completeness in the control path.
+
+The reconnect retained anchors show stable directional closure. For example,
+one anchor progresses:
+
+```text
+161-192
+  need_after=.83
+161-224
+  need_after=.64
+161-256
+  need_after=.81
+161-288
+  need_after=.67
+161-320
+  need_before=.39
+  need_after=.39
+  -> directionally closed
+```
+
+It then receives final utility 0.77.
+
+This is more coherent than R14's state where both directional scores were low
+but an independent scalar completeness score still declared the anchor
+incomplete.
+
+There are still a small number of safety-cap anchors, so directional closure is
+not fully calibrated, but the R13 giant merged-region pathology is gone.
+
+### Full-stack exposes an upstream Phase0 coverage failure
+
+The full-stack sequential runs create obligations in regions such as
+`129-384`, which mostly contain registration/heartbeat supporting code.
+
+The actual task asks for command request/response routing, reconnect/disconnect
+behavior, and pending-work cleanup. Hidden CC reference marks later regions such
+as `449-544` and `609-832` as high-value.
+
+Those regions never become sequential obligations because their Phase0
+relevance is below the 75th-percentile threshold.
+
+Sequential repeat 1:
+
+- q75 tile threshold: 0.4873;
+- `449-544` Phase0 tile means: 0.355 / 0.324 / 0.312;
+- `609-832` Phase0 tile means:
+  0.377 / 0.371 / 0.349 / 0.372 / 0.374 / 0.430 / 0.458.
+
+Sequential repeat 2 shows the same pattern.
+
+Consequently the hard-obligation runtime cannot recover those core regions:
+they were never disclosed as obligations.
+
+This is different from R12's failure. R12 had a valuable region in the state
+and then let evidence feedback suppress it. R15 prevents that failure.
+Full-stack sequential instead demonstrates a Phase0 false-negative / obligation
+geometry boundary.
+
+### Multi-scale confirms the distinction
+
+For full-stack multi-scale, Phase0 raises the command-core region enough to
+cross the relative frontier threshold.
+
+Repeat 1:
+
+- q75: 0.5526;
+- `609-832` tile relevance is roughly 0.584-0.613;
+- obligation `545-896` is created and satisfied;
+- retained anchor closes from seed `641-672` to `641-1024`;
+- final utility 0.65.
+
+Repeat 2 similarly creates obligations over `577-672` and `705-832`, both
+of which are satisfied.
+
+This is strong evidence that R15's obligation mechanism works when Phase0
+actually exposes the relevant mode.
+
+## Current conclusion
+
+R15 establishes three useful runtime invariants:
+
+1. **frontier coverage is durable state**, not a model preference;
+2. **semantic closure is directional and anchor-local**;
+3. **utility is evaluated after closure**, and a low-utility seed does not
+   invalidate its frontier obligation.
+
+The dominant remaining problem is now upstream / geometric:
+
+> how should Phase0 probability fields be converted into coverage obligations
+> without requiring only top-quartile relevance and without degenerating into
+> whole-file coverage?
+
+A fixed top-quantile connected-component rule is too brittle. It can miss
+secondary local modes that are below the global quantile even when those modes
+correspond to important code.
+
+The next geometry study should compare Phase0-only obligation generators such
+as:
+
+- connected top-quantile components;
+- local maxima with prominence;
+- multi-scale peak/basin segmentation;
+- relevance-mass plus spatial-diversity coverage.
+
+No CC labels should participate in obligation generation. Hidden CC remains
+evaluation only.
+
+Pinned results:
+
+- `fixtures/research/r15-frontier-obligations-aggregate.json`;
+- `fixtures/research/r15-phase0-obligation-coverage-diagnostic.json`.
