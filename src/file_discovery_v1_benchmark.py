@@ -11,92 +11,47 @@ def load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def ancestors_for_file(path):
-    parts = Path(path).parts[:-1]
-    out = []
-    for index in range(1, len(parts) + 1):
-        out.append(Path(*parts[:index]).as_posix())
-    return out
-
-
 def evaluate(run, case):
     primary = case["primary_file"]
     selected = {
         item["path"]: item
         for item in run.get("relevant_files", [])
     }
-    node_scores = run.get("node_scores", {})
-    directory_status = run.get("directory_status", {})
-
+    file_scores = run.get("file_scores", {})
+    score = file_scores.get(primary)
     recovered = primary in selected
-    failure = None
 
+    failure = None
     if not recovered:
-        file_node = node_scores.get(f"file:{primary}")
-        if file_node is not None:
+        if score is not None:
             failure = {
                 "kind": "file_rejected",
                 "path": primary,
-                "score": float(file_node["score"]),
+                "score": float(score),
                 "threshold": float(
                     run["policy"]["file_threshold"]
                 ),
             }
         else:
-            pruned = []
-            for ancestor in ancestors_for_file(primary):
-                if directory_status.get(ancestor) == "pruned":
-                    node = node_scores.get(f"dir:{ancestor}", {})
-                    pruned.append({
-                        "path": ancestor,
-                        "score": node.get("score"),
-                    })
-            if pruned:
-                failure = {
-                    "kind": "ancestor_pruned",
-                    "first_pruned_ancestor": pruned[0],
-                    "all_pruned_ancestors": pruned,
-                    "threshold": float(
-                        run["policy"]["directory_threshold"]
-                    ),
-                }
-            else:
-                failure = {
-                    "kind": "unsupported_or_not_disclosed",
-                    "path": primary,
-                }
+            failure = {
+                "kind": "unsupported_or_not_enumerated",
+                "path": primary,
+            }
 
-    primary_node = node_scores.get(f"file:{primary}")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "file-discovery-v1-primary-target-benchmark",
         "case_id": case["id"],
         "primary_file": primary,
         "primary_recovered": recovered,
         "primary_score": (
-            float(primary_node["score"])
-            if primary_node is not None else None
+            float(score) if score is not None else None
         ),
         "selected_file_count": len(
             run.get("relevant_files", [])
         ),
-        "expanded_directory_count": len(
-            run.get("expanded_directories", [])
-        ),
-        "mechanically_expanded_directory_count": sum(
-            item.get("kind") == "directory"
-            and item.get("decision") == "mechanical_expand"
-            for item in node_scores.values()
-        ),
-        "scored_directory_count": sum(
-            item.get("kind") == "directory"
-            and item.get("score") is not None
-            for item in node_scores.values()
-        ),
-        "scored_file_count": sum(
-            item.get("kind") == "file"
-            and item.get("score") is not None
-            for item in node_scores.values()
+        "enumerated_file_count": int(
+            run.get("enumerated_file_count", 0)
         ),
         "selected_files": run.get("relevant_files", []),
         "failure": failure,
@@ -115,10 +70,7 @@ def markdown(result):
         f"- recovered: {result['primary_recovered']}",
         f"- primary score: {result['primary_score']}",
         f"- selected files: {result['selected_file_count']}",
-        f"- expanded directories: {result['expanded_directory_count']}",
-        f"- mechanical directories: {result['mechanically_expanded_directory_count']}",
-        f"- scored directories: {result['scored_directory_count']}",
-        f"- scored files: {result['scored_file_count']}",
+        f"- enumerated files: {result['enumerated_file_count']}",
         "",
         "## Cost",
         "",
