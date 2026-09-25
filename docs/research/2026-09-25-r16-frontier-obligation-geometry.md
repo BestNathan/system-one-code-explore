@@ -230,3 +230,66 @@ Primary question:
 
 > Can prominence add the secondary modes missed by q75 while preserving the
 > narrow source/candidate footprint and precision of the q75 baseline?
+
+
+## Phase B result
+
+Canonical Phase B workflow: `36081607170`.
+
+The narrow hybrids confirm that prominence should be used for **mode
+discovery**, not as a materialization basin.
+
+Overall:
+
+| method | obligations | candidate span | high-region recall | high-line coverage | precision | hidden relevance |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| q75 baseline | 2.67 | 26.2% | 62.2% | 39.5% | **83.1%** | **0.736** |
+| q75 + local seed | 4.08 | 28.5% | 66.7% | 41.2% | 72.1% | 0.724 |
+| q75 + multiscale seed | 3.75 | **27.9%** | **66.7%** | 40.9% | 74.2% | 0.726 |
+
+On sequential fields, q75 high-region recall rises from 57.8% to 63.3% with
+either hybrid. The multiscale hybrid is more selective:
+
+- local hybrid: 5.50 obligations, 29.9% span, 60.9% precision;
+- multiscale hybrid: 4.83 obligations, 28.6% span, 65.1% precision.
+
+A representative full-stack sequential repeat shows the intended behavior:
+
+- q75 only covers the registration/supporting region;
+- a persistent secondary peak at `801-832` is added as one 32-line
+  obligation;
+- that secondary tile overlaps hidden high-reference command-lifecycle code.
+
+The other full-stack sequential repeat still misses the core region. In that
+trajectory the core does not form a sufficiently strong/stable relevance mode.
+This is a genuine Phase0 false-negative boundary, not an obligation-width
+problem.
+
+### R16 conclusion
+
+Carry forward:
+
+```text
+primary obligations
+  = q75 connected high-value components
+
+secondary obligations
+  = narrow persistent multiscale relevance peaks
+    not already represented by q75
+    and at/above within-file median relevance
+```
+
+Reject:
+
+- lowering the global threshold as the only fix;
+- materializing entire prominence basins;
+- treating obligation candidate span as final source evidence.
+
+The promoted R17 candidate is `q75_plus_multiscale_seed`.
+
+Pinned result:
+
+- `fixtures/research/r16-frontier-obligation-geometry-aggregate.json`.
+
+R17 should keep the R15 closure/runtime fixed and change only obligation
+generation to determine whether the geometry gain survives end-to-end.
