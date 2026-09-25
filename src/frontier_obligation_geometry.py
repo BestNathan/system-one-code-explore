@@ -7,11 +7,20 @@ import json
 import math
 from pathlib import Path
 
-from frontier_obligation_runtime import quantile_threshold
 from multi_objective_evidence_acquisition import enrich_action, partition_actions
 
 
 EPS = 1e-12
+
+
+def quantile_threshold(values, quantile):
+    if not values:
+        return 0.0
+    ordered = sorted(float(x) for x in values)
+    q = min(1.0, max(0.0, float(quantile)))
+    index = max(0, math.ceil(q * len(ordered)) - 1)
+    return ordered[index]
+
 
 
 def load(path):
@@ -543,6 +552,114 @@ def q75_plus_secondary_peaks(
         "median_threshold": float(median),
         "added_secondary_peaks": added,
         "secondary_count": len(added),
+    }
+
+
+
+def representative_order(actions, indexes):
+    indexes = [int(index) for index in indexes]
+    center = (min(indexes) + max(indexes)) / 2.0
+    return [
+        actions[index]["id"]
+        for index in sorted(
+            indexes,
+            key=lambda index: (
+                -float(actions[index]["phase0_mean_relevance"]),
+                abs(index - center),
+                index,
+            ),
+        )
+    ]
+
+
+def build_r15_hybrid_obligations(frontier, *, tile_lines=32):
+    """Build R15-compatible q75 + narrow persistent multiscale obligations."""
+    actions = tile_actions(frontier, tile_lines=tile_lines)
+    scores = tile_scores(actions)
+    q75_threshold = quantile_threshold(scores, 0.75)
+    q75 = quantile_components(
+        actions,
+        0.75,
+        "q75_components",
+    )
+    _, multiscale_meta = multiscale_prominence(actions)
+    _, hybrid_meta = q75_plus_secondary_peaks(
+        actions,
+        q75,
+        multiscale_meta["clusters"],
+        method="q75_plus_multiscale_seed",
+    )
+
+    specs = []
+    for base in q75:
+        left_index, right_index = base["tile_index_range"]
+        indexes = list(range(left_index, right_index + 1))
+        specs.append({
+            "range": list(base["range"]),
+            "tile_ids": [actions[i]["id"] for i in indexes],
+            "representative_candidates": representative_order(
+                actions,
+                indexes,
+            ),
+            "kind": "primary_q75",
+        })
+
+    for secondary in hybrid_meta["added_secondary_peaks"]:
+        index = int(secondary["peak_index"])
+        action = actions[index]
+        specs.append({
+            "range": [
+                int(action["start_line"]),
+                int(action["end_line"]),
+            ],
+            "tile_ids": [action["id"]],
+            "representative_candidates": [action["id"]],
+            "kind": "secondary_multiscale_peak",
+            "secondary_peak": secondary,
+        })
+
+    specs.sort(key=lambda item: (item["range"][0], item["range"][1]))
+    obligations = []
+    for number, spec in enumerate(specs, 1):
+        tile_indexes = [
+            int(tile_id.split("_")[-1]) - 1
+            for tile_id in spec["tile_ids"]
+        ]
+        values = [scores[index] for index in tile_indexes]
+        obligation = {
+            "id": f"obligation_{number:03d}",
+            "range": list(spec["range"]),
+            "tile_ids": list(spec["tile_ids"]),
+            "representative_candidates": list(
+                spec["representative_candidates"]
+            ),
+            "attempted_seed_ids": [],
+            "anchor_ids": [],
+            "status": "unresolved",
+            "frontier_threshold": float(q75_threshold),
+            "frontier_peak": max(values),
+            "frontier_mean": sum(values) / len(values),
+            "geometry_kind": spec["kind"],
+        }
+        if "secondary_peak" in spec:
+            obligation["secondary_peak"] = spec["secondary_peak"]
+        obligations.append(obligation)
+
+    return actions, obligations, {
+        "geometry": "q75_plus_multiscale_seed",
+        "q75_threshold": float(q75_threshold),
+        "q75_obligation_count": len(q75),
+        "secondary_obligation_count": len(
+            hybrid_meta["added_secondary_peaks"]
+        ),
+        "median_threshold": hybrid_meta["median_threshold"],
+        "multiscale": {
+            "radii": multiscale_meta["radii"],
+            "cluster_distance": multiscale_meta["cluster_distance"],
+            "minimum_scale_persistence": multiscale_meta[
+                "minimum_scale_persistence"
+            ],
+        },
     }
 
 
