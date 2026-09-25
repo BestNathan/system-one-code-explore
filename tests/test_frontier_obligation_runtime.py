@@ -235,6 +235,55 @@ class R15Tests(unittest.TestCase):
             "retained",
         )
 
+    def test_hybrid_geometry_is_selectable(self):
+        source = "\n".join(
+            f"line {i}"
+            for i in range(1, 385)
+        )
+        # Two high primary tiles at the head, plus a separated secondary mode
+        # around tile 8 that is below q75 but survives multiscale prominence.
+        phase0 = self.phase0([
+            0.80, 0.78, 0.76, 0.74,
+            0.20, 0.18, 0.42, 0.46,
+            0.43, 0.17, 0.15, 0.14,
+        ])
+        # Every anchor closes immediately and is useful. We only care that the
+        # hybrid builder is actually selected by the runtime.
+        decider = FakeDecider(
+            directional=[
+                {"before": 0.1, "after": 0.1},
+                {"before": 0.1, "after": 0.1},
+            ],
+            utilities=[0.9, 0.9],
+        )
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "demo.rs"
+            path.write_text(source + "\n", encoding="utf-8")
+            result = run(
+                path,
+                "find both modes",
+                phase0,
+                decider,
+                obligation_geometry="q75_plus_multiscale_seed",
+            )
+
+        self.assertEqual(
+            result["policy"]["obligation_geometry"],
+            "q75_plus_multiscale_seed",
+        )
+        self.assertGreaterEqual(
+            result["frontier_geometry"]["secondary_obligation_count"],
+            1,
+        )
+        self.assertTrue(
+            any(
+                item.get("geometry_kind")
+                == "secondary_multiscale_peak"
+                for item in result["obligations"]
+            )
+        )
+
     def test_obligation_exhausts_only_after_all_candidates_fail(self):
         source = "\n".join(
             f"line {i}"
