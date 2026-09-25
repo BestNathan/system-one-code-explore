@@ -7,7 +7,7 @@ import time
 from collections import Counter, defaultdict
 from pathlib import PurePosixPath
 
-from file_discovery_profiles import ProfiledFileDiscoveryDecider, tokenize_path
+from file_discovery_profiles import ProfiledFileDiscoveryDecider
 
 
 STOP = set("a an the and or to of for in on with without from by as is are be "
@@ -101,7 +101,7 @@ def build_tree(candidates, fanout=32):
 def module_card(node, query):
     paths = node["members"]
     terms = tokens(query)
-    frequencies = Counter(t for p in paths for t in tokens(p))
+    frequencies = Counter(t for p in paths for t in sorted(tokens(p)))
     matches = [p for p in paths if tokens(p) & terms]
     # Compact samples are summary content, never a restriction on reachable files.
     step = max(1, len(paths) // 8)
@@ -109,7 +109,7 @@ def module_card(node, query):
     return {"id": node["id"], "kind": "module", "payload": {
         "prefix": node["prefix"], "descendant_files": len(paths),
         "child_modules": len(node["children"]),
-        "common_descendant_tokens": [t for t, _ in frequencies.most_common(24)],
+        "common_descendant_tokens": sorted(frequencies, key=lambda t: (-frequencies[t], t))[:24],
         "task_matched_tokens": sorted(terms & frequencies.keys()),
         "matching_path_count": len(matches), "matching_path_examples": matches[:8],
         "representative_paths": samples, "summary_is_lossy": len(paths) > len(samples),

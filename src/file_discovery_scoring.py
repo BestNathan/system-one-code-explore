@@ -21,6 +21,10 @@ class LockedTrace(Trace):
         self.requests = 0
         self.max_request_bytes = 0
         self.returned_models = set()
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.response_count = 0
+        self.response_time_sum_ms = 0.0
 
     def emit(self, event, **data):
         with self.lock:
@@ -32,6 +36,12 @@ class LockedTrace(Trace):
                 self.max_request_bytes = max(self.max_request_bytes, data["request_bytes"])
             if event == "system_one_response" and data.get("model"):
                 self.returned_models.add(str(data["model"]))
+            if event == "system_one_response":
+                self.response_count += 1
+                usage = data.get("usage", {})
+                self.input_tokens += int(usage.get("input_tokens", 0) or 0)
+                self.output_tokens += int(usage.get("output_tokens", 0) or 0)
+                self.response_time_sum_ms += float(data.get("latency_ms", 0))
             super().emit(event, **data)
 
 
@@ -57,11 +67,13 @@ class BatchScorer:
         ordered = sorted(candidates, key=lambda x: x["id"])
         if len({c["id"] for c in ordered}) != len(ordered):
             raise ValueError("duplicate candidate IDs")
-        batch, size = [], 0
-        for c in ordered:
-            n = len(json.dumps(c["payload"], ensure_ascii=False).encode("utf-8"))
+        sizes = [len(json.dumps(c["payload"], ensure_ascii=False).encode("utf-8")) for c in ordered]
+        # Validate the entire wave before starting any billable request.
+        for c, n in zip(ordered, sizes):
             if n > self.max_candidate_bytes:
                 raise ValueError(f"single candidate exceeds transport size: {c['id']}")
+        batch, size = [], 0
+        for c, n in zip(ordered, sizes):
             if batch and (len(batch) >= self.batch_size or size + n > self.max_candidate_bytes):
                 yield batch
                 batch, size = [], 0
