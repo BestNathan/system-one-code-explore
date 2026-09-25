@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "kind": "r16-frontier-obligation-geometry-aggregate",
+  "canonical_phase_a_run": 36081359100,
+  "canonical_phase_b_run": 36081607170,
+  "source_phase0_run": 36004833542,
+  "runs": 12,
+  "overall": {
+    "q75_components": {
+      "obligation_count": 2.6666666666666665,
+      "source_coverage": 0.2623778370556125,
+      "hidden_high_region_recall": 0.6222222222222222,
+      "hidden_high_line_coverage": 0.3945503906767316,
+      "obligation_precision": 0.8305555555555556,
+      "mean_hidden_relevance": 0.7355385013537187
+    },
+    "q60_components": {
+      "obligation_count": 3.5,
+      "source_coverage": 0.41851332295298627,
+      "hidden_high_region_recall": 0.7555555555555555,
+      "hidden_high_line_coverage": 0.5308212488412131,
+      "obligation_precision": 0.7916666666666666,
+      "mean_hidden_relevance": 0.6802808728113606
+    },
+    "local_prominence": {
+      "obligation_count": 3.6666666666666665,
+      "source_coverage": 0.5060605616888673,
+      "hidden_high_region_recall": 0.8333333333333334,
+      "hidden_high_line_coverage": 0.5869640610515163,
+      "obligation_precision": 0.7678571428571428,
+      "mean_hidden_relevance": 0.6478269760106551
+    },
+    "multiscale_prominence": {
+      "obligation_count": 2.8333333333333335,
+      "source_coverage": 0.5706356645034517,
+      "hidden_high_region_recall": 0.8333333333333334,
+      "hidden_high_line_coverage": 0.6362559594755661,
+      "obligation_precision": 0.8277777777777778,
+      "mean_hidden_relevance": 0.6441386761426368
+    },
+    "mass_diverse": {
+      "obligation_count": 2.25,
+      "source_coverage": 0.41009161607031713,
+      "hidden_high_region_recall": 0.6944444444444445,
+      "hidden_high_line_coverage": 0.534413488279698,
+      "obligation_precision": 0.8375,
+      "mean_hidden_relevance": 0.7260064682840895
+    },
+    "q75_plus_local_seed": {
+      "obligation_count": 4.083333333333333,
+      "source_coverage": 0.2851783786166165,
+      "hidden_high_region_recall": 0.6666666666666666,
+      "hidden_high_line_coverage": 0.41207166269368295,
+      "obligation_precision": 0.7212301587301587,
+      "mean_hidden_relevance": 0.7243624135124135
+    },
+    "q75_plus_multiscale_seed": {
+      "obligation_count": 3.75,
+      "source_coverage": 0.2786329882809997,
+      "hidden_high_region_recall": 0.6666666666666666,
+      "hidden_high_line_coverage": 0.40889327572506956,
+      "obligation_precision": 0.7420634920634921,
+      "mean_hidden_relevance": 0.7262694902319903
+    }
+  },
+  "estimators": {
+    "multi_scale_gaussian": {
+      "q75_components": {
+        "source_coverage": 0.2623778370556125,
+        "hidden_high_region_recall": 0.6666666666666666,
+        "obligation_precision": 0.9444444444444445
+      },
+      "q75_plus_multiscale_seed": {
+        "source_coverage": 0.2711545445280748,
+        "hidden_high_region_recall": 0.7000000000000001,
+        "obligation_precision": 0.8333333333333334
+      }
+    },
+    "sequential_exponential": {
+      "q75_components": {
+        "source_coverage": 0.2623778370556125,
+        "hidden_high_region_recall": 0.5777777777777778,
+        "obligation_precision": 0.7166666666666667
+      },
+      "q75_plus_local_seed": {
+        "source_coverage": 0.29920221270515823,
+        "hidden_high_region_recall": 0.6333333333333333,
+        "obligation_precision": 0.6091269841269841
+      },
+      "q75_plus_multiscale_seed": {
+        "source_coverage": 0.28611143203392464,
+        "hidden_high_region_recall": 0.6333333333333333,
+        "obligation_precision": 0.6507936507936508
+      }
+    }
+  },
+  "conclusion": "Prominence is useful as mode detection but full basins are too broad. q75 plus narrow persistent multiscale secondary seeds gives a modest high-region recall gain at small candidate-span cost. It cannot repair Phase0 regions that form neither a high-rank component nor a stable relevance mode."
+}
