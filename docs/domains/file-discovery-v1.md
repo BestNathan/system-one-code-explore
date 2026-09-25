@@ -118,7 +118,23 @@ No source body, AST, symbol graph, embeddings, or LSP semantics are part of V1.
 
 Start by expanding the repository root mechanically.
 
-For every newly disclosed node, ask System One exactly once:
+Before semantic scoring, the Harness also collapses **structural container directories**:
+
+```text
+has child directories
+AND
+has no direct implementation files
+```
+
+Such a directory is expanded mechanically rather than semantically pruned.
+
+Examples include namespace/package containers such as `crates/` or a crate/package root whose only direct files are manifests/configuration and whose implementation lives under `src/`.
+
+The purpose is not to guess a fixed depth. It is to avoid asking System One to infer a deep task from semantically weak namespace labels such as `crates`, `packages`, or `nession-agent`.
+
+Once a directory exposes direct implementation files, it becomes a semantic frontier and is Noul-scored normally.
+
+For every newly disclosed semantic node, ask System One exactly once:
 
 ### Directory Noul
 
@@ -137,7 +153,10 @@ root
   -> disclose direct children
   -> independently score each child once
 
-directory score >= directory_threshold
+structural container directory
+  -> expand mechanically
+
+semantic directory score >= directory_threshold
   -> expand directory
   -> disclose its direct children
 
@@ -257,7 +276,7 @@ Because supporting-file labels are incomplete, **do not claim precision from thi
 
 Mechanism V1 is considered usable for composition with Evidence Localization when, on the frozen primary-target benchmark:
 
-1. all primary target files are recovered in the canonical run;
+1. all primary target files are recovered in two canonical repeats;
 2. no result depends on fixed top-k or model global Stop;
 3. every selected/rejected node has one auditable score and ancestry path;
 4. all model/source costs are reported;
@@ -270,6 +289,7 @@ If target recall is below 100%, diagnose ancestor-pruned vs file-rejected vs uns
 The following are no longer open architecture questions for V1:
 
 - flat vs hierarchical repository traversal -> **hierarchical direct-child disclosure**;
+- fixed depth vs namespace handling -> **mechanically collapse structural containers until a semantic-bearing directory frontier**;
 - Choice vs Noul for sibling relevance -> **independent Noul**;
 - top-k vs multi-hit -> **no top-k**;
 - fixed batch order -> **transport-only batching**;
@@ -286,3 +306,42 @@ Only three research questions remain inside this domain:
 3. **Cross-file expansion:** when metadata is insufficient, what grounded observation from Evidence Localization may create new File Discovery actions without collapsing the two domains?
 
 Everything else should be treated as implementation optimization, not a new File Discovery architecture.
+
+## Convergence gate history
+
+### Gate 1 — strict semantic pruning from repository root
+
+Policy:
+
+```text
+directory_threshold = 0.50
+file_threshold      = 0.65
+```
+
+Two repeats both recovered 5/6 primary files.
+
+The same case failed both times:
+
+`fs_symlink_delete_semantics -> crates/nession-agent/src/fs/sandbox.rs`
+
+Failure was `ancestor_pruned` before the target file was ever disclosed.
+
+### Gate 2 — mechanically expand only top-level directories
+
+The failure moved one level deeper:
+
+```text
+crates/nession-agent
+score = 0.22
+threshold = 0.50
+```
+
+in both repeats.
+
+This falsifies fixed-depth expansion as the underlying solution. Generic namespace/package containers do not carry enough task semantics for reliable pruning.
+
+### Structural conclusion
+
+Directory pruning must begin at a **semantic-bearing frontier**, not at a fixed path depth.
+
+V1 therefore mechanically collapses directories with child directories but no direct implementation files, and only then applies System One directory relevance.
