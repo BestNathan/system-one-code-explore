@@ -57,8 +57,10 @@ class R16GeometryTests(unittest.TestCase):
 
     def test_local_prominence_keeps_secondary_mode_below_global_q75(self):
         actions = self.actions([
-            0.70,
-            0.68,
+            0.80,
+            0.78,
+            0.76,
+            0.74,
             0.20,
             0.18,
             0.42,
@@ -66,6 +68,7 @@ class R16GeometryTests(unittest.TestCase):
             0.43,
             0.17,
             0.15,
+            0.14,
         ])
         q75 = quantile_components(
             actions,
@@ -85,8 +88,8 @@ class R16GeometryTests(unittest.TestCase):
             for tile_id in obligation["tile_ids"]
         }
 
-        self.assertNotIn("tile_006", q75_ids)
-        self.assertIn("tile_006", local_ids)
+        self.assertNotIn("tile_008", q75_ids)
+        self.assertIn("tile_008", local_ids)
 
     def test_flat_field_collapses_to_one_prominence_obligation(self):
         actions = self.actions([0.8] * 10)
