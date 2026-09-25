@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "provider": "TypeSafe AI",
+  "model_family": "Jev",
+  "snapshot_date": "2026-09-25",
+  "currency": "USD",
+  "unit": "per_1m_tokens",
+  "input_usd": 0.042,
+  "output_usd": 0,
+  "notes": [
+    "Official TypeSafe pricing states $42 per billion input tokens, equivalent to $0.042 per million input tokens.",
+    "Output tokens are free / too cheap to meter at this snapshot."
+  ],
+  "sources": [
+    "https://typesafe.ai/",
+    "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+  ]
+}
