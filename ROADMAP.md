@@ -1,93 +1,114 @@
 # Roadmap
 
-## Research objective
+## Project objective
 
-Build a general **System One Code Exploration Runtime** in which the harness owns state, legal actions, effects, budgets, and durability while a fast model supplies bounded policy decisions.
+Determine whether a constrained System One harness can replace or approximate System Two for code localization: first finding the relevant files, then finding concrete source evidence inside those files, while materially reducing calls, tokens, and latency.
 
-## Completed research path
+The project has two primary problem domains:
 
-- **R01 — Range runtime baseline:** bounded adaptive reads and stopping behavior.
-- **R02 — Adaptive relevance frontier:** useful experiment, but coarse region scores were the wrong state abstraction.
-- **R03 — Full-read System 2 reference:** fixed distribution-level evaluation target.
-- **R04 — Choice and evidence closure:** Choice works as a policy distribution; isolated fragment keep/drop does not.
-- **R05 — Sparse Phase0:** sparse sensing is viable; collapsing samples into a few coarse scores is not.
-- **R06 — Whole-file probability frontier:** represent relevance and uncertainty at file length.
-- **R07 — Posterior reconstruction:** separate durable observations from a replaceable, path-independent posterior estimator.
-- **R08 — Online posterior feedback and holdout search:** a better relevance posterior changed the online path, but its support-derived uncertainty failed holdout search generalization.
+1. **File discovery** — repository -> relevant files.
+2. **Evidence localization** — candidate file -> concrete, semantically complete evidence spans.
 
-Canonical details live in `docs/research/README.md`.
+Benchmark methodology and cost/runtime are cross-cutting.
 
-## Current milestone — R09 uncertainty calibration and search policy
+## Milestone 1 — Converged research contracts
 
-R08 identified a structural separation that the runtime must make explicit:
+Status: current convergence step.
+
+- stable Task / Usage / RelevantFile / EvidenceAnchor / EvidenceSpan / LocalizationResult concepts;
+- one benchmark contract for quality + cost;
+- chronological Rxx history separated from the conceptual architecture;
+- counterfactual-safe policy comparison for identical semantic states.
+
+## Milestone 2 — Canonical evidence-localization runtime
+
+Retain the strongest current invariants:
+
+- sparse observations and replaceable posterior reconstruction;
+- separate relevance and epistemic uncertainty;
+- durable coverage obligations;
+- anchor-local directional closure;
+- final utility after closure;
+- shared semantic-decision cache for A/B.
+
+Before calling this domain stable, reduce cost tails:
+
+- batch directional closure across anchors;
+- use boundary-window context rather than resending the full growing anchor;
+- add adaptive Phase0 stopping based on frontier/obligation stability;
+- report p50/max calls, tokens, and wall time in every canonical run.
+
+## Milestone 3 — File-discovery benchmark and runtime
+
+File discovery is currently the less mature problem domain.
+
+Build a repository-level benchmark with:
+
+- multiple relevant files per task;
+- primary/supporting/incidental reference labels;
+- misleading names and same-symbol distractors;
+- test/implementation/configuration splits;
+- repository-level System Two reference or carefully frozen human/reference sets.
+
+Then build a canonical progressive-disclosure runtime with file-level relevance, uncertainty, and coverage obligations.
+
+## Milestone 4 — End-to-end localization
+
+Compose:
 
 ```text
-relevance interpolation
-    !=
-epistemic need-to-observe
+File Discovery
+    -> RelevantFile[]
+    -> Evidence Localization per file
+    -> EvidenceSpan[]
+    -> LocalizationResult
 ```
 
-R09 keeps the multi-scale relevance reconstruction unchanged and introduces a
-conservative observation-distance lower bound for exploration uncertainty.
+End-to-end evaluation must include the cost induced by file false positives. A file-discovery policy is not cheap if it promotes many files into expensive evidence localization.
 
-The first R09 round is pre-registered on three fresh holdouts:
+## Milestone 5 — Broader generalization
 
-- agent filesystem read/chunking safety;
-- tmux lifecycle and cleanup safety;
-- web terminal attach/reconnect lifecycle.
+Expand beyond one repository:
 
-Primary success criteria are search-oriented:
+- multiple repositories;
+- multiple languages;
+- small and very large files;
+- feature work, bug investigation, refactoring, protocol tracing, tests, configuration, and cross-layer tasks.
 
-- higher high-relevance recall AUC per probe;
-- higher relevance-mass recall AUC per probe;
-- better fixed-budget high-line recall;
-- improved useful-probe rate;
-- no uncertainty collapse in distant unread regions.
+Freeze candidates before hidden evaluation and keep diagnostic versus fresh-generalization evidence separate.
 
-R08 holdouts are diagnosis-only and cannot be used as R09 generalization
-evidence.
+## Milestone 6 — System One / System Two escalation
 
-## After R09
+The long-term result does not need to be 'System One only'.
 
-If the uncertainty guard generalizes on fresh holdouts, promote the split
-relevance/uncertainty state model into the default probability frontier. If it
-does not, preserve the R09 data and open a new iteration rather than tuning on
-the same validation references.
+Study an escalation policy:
 
-Longer-term runtime milestones remain:
+```text
+System One handles cheap bounded localization
+        |
+        +--> confident / covered -> finish
+        |
+        +--> unresolved / high-risk -> System Two escalation
+```
 
-### Observation-driven cross-file actions
+The objective is to identify which localization work can move reliably to System One and when a stronger model is economically justified.
 
-Progressively disclose grounded actions such as `FollowFile`, `FollowSymbol`, `InspectCaller`, and `InspectCallee` from observations rather than eagerly building a complete semantic graph.
+## Current research priorities
 
-### Evidence shaping
+1. Finish R19 counterfactual-safe comparison methodology.
+2. Standardize Usage and wall-time accounting across all experiments.
+3. Optimize evidence-localization calls/tokens without changing semantics.
+4. Start the canonical file-discovery benchmark/runtime.
+5. Only then expand end-to-end datasets.
 
-Separate navigation from final evidence presentation: shrink useful observations, classify primary/supporting context, and measure precision, redundancy, and downstream actionability.
+## Evaluation rule
 
-### Context and cost efficiency
+Every promoted method must report both quality and cost. Do not promote a method solely because it improves recall if it materially worsens calls, tokens, latency, or source exposure without a justified tradeoff.
 
-Reduce repeated state transmission with deltas, stable observation references, cache-friendly prefixes, compact histories, and bounded batching. Track monetary cost as well as latency and tokens.
+See:
 
-### Durable scheduler
-
-Move exploration behind a scheduler/effect abstraction supporting pause/resume, event logging, replay, explicit resource budgets, bounded concurrency, priority, and forkable branches.
-
-### System One / System 2 hybrid
-
-Use System One for fast decisions inside disclosed state spaces and System 2 only when the runtime must create or reshape the state/action space.
-
-## Evaluation discipline
-
-Every algorithm change should record:
-
-1. frozen subject revision and verbatim task;
-2. model/runtime configuration;
-3. source-read and model-call budgets;
-4. frontier convergence and uncertainty behavior;
-5. fixed-reference metrics where applicable;
-6. blind downstream-quality impact where applicable;
-7. omissions and failure modes;
-8. repeated-run variance;
-9. whether parameters were frozen before evaluation.
-
-Do not treat Claude overlap alone as ground truth, and do not retune a candidate on the same holdout evidence used to claim generalization.
+- `docs/benchmark.md`
+- `docs/project-structure.md`
+- `docs/domains/file-discovery.md`
+- `docs/domains/evidence-localization.md`
+- `docs/research-path.md`
