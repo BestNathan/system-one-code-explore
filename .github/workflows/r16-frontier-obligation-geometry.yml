@@ -102,6 +102,8 @@ jobs:
               "local_prominence",
               "multiscale_prominence",
               "mass_diverse",
+              "q75_plus_local_seed",
+              "q75_plus_multiscale_seed",
           ]
           metric_names = [
               "obligation_count",
