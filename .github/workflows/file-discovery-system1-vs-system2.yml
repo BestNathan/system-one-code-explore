@@ -1,4 +1,4 @@
-name: File Discovery — System One vs System2
+name: File Discovery — Large Repo System One Profiles
 
 on:
   push:
@@ -7,10 +7,9 @@ on:
     paths:
       - "src/file_discovery_v1.py"
       - "src/file_discovery_profiles.py"
-      - "src/system2_file_discovery.py"
-      - "src/compare_file_discovery_systems.py"
+      - "src/model_pricing.py"
       - "fixtures/file-discovery/system1-vs-system2-cases.json"
-      - ".github/workflows/file-discovery-system1-vs-system2.yml"
+      - "fixtures/research/file-discovery-system2-frozen-metrics.json"
   workflow_dispatch:
 
 permissions:
@@ -18,10 +17,9 @@ permissions:
 
 env:
   CASES: fixtures/file-discovery/system1-vs-system2-cases.json
+  SYSTEM2_REFERENCE: fixtures/research/file-discovery-system2-frozen-metrics.json
   TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
   TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
-  SYSTEM2_MODEL: ${{ vars.SYSTEM2_MODEL || vars.CLAUDE_MODEL || 'claude-sonnet-5' }}
-  ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}
 
 jobs:
   authorize:
@@ -50,6 +48,7 @@ jobs:
           - baseline_v1
           - instruction_v2
           - enriched_state_v3
+          - compact_state_v4
         case:
           - id: nession_backend_reconnect_lifecycle
             repository: BestNathan/nession
@@ -80,6 +79,7 @@ jobs:
             revision: d7b07d45517a793acfba4cbf8de697d723cceb46
     steps:
       - uses: actions/checkout@v4
+
       - name: Checkout frozen subject
         uses: actions/checkout@v4
         with:
@@ -88,9 +88,11 @@ jobs:
           path: subject
           fetch-depth: 1
           persist-credentials: false
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
       - name: Run System One profile
         env:
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
@@ -107,6 +109,16 @@ jobs:
           PY
           )"
           python3 src/file_discovery_v1.py             subject "$QUERY"             --profile "${{ matrix.profile }}"             --file-threshold 0.65             --relative-fallback-fraction 0.01             --transport-batch-size 64             --trace-file "$OUT/trace.jsonl"             --output "$OUT/run.json"
+          python3 - "$OUT/run.json" <<'PY'
+          import json, os, sys
+          path=sys.argv[1]
+          obj=json.load(open(path))
+          obj["benchmark_case_id"]="${{ matrix.case.id }}"
+          obj["subject_repository"]="${{ matrix.case.repository }}"
+          obj["subject_revision"]="${{ matrix.case.revision }}"
+          open(path,"w").write(json.dumps(obj,indent=2)+"\n")
+          PY
+
       - uses: actions/upload-artifact@v4
         with:
           name: fd-s1-${{ matrix.case.id }}-${{ matrix.profile }}
@@ -114,227 +126,97 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  system-two:
-    name: S2 / ${{ matrix.case.id }}
-    needs: authorize
-    runs-on: ubuntu-24.04
-    environment: ds
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        case:
-          - id: nession_backend_reconnect_lifecycle
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: nession_filesystem_symlink_delete_safety
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: nession_frontend_request_correlation
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: openclaw_gateway_ws_dispatch
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: openclaw_skill_source_precedence
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: openclaw_memory_hybrid_search
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: codex_approval_routing
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-          - id: codex_mcp_tool_approval
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-          - id: codex_thread_resume_persistence
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-    steps:
-      - uses: actions/checkout@v4
-      - name: Checkout frozen subject
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ matrix.case.repository }}
-          ref: ${{ matrix.case.revision }}
-          path: subject
-          fetch-depth: 1
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22.14.0"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install pinned Claude Code
-        run: |
-          npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
-          claude --version
-      - name: Require explicit System2 configuration
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          set -euo pipefail
-          test -n "$ANTHROPIC_API_KEY"
-          test -n "$SYSTEM2_MODEL"
-          case "$SYSTEM2_MODEL" in
-            default|sonnet|opus|haiku)
-              echo "Use a pinned explicit SYSTEM2_MODEL/CLAUDE_MODEL." >&2
-              exit 2
-              ;;
-          esac
-      - name: Build System2 prompt
-        run: |
-          OUT="artifacts/system-two/${{ matrix.case.id }}"
-          mkdir -p "$OUT"
-          python3 src/system2_file_discovery.py prompt             --cases "$CASES"             --case-id "${{ matrix.case.id }}"             --model "$SYSTEM2_MODEL"             --output "$OUT/prompt.txt"
-      - name: Run independent System2 repository investigation
-        working-directory: subject
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          set -euo pipefail
-          claude -p             --output-format stream-json             --verbose             --model "$SYSTEM2_MODEL"             --effort high             --max-turns 100             --permission-mode dontAsk             --no-session-persistence             --setting-sources ''             --strict-mcp-config             --mcp-config '{"mcpServers":{}}'             --disable-slash-commands             --tools 'Read,Glob,Grep'             --allowedTools 'Read' 'Glob' 'Grep'             --disallowedTools 'Bash' 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*'             --settings '{"disableAllHooks":true}'             < "../artifacts/system-two/${{ matrix.case.id }}/prompt.txt"             > "../artifacts/system-two/${{ matrix.case.id }}/raw.jsonl"
-      - name: Normalize System2 result
-        run: |
-          python3 src/system2_file_discovery.py parse             --cases "$CASES"             --case-id "${{ matrix.case.id }}"             --model "$SYSTEM2_MODEL"             --raw-jsonl "artifacts/system-two/${{ matrix.case.id }}/raw.jsonl"             --subject-root subject             --output "artifacts/system-two/${{ matrix.case.id }}/result.json"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: fd-s2-${{ matrix.case.id }}
-          path: artifacts/system-two/${{ matrix.case.id }}/
-          if-no-files-found: error
-          retention-days: 90
-
-  compare:
-    name: Compare / ${{ matrix.case.id }} / ${{ matrix.profile }}
-    needs:
-      - system-one
-      - system-two
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        profile:
-          - baseline_v1
-          - instruction_v2
-          - enriched_state_v3
-        case:
-          - id: nession_backend_reconnect_lifecycle
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: nession_filesystem_symlink_delete_safety
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: nession_frontend_request_correlation
-            repository: BestNathan/nession
-            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
-          - id: openclaw_gateway_ws_dispatch
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: openclaw_skill_source_precedence
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: openclaw_memory_hybrid_search
-            repository: openclaw/openclaw
-            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
-          - id: codex_approval_routing
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-          - id: codex_mcp_tool_approval
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-          - id: codex_thread_resume_persistence
-            repository: openai/codex
-            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: fd-s1-${{ matrix.case.id }}-${{ matrix.profile }}
-          path: artifacts/system-one
-      - uses: actions/download-artifact@v4
-        with:
-          name: fd-s2-${{ matrix.case.id }}
-          path: artifacts/system-two
-      - name: Compare
-        run: |
-          mkdir -p artifacts/comparison
-          python3 src/compare_file_discovery_systems.py             --cases "$CASES"             --case-id "${{ matrix.case.id }}"             --system-one artifacts/system-one/run.json             --system-two artifacts/system-two/result.json             --output "artifacts/comparison/${{ matrix.case.id }}-${{ matrix.profile }}.json"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fd-compare-${{ matrix.case.id }}-${{ matrix.profile }}
-          path: artifacts/comparison/
-          retention-days: 90
-
   aggregate:
-    name: Aggregate large-repo benchmark
-    needs: compare
+    name: Aggregate large-repo profile benchmark
+    needs: system-one
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
-          pattern: fd-compare-*
-          path: artifacts
-          merge-multiple: true
-      - name: Aggregate by profile and repository
+          pattern: fd-s1-*
+          path: artifacts/system-one
+
+      - name: Aggregate System One profiles against frozen System2
         run: |
           python3 - <<'PY'
           import json, statistics
           from collections import defaultdict
           from pathlib import Path
 
-          rows=[json.loads(p.read_text()) for p in sorted(Path("artifacts").glob("*.json"))]
+          cases=json.load(open("fixtures/file-discovery/system1-vs-system2-cases.json"))
+          case_by_id={x["id"]:x for x in cases["cases"]}
+          s2=json.load(open("fixtures/research/file-discovery-system2-frozen-metrics.json"))["results"]
 
-          def avg(items, getter):
-              vals=[getter(x) for x in items]
-              vals=[float(x) for x in vals if x is not None]
+          rows=[]
+          for path in sorted(Path("artifacts/system-one").glob("*/run.json")):
+              run=json.loads(path.read_text())
+              case_id=run["benchmark_case_id"]
+              case=case_by_id[case_id]
+              primary=set(case["primary_files"])
+              selected={x["path"] for x in run["relevant_files"]}
+              scores=run["file_scores"]
+              ordered=sorted(scores.items(),key=lambda kv:(-kv[1],kv[0]))
+              ranks={p:i+1 for i,(p,_) in enumerate(ordered)}
+              rows.append({
+                  "case_id":case_id,
+                  "repository":case["repository"],
+                  "profile":run["profile"],
+                  "enumerated_files":run["enumerated_file_count"],
+                  "primary_recall":len(primary & selected)/len(primary),
+                  "primary_scores":{p:scores.get(p) for p in sorted(primary)},
+                  "primary_ranks":{p:ranks.get(p) for p in sorted(primary)},
+                  "selected_file_count":len(selected),
+                  "model_calls":run["usage"]["model_calls"],
+                  "input_tokens":run["usage"]["input_tokens"],
+                  "output_tokens":run["usage"]["output_tokens"],
+                  "model_wall_time_ms":run["usage"]["model_wall_time_ms"],
+                  "estimated_cost_usd":run["usage"]["pricing"]["estimated_cost_usd"],
+              })
+
+          def avg(items,key):
+              vals=[float(x[key]) for x in items if x.get(key) is not None]
               return statistics.fmean(vals) if vals else None
+
+          def summary(items):
+              return {
+                  "cases":len(items),
+                  "mean_primary_recall":avg(items,"primary_recall"),
+                  "mean_selected_files":avg(items,"selected_file_count"),
+                  "mean_model_calls":avg(items,"model_calls"),
+                  "mean_input_tokens":avg(items,"input_tokens"),
+                  "mean_output_tokens":avg(items,"output_tokens"),
+                  "mean_wall_time_ms":avg(items,"model_wall_time_ms"),
+                  "mean_cost_usd":avg(items,"estimated_cost_usd"),
+              }
 
           by_profile=defaultdict(list)
           by_repo_profile=defaultdict(list)
-          s2_by_case={}
           for row in rows:
-              profile=row["system_one"]["profile"]
-              repo=row["repository"]
-              by_profile[profile].append(row)
-              by_repo_profile[(repo,profile)].append(row)
-              s2_by_case[row["case_id"]]=row
+              by_profile[row["profile"]].append(row)
+              by_repo_profile[(row["repository"],row["profile"])].append(row)
 
-          def s1_summary(items):
-              return {
-                  "cases":len(items),
-                  "mean_primary_recall":avg(items,lambda x:x["system_one"]["primary_recall"]),
-                  "mean_selected_files":avg(items,lambda x:x["system_one"]["selected_file_count"]),
-                  "mean_model_calls":avg(items,lambda x:x["system_one"]["model_calls"]),
-                  "mean_input_tokens":avg(items,lambda x:x["system_one"]["input_tokens"]),
-                  "mean_output_tokens":avg(items,lambda x:x["system_one"]["output_tokens"]),
-                  "mean_wall_time_ms":avg(items,lambda x:x["system_one"]["model_wall_time_ms"]),
-                  "mean_cost_usd":avg(items,lambda x:x["system_one"]["estimated_cost_usd"]),
-              }
-
-          unique_s2=list(s2_by_case.values())
+          s2_rows=list(s2.values())
           payload={
-              "schema_version":2,
-              "kind":"file-discovery-large-repo-profile-benchmark",
-              "cases":len(unique_s2),
+              "schema_version":3,
+              "kind":"file-discovery-large-repo-system-one-profile-benchmark",
+              "system2_reference_source_run":36109538329,
               "system_one_profiles":{
-                  profile:s1_summary(items)
+                  profile:summary(items)
                   for profile,items in sorted(by_profile.items())
               },
               "system_one_by_repository":{
-                  f"{repo}::{profile}":s1_summary(items)
+                  f"{repo}::{profile}":summary(items)
                   for (repo,profile),items in sorted(by_repo_profile.items())
               },
-              "system_two":{
-                  "cases":len(unique_s2),
-                  "mean_primary_recall":avg(unique_s2,lambda x:x["system_two"]["primary_recall"]),
-                  "mean_selected_files":avg(unique_s2,lambda x:x["system_two"]["selected_file_count"]),
-                  "mean_tool_calls":avg(unique_s2,lambda x:x["system_two"]["tool_calls"]),
-                  "mean_wall_time_ms":avg(unique_s2,lambda x:x["system_two"]["duration_ms"]),
-                  "mean_provider_cost_usd":avg(unique_s2,lambda x:x["system_two"]["provider_cost_usd"]),
+              "system_two_frozen":{
+                  "cases":len(s2_rows),
+                  "mean_primary_recall":statistics.fmean(x["primary_recall"] for x in s2_rows),
+                  "mean_selected_files":statistics.fmean(x["selected_file_count"] for x in s2_rows),
+                  "mean_tool_calls":statistics.fmean(x["tool_calls"] for x in s2_rows),
+                  "mean_wall_time_ms":statistics.fmean(x["duration_ms"] for x in s2_rows),
+                  "mean_provider_cost_usd":statistics.fmean(x["provider_cost_usd"] for x in s2_rows),
               },
               "rows":rows,
           }
@@ -342,8 +224,9 @@ jobs:
           print(json.dumps(payload,indent=2))
           PY
           cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: fd-large-repo-benchmark-${{ github.run_id }}
+          name: fd-large-repo-profiles-${{ github.run_id }}
           path: aggregate.json
           retention-days: 90
