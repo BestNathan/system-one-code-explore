@@ -1,0 +1,236 @@
+name: File Discovery — System One vs System2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_REPOSITORY: BestNathan/nession
+  SUBJECT_SHA: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+  CASES: fixtures/file-discovery/system1-vs-system2-cases.json
+  TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+  TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+  SYSTEM2_MODEL: ${{ vars.SYSTEM2_MODEL || vars.CLAUDE_MODEL || 'claude-sonnet-5' }}
+  ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}
+
+jobs:
+  authorize:
+    name: Authorize manual research run
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require repository owner
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "BestNathan" || {
+            echo "This research workflow may only execute for github.actor=BestNathan" >&2
+            exit 1
+          }
+
+  system-one:
+    name: System One / ${{ matrix.case }}
+    needs: authorize
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          - backend_reconnect_lifecycle
+          - filesystem_symlink_delete_safety
+          - frontend_request_correlation
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run metadata-only System One File Discovery V1
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TYPESAFE_API_KEY"
+          mkdir -p "artifacts/system-one/${{ matrix.case }}"
+          QUERY="$(python3 - "$CASES" "${{ matrix.case }}" <<'PY'
+          import json,sys
+          fixture=json.load(open(sys.argv[1]))
+          case=next(x for x in fixture["cases"] if x["id"]==sys.argv[2])
+          print(case["goal"])
+          PY
+          )"
+          python3 src/file_discovery_v1.py             subject "$QUERY"             --file-threshold 0.65             --relative-fallback-fraction 0.01             --transport-batch-size 64             --trace-file "artifacts/system-one/${{ matrix.case }}/trace.jsonl"             --output "artifacts/system-one/${{ matrix.case }}/run.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fd-s1-${{ matrix.case }}
+          path: artifacts/system-one/${{ matrix.case }}/
+          retention-days: 90
+
+  system-two:
+    name: System2 / ${{ matrix.case }}
+    needs: authorize
+    runs-on: ubuntu-24.04
+    environment: ds
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          - backend_reconnect_lifecycle
+          - filesystem_symlink_delete_safety
+          - frontend_request_correlation
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SUBJECT_REPOSITORY }}
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned Claude Code
+        run: |
+          npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.278
+          claude --version
+      - name: Require explicit System2 configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ANTHROPIC_API_KEY"
+          test -n "$SYSTEM2_MODEL"
+          case "$SYSTEM2_MODEL" in
+            default|sonnet|opus|haiku)
+              echo "Use a pinned explicit SYSTEM2_MODEL/CLAUDE_MODEL." >&2
+              exit 2
+              ;;
+          esac
+      - name: Build frozen System2 prompt
+        run: |
+          mkdir -p "artifacts/system-two/${{ matrix.case }}"
+          python3 src/system2_file_discovery.py prompt             --cases "$CASES"             --case-id "${{ matrix.case }}"             --model "$SYSTEM2_MODEL"             --output "artifacts/system-two/${{ matrix.case }}/prompt.txt"
+      - name: Run independent System2 repository investigation
+        working-directory: subject
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          claude -p             --output-format stream-json             --verbose             --model "$SYSTEM2_MODEL"             --effort high             --max-turns 80             --permission-mode dontAsk             --no-session-persistence             --setting-sources ''             --strict-mcp-config             --mcp-config '{"mcpServers":{}}'             --disable-slash-commands             --tools 'Read,Glob,Grep'             --allowedTools 'Read' 'Glob' 'Grep'             --disallowedTools 'Bash' 'Edit' 'Write' 'Agent' 'Task' 'WebFetch' 'WebSearch' 'EndConversation' 'mcp__*'             --settings '{"disableAllHooks":true}'             < "../artifacts/system-two/${{ matrix.case }}/prompt.txt"             > "../artifacts/system-two/${{ matrix.case }}/raw.jsonl"
+      - name: Normalize System2 result and cost
+        run: |
+          python3 src/system2_file_discovery.py parse             --cases "$CASES"             --case-id "${{ matrix.case }}"             --model "$SYSTEM2_MODEL"             --raw-jsonl "artifacts/system-two/${{ matrix.case }}/raw.jsonl"             --subject-root subject             --output "artifacts/system-two/${{ matrix.case }}/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fd-s2-${{ matrix.case }}
+          path: artifacts/system-two/${{ matrix.case }}/
+          if-no-files-found: error
+          retention-days: 90
+
+  compare:
+    name: Compare / ${{ matrix.case }}
+    needs:
+      - system-one
+      - system-two
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          - backend_reconnect_lifecycle
+          - filesystem_symlink_delete_safety
+          - frontend_request_correlation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fd-s1-${{ matrix.case }}
+          path: artifacts/system-one
+      - uses: actions/download-artifact@v4
+        with:
+          name: fd-s2-${{ matrix.case }}
+          path: artifacts/system-two
+      - name: Compare same frozen target
+        run: |
+          mkdir -p artifacts/comparison
+          python3 src/compare_file_discovery_systems.py             --cases "$CASES"             --case-id "${{ matrix.case }}"             --system-one artifacts/system-one/run.json             --system-two artifacts/system-two/result.json             --output "artifacts/comparison/${{ matrix.case }}.json"
+          cat "artifacts/comparison/${{ matrix.case }}.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fd-comparison-${{ matrix.case }}
+          path: artifacts/comparison/
+          retention-days: 90
+
+  aggregate:
+    name: Aggregate System One vs System2
+    needs: compare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fd-comparison-*
+          path: artifacts
+          merge-multiple: true
+      - name: Aggregate
+        run: |
+          python3 - <<'PY'
+          import json, statistics
+          from pathlib import Path
+          rows=[json.loads(p.read_text()) for p in sorted(Path("artifacts").glob("*.json"))]
+          def mean(path):
+              values=[]
+              for r in rows:
+                  cur=r
+                  for key in path:
+                      cur=cur.get(key) if isinstance(cur,dict) else None
+                  if cur is not None:
+                      values.append(float(cur))
+              return statistics.fmean(values) if values else None
+          payload={
+              "schema_version":1,
+              "kind":"file-discovery-system1-vs-system2-aggregate",
+              "subject_repository":"BestNathan/nession",
+              "subject_revision":"7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+              "cases":len(rows),
+              "system_one":{
+                  "mean_primary_recall":mean(["system_one","primary_recall"]),
+                  "mean_selected_files":mean(["system_one","selected_file_count"]),
+                  "mean_model_calls":mean(["system_one","model_calls"]),
+                  "mean_input_tokens":mean(["system_one","input_tokens"]),
+                  "mean_model_wall_time_ms":mean(["system_one","model_wall_time_ms"]),
+                  "mean_estimated_cost_usd":mean(["system_one","estimated_cost_usd"]),
+              },
+              "system_two":{
+                  "mean_primary_recall":mean(["system_two","primary_recall"]),
+                  "mean_selected_files":mean(["system_two","selected_file_count"]),
+                  "mean_tool_calls":mean(["system_two","tool_calls"]),
+                  "mean_duration_ms":mean(["system_two","duration_ms"]),
+                  "mean_provider_cost_usd":mean(["system_two","provider_cost_usd"]),
+              },
+              "rows":rows,
+          }
+          Path("aggregate.json").write_text(json.dumps(payload,indent=2)+"\n")
+          print(json.dumps(payload,indent=2))
+          PY
+          cat aggregate.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fd-system1-vs-system2-${{ github.run_id }}
+          path: aggregate.json
+          retention-days: 90
