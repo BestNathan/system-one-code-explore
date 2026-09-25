@@ -61,3 +61,79 @@ def jev_cost_record(input_tokens, output_tokens=0):
         ),
         "sources": list(JEV_PRICING_SNAPSHOT["sources"]),
     }
+
+
+DEEPSEEK_FLASH_PRICING_SNAPSHOT = {
+    "provider": "DeepSeek",
+    "model": "deepseek-flash",
+    "snapshot_date": "2026-09-25",
+    "currency": "USD",
+    "peak": {
+        "input_cache_hit_usd_per_million": 0.006,
+        "input_cache_miss_usd_per_million": 0.30,
+        "output_usd_per_million": 1.20,
+    },
+    "off_peak": {
+        "input_cache_hit_usd_per_million": 0.003,
+        "input_cache_miss_usd_per_million": 0.15,
+        "output_usd_per_million": 0.60,
+    },
+    "peak_utc": [
+        {"start": "01:00", "end": "04:00"},
+        {"start": "06:00", "end": "10:00"},
+    ],
+    "peak_weekdays": "Monday-Friday",
+    "source": "https://api-docs.deepseek.com/quick_start/pricing/",
+}
+
+
+def deepseek_flash_cost_usd(
+    input_tokens,
+    cache_read_input_tokens,
+    output_tokens,
+    *,
+    peak,
+):
+    tier = DEEPSEEK_FLASH_PRICING_SNAPSHOT[
+        "peak" if peak else "off_peak"
+    ]
+    return (
+        float(input_tokens or 0)
+        * tier["input_cache_miss_usd_per_million"]
+        + float(cache_read_input_tokens or 0)
+        * tier["input_cache_hit_usd_per_million"]
+        + float(output_tokens or 0)
+        * tier["output_usd_per_million"]
+    ) / 1_000_000.0
+
+
+def deepseek_flash_cost_range(
+    input_tokens,
+    cache_read_input_tokens,
+    output_tokens,
+):
+    return {
+        "pricing_snapshot_date": (
+            DEEPSEEK_FLASH_PRICING_SNAPSHOT["snapshot_date"]
+        ),
+        "currency": "USD",
+        "off_peak_usd": round(
+            deepseek_flash_cost_usd(
+                input_tokens,
+                cache_read_input_tokens,
+                output_tokens,
+                peak=False,
+            ),
+            12,
+        ),
+        "peak_usd": round(
+            deepseek_flash_cost_usd(
+                input_tokens,
+                cache_read_input_tokens,
+                output_tokens,
+                peak=True,
+            ),
+            12,
+        ),
+        "source": DEEPSEEK_FLASH_PRICING_SNAPSHOT["source"],
+    }
