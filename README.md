@@ -48,33 +48,28 @@ System One code localization currently has two first-class problem domains.
 
 Find the repository files that deserve inspection.
 
+The V1 mechanism is now converged:
+
 ```text
-repository structure / metadata
-        |
-        v
-progressively disclosed file state
-        |
-        v
-System One policy
-        |
-        v
-RelevantFile[]
+repository
+    -> mechanically enumerate supported file metadata
+    -> independent System One Noul score per file
+    -> absolute high-confidence selection
+       + top-1% relative recall guard
+    -> RelevantFile[]
 ```
 
-Questions include:
+Semantic directory pruning is explicitly rejected: relevance of a deep file is
+not monotonic in shallow parent-directory metadata.
 
-- how to search large repository trees without enumerating every file into the
-  model context;
-- how to expose directories/files progressively;
-- how to represent file relevance, uncertainty, and unresolved search mass;
-- how to follow newly discovered files/symbol relations without turning the
-  harness into a semantic search engine;
-- how to stop without silently missing an independent relevant file;
-- how to batch decisions and cache repeated semantic states;
-- how file recall/precision trades against calls, tokens, latency, and metadata
-  scanned.
+On the frozen six-case convergence suite, V1 recovered 12/12 primary targets
+across two repeats. Current cost on the 1,096-file nession fixture is about 18
+model calls / 212k input tokens / 6.6s model wall time per task; reducing that
+physical cost without changing logical all-file coverage is now an optimization
+problem rather than a new search architecture.
 
-See [File discovery](docs/domains/file-discovery.md).
+See [File discovery](docs/domains/file-discovery.md) and
+[File Discovery V1](docs/domains/file-discovery-v1.md).
 
 ### 2. Evidence localization inside a file
 
