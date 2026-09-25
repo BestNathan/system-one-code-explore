@@ -119,6 +119,21 @@ class ScalingTests(unittest.TestCase):
         self.assertEqual(result["scored_file_count"], 0)
         self.assertGreater(result["deferred_module_count"], 0)
 
+    def test_module_summary_breaks_frequency_ties_lexically(self):
+        from file_discovery_adaptive import module_card
+        node = {"id": "module:test", "prefix": "test", "children": [],
+                "members": ["alpha.py", "bravo.py", "charlie.py"]}
+        self.assertEqual(module_card(node, "task")["payload"]["common_descendant_tokens"],
+                         ["alpha", "bravo", "charlie"])
+
+    def test_trace_retains_billed_usage_even_before_answer_validation(self):
+        from file_discovery_scoring import LockedTrace
+        trace = LockedTrace(None)
+        trace.emit("system_one_response", latency_ms=42, model="pinned-model",
+                   usage={"input_tokens": 123, "output_tokens": 4}, answers={})
+        self.assertEqual(getattr(trace, "input_tokens", None), 123)
+        self.assertEqual(getattr(trace, "response_count", None), 1)
+
 
 class ScalingReportTests(unittest.TestCase):
     def test_report_preserves_failed_arm_and_expected_count(self):
