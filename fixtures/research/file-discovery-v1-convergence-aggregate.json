@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-v1-convergence-result",
+  "canonical_run": 36104786728,
+  "repository": "BestNathan/nession",
+  "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+  "repeats": 2,
+  "cases": 6,
+  "logical_case_runs": 12,
+  "policy": {
+    "directory_semantic_pruning": false,
+    "source_body_visible": false,
+    "file_threshold": 0.65,
+    "relative_recall_guard_fraction": 0.01,
+    "top_k": null,
+    "stop_rule": "all_file_metadata_scored",
+    "transport_batch_size": 64
+  },
+  "result": {
+    "all_primary_recovered_every_run": true,
+    "mean_primary_recall": 1,
+    "mean_selected_files_per_case": 16.5,
+    "max_selected_files_in_case": 35,
+    "enumerated_files_per_case": 1096,
+    "mean_model_calls_per_case": 18,
+    "mean_input_tokens_per_case": 212584,
+    "mean_model_wall_time_ms_per_case": 6606.459734166663,
+    "failure_kinds": {}
+  },
+  "selection_ablation_same_score_fields": {
+    "strict_0_65": {
+      "primary_recall": 0.8333333333333334,
+      "mean_selected_files": 12.666666666666666,
+      "max_selected_files": 35
+    },
+    "strict_0_45": {
+      "primary_recall": 1,
+      "mean_selected_files": 47.416666666666664,
+      "max_selected_files": 116
+    },
+    "threshold_0_65_plus_top_1_percent_guard": {
+      "primary_recall": 1,
+      "mean_selected_files": 16.5,
+      "max_selected_files": 35
+    }
+  },
+  "target_rank_diagnostic": {
+    "note": "In the pre-guard all-file scoring run, all six primary targets ranked within the top 9 of 1096 files in both repeats; the fs sandbox target had low absolute calibration (0.46-0.47) but rank 8-9.",
+    "interpretation": "System One file-path ranking was strong; the remaining miss was absolute calibration, not reachability."
+  },
+  "architecture_conclusion": [
+    "Semantic directory pruning is rejected because descendant relevance is not monotonic in parent-directory metadata.",
+    "File Discovery V1 mechanically enumerates supported files and independently Noul-scores each file once.",
+    "A high-confidence absolute threshold is augmented by a small relative recall guard instead of lowering the global threshold.",
+    "No top-k, source reads, global model Stop, or repeated unchanged-state scoring is used.",
+    "Future work in this domain is efficiency/generalization/calibration, not a new traversal architecture."
+  ]
+}
