@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-system1-system2-cases",
+  "repository": "BestNathan/nession",
+  "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+  "cases": [
+    {
+      "id": "backend_reconnect_lifecycle",
+      "domain": "backend networking / lifecycle",
+      "language": "Rust",
+      "goal": "I need to debug the agent-to-server reconnect lifecycle. Find the files that materially implement exponential reconnect/backoff, registration after reconnect, connection state transitions, sync-needed behavior, and handling of queued outbound messages while disconnected.",
+      "primary_files": [
+        "crates/nession-agent/src/connection/server_client.rs"
+      ]
+    },
+    {
+      "id": "filesystem_symlink_delete_safety",
+      "domain": "filesystem correctness / safety",
+      "language": "Rust",
+      "goal": "I am reviewing filesystem safety semantics. Find the files that materially implement delete behavior around symlinks, parent-symlink resolution, non-existent ancestors, and the rule that deleting a symlink must not delete the symlink target.",
+      "primary_files": [
+        "crates/nession-agent/src/fs/sandbox.rs"
+      ]
+    },
+    {
+      "id": "frontend_request_correlation",
+      "domain": "frontend realtime messaging",
+      "language": "TypeScript",
+      "goal": "I am debugging frontend WebSocket request correlation and disconnect handling. Find the files that materially implement request IDs, pending request tracking, request timeouts, routing incoming responses back to callers, and failing pending requests when the socket disconnects.",
+      "primary_files": [
+        "web/src/platform/socket/MessageRouter.ts"
+      ]
+    }
+  ]
+}
