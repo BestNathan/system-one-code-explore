@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "kind": "r17-hybrid-obligations-aggregate",
+  "canonical_run": 36082094094,
+  "source_phase0_run": 36004833542,
+  "geometry": "q75_plus_multiscale_seed",
+  "runs": 8,
+  "estimators": {
+    "multi_scale_gaussian": {
+      "mean_obligation_count": 2.75,
+      "mean_satisfied_obligations": 1.25,
+      "mean_exhausted_obligations": 1.5,
+      "mean_seed_attempts_per_obligation": 2.708333333333333,
+      "mean_anchor_count": 7.75,
+      "mean_retained_anchor_count": 1.25,
+      "materialized_source_fraction": 0.30443341744951263,
+      "materialized_high_recall": 0.41875,
+      "retained_source_fraction": 0.1436054032275166,
+      "retained_mean_reference_relevance": 0.7908333333333333,
+      "retained_high_precision": 0.75,
+      "retained_high_recall": 0.25416666666666665,
+      "retained_weighted_relevance_recall": 0.18454876547540314,
+      "hidden_cc_high_regions_without_obligation": 1.75,
+      "closure_safety_cap_count": 0.75,
+      "mean_model_calls": 46.5,
+      "mean_input_tokens": 198291.75
+    },
+    "sequential_exponential": {
+      "mean_obligation_count": 4.75,
+      "mean_satisfied_obligations": 1.25,
+      "mean_exhausted_obligations": 3.5,
+      "mean_seed_attempts_per_obligation": 3.3928571428571432,
+      "mean_anchor_count": 14.0,
+      "mean_retained_anchor_count": 1.25,
+      "materialized_source_fraction": 0.4484664701599621,
+      "materialized_high_recall": 0.5479166666666666,
+      "retained_source_fraction": 0.0812357302910137,
+      "retained_mean_reference_relevance": 0.61775,
+      "retained_high_precision": 0.6,
+      "retained_high_recall": 0.19791666666666666,
+      "retained_weighted_relevance_recall": 0.15005727531667898,
+      "hidden_cc_high_regions_without_obligation": 2.25,
+      "closure_safety_cap_count": 0.75,
+      "mean_model_calls": 67.0,
+      "mean_input_tokens": 228966.75
+    }
+  },
+  "r15_baseline": {
+    "multi_scale_gaussian": {
+      "mean_obligation_count": 2.0,
+      "mean_retained_anchor_count": 1.25,
+      "materialized_source_fraction": 0.27084349442641953,
+      "retained_source_fraction": 0.1436054032275166,
+      "retained_mean_reference_relevance": 0.7908333333333333,
+      "retained_high_precision": 0.75,
+      "retained_high_recall": 0.25416666666666665,
+      "retained_weighted_relevance_recall": 0.18454876547540314,
+      "hidden_cc_high_regions_without_obligation": 2.0,
+      "mean_model_calls": 41.75,
+      "mean_input_tokens": 174606.25
+    },
+    "sequential_exponential": {
+      "mean_obligation_count": 3.25,
+      "mean_retained_anchor_count": 1.0,
+      "materialized_source_fraction": 0.36771847233708677,
+      "retained_source_fraction": 0.06438068579426173,
+      "retained_mean_reference_relevance": 0.4342307692307692,
+      "retained_high_precision": 0.5,
+      "retained_high_recall": 0.19166666666666665,
+      "retained_weighted_relevance_recall": 0.13806195530244197,
+      "hidden_cc_high_regions_without_obligation": 2.5,
+      "mean_model_calls": 61.0,
+      "mean_input_tokens": 209294.5
+    }
+  },
+  "key_mechanism_case": {
+    "case": "full_stack_command_lifecycle",
+    "estimator": "sequential_exponential",
+    "repeat": 1,
+    "secondary_obligation": [801, 832],
+    "secondary_hidden_reference_mean": 0.78,
+    "closed_anchor": [769, 928],
+    "final_utility_probability": 0.66,
+    "status": "retained",
+    "retained_hidden_reference_mean": 0.696,
+    "retained_high_recall": 0.125,
+    "r15_same_case_retained_evidence": "none"
+  },
+  "boundary_case": {
+    "case": "full_stack_command_lifecycle",
+    "estimator": "sequential_exponential",
+    "repeat": 2,
+    "secondary_peak_added": [1313, 1344],
+    "secondary_peak_hidden_reference_mean": 0.6,
+    "retained_evidence": "none",
+    "interpretation": "The command-core region still does not form a stable relevance mode; geometry cannot recover a genuine Phase0 false negative."
+  },
+  "conclusion": "Persistent multiscale secondary peaks can convert a missed relevance mode into retained end-to-end evidence, but the mechanism adds false-positive obligations and model cost. Multi-scale Phase0 gains no final evidence benefit on these cases because q75 already exposes its useful modes. Freeze the hybrid and validate on fresh files/goals before any default promotion."
+}
