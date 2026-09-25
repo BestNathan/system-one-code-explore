@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from file_discovery_v1 import disclose_children, run
+from file_discovery_v1 import enumerate_files, run
 
 
 class FakeDecider:
@@ -57,124 +57,64 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def test_direct_children_only(self):
+    def test_mechanical_enumeration_has_no_directory_pruning(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             self.make_repo(root)
-            children = disclose_children(root, "")
-            paths = {item["path"] for item in children}
-            self.assertIn("src", paths)
-            self.assertIn("docs", paths)
-            self.assertNotIn("src/net/client.rs", paths)
-            self.assertNotIn("target", paths)
+            candidates = enumerate_files(root)
+            paths = {item["path"] for item in candidates}
 
-    def test_hierarchical_multi_hit_without_top_k(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            self.make_repo(root)
-            decider = FakeDecider({
-                "src/net": 0.92,
-                "src/db": 0.80,
-                "src/net/client.rs": 0.91,
-                "src/net/retry.rs": 0.88,
-                "src/db/store.rs": 0.70,
-            })
-            result = run(
-                root,
-                "connection retries",
-                decider,
-                directory_threshold=0.50,
-                file_threshold=0.65,
-                transport_batch_size=64,
-            )
-
-        paths = {
-            item["path"]
-            for item in result["relevant_files"]
-        }
         self.assertEqual(
             paths,
             {
                 "src/net/client.rs",
                 "src/net/retry.rs",
                 "src/db/store.rs",
+                "docs/notes.md",
             },
         )
+        self.assertNotIn("target/ignored.rs", paths)
+
+    def test_multi_hit_without_top_k(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.make_repo(root)
+            decider = FakeDecider({
+                "src/net/client.rs": 0.91,
+                "src/net/retry.rs": 0.88,
+                "src/db/store.rs": 0.70,
+                "docs/notes.md": 0.10,
+            })
+            result = run(
+                root,
+                "connection retries",
+                decider,
+                file_threshold=0.65,
+                transport_batch_size=64,
+            )
+
         self.assertEqual(
-            result["directory_status"]["docs"],
-            "pruned",
+            {item["path"] for item in result["relevant_files"]},
+            {
+                "src/net/client.rs",
+                "src/net/retry.rs",
+                "src/db/store.rs",
+            },
         )
-        self.assertEqual(
-            result["termination"],
-            "frontier_exhausted",
+        self.assertFalse(
+            result["policy"]["directory_semantic_pruning"]
         )
         self.assertIsNone(result["policy"]["top_k"])
+        self.assertEqual(
+            result["termination"],
+            "all_file_metadata_scored",
+        )
 
-    def test_top_level_directory_is_mechanically_expanded(self):
+    def test_file_below_threshold_remains_auditable(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             self.make_repo(root)
             decider = FakeDecider({
-                "src/net": 0.90,
-                "src/db": 0.10,
-                "src/net/client.rs": 0.90,
-                "src/net/retry.rs": 0.10,
-            })
-            result = run(
-                root,
-                "connection",
-                decider,
-                directory_threshold=0.50,
-                file_threshold=0.65,
-            )
-
-        self.assertEqual(
-            result["directory_status"]["src"],
-            "mechanical_expand",
-        )
-        self.assertIn(
-            "src/net/client.rs",
-            {item["path"] for item in result["relevant_files"]},
-        )
-
-    def test_pruned_ancestor_hides_descendants(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            self.make_repo(root)
-            decider = FakeDecider({
-                "src/net": 0.40,
-                "src/db": 0.10,
-                "src/net/client.rs": 0.99,
-            })
-            result = run(
-                root,
-                "connection",
-                decider,
-                directory_threshold=0.50,
-                file_threshold=0.65,
-            )
-
-        self.assertEqual(result["relevant_files"], [])
-        self.assertEqual(
-            result["directory_status"]["src"],
-            "mechanical_expand",
-        )
-        self.assertEqual(
-            result["directory_status"]["src/net"],
-            "pruned",
-        )
-        self.assertNotIn(
-            "file:src/net/client.rs",
-            result["node_scores"],
-        )
-
-    def test_file_threshold_does_not_limit_other_hits(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            self.make_repo(root)
-            decider = FakeDecider({
-                "src/net": 0.90,
-                "src/db": 0.10,
                 "src/net/client.rs": 0.90,
                 "src/net/retry.rs": 0.64,
             })
@@ -182,7 +122,6 @@ class FileDiscoveryV1Tests(unittest.TestCase):
                 root,
                 "connection",
                 decider,
-                directory_threshold=0.50,
                 file_threshold=0.65,
             )
 
@@ -191,9 +130,40 @@ class FileDiscoveryV1Tests(unittest.TestCase):
             ["src/net/client.rs"],
         )
         self.assertEqual(
-            result["node_scores"]["file:src/net/retry.rs"]["score"],
+            result["file_scores"]["src/net/retry.rs"],
             0.64,
         )
+
+    def test_transport_batches_do_not_change_semantics(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.make_repo(root)
+            scores = {
+                "src/net/client.rs": 0.90,
+                "src/net/retry.rs": 0.80,
+                "src/db/store.rs": 0.70,
+                "docs/notes.md": 0.10,
+            }
+            small = FakeDecider(scores)
+            large = FakeDecider(scores)
+            a = run(
+                root,
+                "task",
+                small,
+                file_threshold=0.65,
+                transport_batch_size=1,
+            )
+            b = run(
+                root,
+                "task",
+                large,
+                file_threshold=0.65,
+                transport_batch_size=64,
+            )
+
+        self.assertEqual(a["relevant_files"], b["relevant_files"])
+        self.assertEqual(a["file_scores"], b["file_scores"])
+        self.assertGreater(small.calls, large.calls)
 
 
 if __name__ == "__main__":
