@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Canonical File Discovery V1.
 
-Metadata-only hierarchical progressive disclosure:
-- root expands mechanically;
-- every newly disclosed directory/file is independently Noul-scored once;
-- directories above threshold expose direct children;
-- files above threshold become RelevantFile;
-- no top-k, source reads, global model Stop, or unchanged-state rescoring.
+Final converged mechanism:
+- Harness mechanically enumerates supported file metadata.
+- System One independently Noul-scores every file exactly once.
+- No semantic directory pruning, top-k, source reads, global model Stop, or
+  unchanged-state rescoring.
+- Transport batching is implementation-only and does not affect semantics.
 """
 from __future__ import annotations
 
@@ -25,13 +25,8 @@ from system_one_code_locator import (
     Trace,
 )
 
-DEFAULT_DIRECTORY_THRESHOLD = 0.50
 DEFAULT_FILE_THRESHOLD = 0.65
 DEFAULT_TRANSPORT_BATCH_SIZE = 64
-IMPLEMENTATION_SUFFIXES = {
-    ".py", ".rs", ".go", ".java", ".ts", ".tsx",
-    ".js", ".jsx", ".vue", ".proto", ".sql", ".sh",
-}
 
 
 def empty_usage():
@@ -51,93 +46,47 @@ def merge_usage(total, current):
         total[key] += int(current.get(key, 0) or 0)
 
 
-def _visible_entries(path):
-    try:
-        return sorted(
-            [
-                item
-                for item in path.iterdir()
-                if not item.name.startswith(".")
-                and item.name not in IGNORE
-            ],
-            key=lambda item: item.name,
-        )
-    except OSError:
-        return []
-
-
-def directory_candidate(root, path, parent):
-    entries = _visible_entries(path)
-    child_directories = [
-        item.name for item in entries if item.is_dir()
-    ]
-    direct_files = [
-        item.name
-        for item in entries
-        if item.is_file() and item.suffix.lower() in SUFFIXES
-    ]
-    implementation_files = [
-        item.name
-        for item in entries
-        if item.is_file()
-        and item.suffix.lower() in IMPLEMENTATION_SUFFIXES
-    ]
-    rel = path.relative_to(root).as_posix()
-    return {
-        "id": f"dir:{rel}",
-        "kind": "directory",
-        "path": rel,
-        "parent": parent,
-        "payload": {
-            "kind": "directory",
-            "path": rel,
-            "name": path.name,
-            "child_directories": child_directories[:24],
-            "direct_files": direct_files[:40],
-            "implementation_files": implementation_files[:40],
-            "structural_container": (
-                bool(child_directories) and not implementation_files
-            ),
-        },
-    }
-
-
-def file_candidate(root, path, parent):
-    try:
-        size_bytes = path.stat().st_size
-    except OSError:
-        size_bytes = None
-    rel = path.relative_to(root).as_posix()
-    return {
-        "id": f"file:{rel}",
-        "kind": "file",
-        "path": rel,
-        "parent": parent,
-        "payload": {
-            "kind": "file",
-            "path": rel,
-            "filename": path.name,
-            "extension": path.suffix.lower(),
-            "size_bytes": size_bytes,
-        },
-    }
-
-
-def disclose_children(root, relative_directory):
+def enumerate_files(root):
     root = Path(root).resolve()
-    base = root if not relative_directory else root / relative_directory
-    entries = _visible_entries(base)
     out = []
-    parent = relative_directory or "."
-    for path in entries:
-        if path.is_dir():
-            out.append(directory_candidate(root, path, parent))
-        elif path.is_file() and path.suffix.lower() in SUFFIXES:
-            out.append(file_candidate(root, path, parent))
+    for current, dirs, names in os.walk(root):
+        dirs[:] = sorted(
+            name
+            for name in dirs
+            if not name.startswith(".") and name not in IGNORE
+        )
+        base = Path(current)
+        for name in sorted(names):
+            if name.startswith("."):
+                continue
+            path = base / name
+            if path.suffix.lower() not in SUFFIXES:
+                continue
+            try:
+                size_bytes = path.stat().st_size
+            except OSError:
+                continue
+            rel = path.relative_to(root).as_posix()
+            out.append({
+                "id": f"file:{rel}",
+                "kind": "file",
+                "path": rel,
+                "parent": (
+                    path.parent.relative_to(root).as_posix()
+                    if path.parent != root else "."
+                ),
+                "payload": {
+                    "kind": "file",
+                    "path": rel,
+                    "filename": path.name,
+                    "extension": path.suffix.lower(),
+                    "size_bytes": size_bytes,
+                },
+            })
     return out
 
 
-def score_once(
+def score_files(
     query,
     decider,
     candidates,
@@ -148,6 +97,7 @@ def score_once(
 ):
     results = []
     misses = []
+
     for candidate in candidates:
         key = json.dumps(
             {
@@ -176,13 +126,14 @@ def score_once(
             time.perf_counter() - started
         ) * 1000.0
         merge_usage(usage, current)
+
         by_id = {item["id"]: item for item in scored}
         for key, candidate in batch:
             score = float(by_id[candidate["id"]]["score"])
             cache[key] = score
             results.append({**candidate, "score": score})
 
-    results.sort(key=lambda item: (item["kind"], item["path"]))
+    results.sort(key=lambda item: item["path"])
     return results
 
 
@@ -191,117 +142,62 @@ def run(
     query,
     decider,
     *,
-    directory_threshold=DEFAULT_DIRECTORY_THRESHOLD,
     file_threshold=DEFAULT_FILE_THRESHOLD,
     transport_batch_size=DEFAULT_TRANSPORT_BATCH_SIZE,
 ):
     root = Path(root).resolve()
     usage = empty_usage()
     cache = {}
-    node_scores = {}
-    directory_status = {}
-    relevant_files = []
-    expanded_directories = []
-    frontier = [""]
 
     started = time.perf_counter()
+    candidates = enumerate_files(root)
+    usage["metadata_items_seen"] = len(candidates)
 
-    while frontier:
-        current_frontier = sorted(set(frontier))
-        frontier = []
-        newly_disclosed = []
+    scored = score_files(
+        query,
+        decider,
+        candidates,
+        usage,
+        cache,
+        batch_size=transport_batch_size,
+    )
 
-        for relative_directory in current_frontier:
-            expanded_directories.append(relative_directory or ".")
-            children = disclose_children(root, relative_directory)
-            usage["metadata_items_seen"] += len(children)
-            for candidate in children:
-                if candidate["id"] not in node_scores:
-                    newly_disclosed.append(candidate)
-
-        if not newly_disclosed:
-            continue
-
-        mechanical = []
-        semantic = []
-        for candidate in newly_disclosed:
-            if (
-                candidate["kind"] == "directory"
-                and candidate["payload"].get("structural_container")
-            ):
-                mechanical.append(candidate)
-            else:
-                semantic.append(candidate)
-
-        for item in mechanical:
-            node_scores[item["id"]] = {
-                "kind": item["kind"],
-                "path": item["path"],
-                "parent": item["parent"],
-                "score": None,
-                "decision": "mechanical_expand",
-            }
-            directory_status[item["path"]] = "mechanical_expand"
-            frontier.append(item["path"])
-
-        scored = score_once(
-            query,
-            decider,
-            semantic,
-            usage,
-            cache,
-            batch_size=transport_batch_size,
-        )
-
-        for item in scored:
-            node_scores[item["id"]] = {
-                "kind": item["kind"],
-                "path": item["path"],
-                "parent": item["parent"],
-                "score": float(item["score"]),
-                "decision": "semantic_score",
-            }
-            if item["kind"] == "directory":
-                if item["score"] >= float(directory_threshold):
-                    directory_status[item["path"]] = "expanded"
-                    frontier.append(item["path"])
-                else:
-                    directory_status[item["path"]] = "pruned"
-            else:
-                if item["score"] >= float(file_threshold):
-                    relevant_files.append({
-                        "path": item["path"],
-                        "score": float(item["score"]),
-                        "parent_directory": item["parent"],
-                    })
-
+    relevant_files = [
+        {
+            "path": item["path"],
+            "score": float(item["score"]),
+            "parent_directory": item["parent"],
+        }
+        for item in scored
+        if item["score"] >= float(file_threshold)
+    ]
     relevant_files.sort(
         key=lambda item: (-item["score"], item["path"])
     )
+
+    file_scores = {
+        item["path"]: float(item["score"])
+        for item in scored
+    }
     wall_time_ms = (time.perf_counter() - started) * 1000.0
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "file-discovery-v1",
         "goal": query,
         "root": str(root),
         "policy": {
-            "directory_threshold": float(directory_threshold),
             "file_threshold": float(file_threshold),
             "transport_batch_size": int(transport_batch_size),
-            "structural_container_rule": (
-                "mechanically expand directories with child directories "
-                "and no direct implementation files"
-            ),
-            "stop_rule": "frontier_exhausted",
+            "directory_semantic_pruning": False,
+            "stop_rule": "all_file_metadata_scored",
             "source_body_visible": False,
             "top_k": None,
         },
         "relevant_files": relevant_files,
-        "node_scores": node_scores,
-        "directory_status": directory_status,
-        "expanded_directories": expanded_directories,
-        "termination": "frontier_exhausted",
+        "file_scores": file_scores,
+        "enumerated_file_count": len(candidates),
+        "termination": "all_file_metadata_scored",
         "usage": usage,
         "wall_time_ms": wall_time_ms,
     }
@@ -311,11 +207,6 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("root")
     parser.add_argument("query")
-    parser.add_argument(
-        "--directory-threshold",
-        type=float,
-        default=DEFAULT_DIRECTORY_THRESHOLD,
-    )
     parser.add_argument(
         "--file-threshold",
         type=float,
@@ -352,7 +243,6 @@ def main(argv=None):
         args.root,
         args.query,
         decider,
-        directory_threshold=args.directory_threshold,
         file_threshold=args.file_threshold,
         transport_batch_size=args.transport_batch_size,
     )
@@ -362,8 +252,8 @@ def main(argv=None):
     )
     print(json.dumps({
         "termination": result["termination"],
+        "enumerated_files": result["enumerated_file_count"],
         "relevant_files": len(result["relevant_files"]),
-        "expanded_directories": len(result["expanded_directories"]),
         "usage": result["usage"],
         "wall_time_ms": result["wall_time_ms"],
     }, indent=2))
