@@ -1,39 +1,82 @@
 # Research Summary
 
-## Current result
+## Project objective
 
-The project has moved beyond the original adaptive range locator into a sparse-observation probability-frontier runtime.
+System One Code Explore studies whether a constrained System One harness can perform code localization well enough to replace or approximate System Two for:
 
-The current architecture keeps durable micro-probe observations, reconstructs a file-length relevance/uncertainty posterior from those observations, and lets System One Choice select among a bounded set of legal probes. Posterior reconstruction is now a first-class replaceable component rather than an implicit sequence of local mutations.
+1. finding the files relevant to an engineering task;
+2. finding concrete, semantically usable evidence spans inside those files;
 
-## What R07 established
+while reducing model calls, tokens, wall time, and unnecessary source exposure.
 
-R07 held the websocket observations and probe order fixed and changed only the posterior estimator. The historical sequential posterior lost a large part of the local relevance signal; a path-independent multi-scale Gaussian reconstruction recovered substantially more of it without additional source reads or model calls.
+System Two is a stronger reference and possible escalation path, not ground truth.
 
-The important conclusion is architectural: **posterior reconstruction, not local System One scoring, was the dominant information-loss layer on that controlled fixture**.
+## Current problem model
 
-See `docs/research/2026-09-24-r07-posterior-reconstruction.md`.
+```text
+Repository + Task
+    -> File Discovery
+    -> RelevantFile[]
+    -> Evidence Localization
+       -> sparse observations
+       -> relevance / uncertainty state
+       -> coverage obligations
+       -> evidence anchors
+       -> directional semantic closure
+       -> post-closure utility
+    -> EvidenceSpan[]
+```
 
-## What R08 established
+File discovery and evidence localization are separate problem domains with separate state/action spaces and benchmarks.
 
-R08 integrated the posterior into the online feedback loop, so the reconstructed frontier can change which probes System One selects next.
+## Strongest retained findings
 
-On the same frozen websocket task and the same 32 × 8-line source-read budget, the multi-scale arm improved the final reference-field metrics over the sequential arm and produced a substantially different probe trajectory. This shows that the posterior affects exploration policy, not only the final visualization.
+- System One works best as a bounded policy/value function inside a Harness, not as an unconstrained ReAct loop.
+- Progressive disclosure is essential; repository trees, full files, and action spaces should not be eagerly injected.
+- Sparse observations are a better basis than a few coarse region scores.
+- Whole-file relevance/posterior state is useful, but relevance and epistemic uncertainty must be separated.
+- Coverage must be durable state: finding some useful evidence must not erase another unresolved relevant region.
+- Fixed top-N evidence is an artificial constraint.
+- Relevant fragments must be closed around an anchor/local semantic unit; merged-region closure can run away.
+- Directional `need_before` / `need_after` is a better runtime control signal than one scalar completeness score.
+- Final utility should be judged after semantic closure.
+- Obligation geometry can recover some missed secondary modes, but cannot recover a genuine Phase0 false negative.
+- False-positive obligations are expensive because they multiply seed attempts and closure calls.
+- Identical semantic states must share System One decisions in causal policy A/B tests.
+- Quality must always be reported together with calls, tokens, wall time, and source-read cost.
 
-The project is now in **R08 Phase C: holdout generalization**. Estimator parameters are frozen before fresh files/tasks and full-read references are evaluated.
+## Current methodological frontier
 
-See `docs/research/2026-09-24-r08-online-posterior-generalization.md`.
+R18 showed that independent model variance can create fake policy wins around hard thresholds even when two policies have identical geometry and source state.
 
-## Historical baseline
+R19 therefore focuses on counterfactual-safe evaluation through a shared semantic-decision cache. Logical standalone policy cost and physical cached execution cost are reported separately.
 
-The earlier range runtime remains a useful historical control. It established that System One can act as a fast policy over bounded reads and terminate without a free-form ReAct loop. Later frontier experiments superseded its state representation as the active Phase0 design.
+## Current engineering priorities
 
-The older latency/quality benchmark, Stop reconciliation work, and blind evaluation remain valid historical evidence; they are not the current algorithm.
+### Evidence localization
 
-## Research thesis
+- finish counterfactual-safe policy comparison;
+- reduce closure calls through batching;
+- reduce tokens through boundary-window context;
+- stop Phase0 based on frontier/obligation stability;
+- improve genuine Phase0 false-negative recovery.
 
-> System One models are most useful as fast policies inside a harness that owns state, legal actions, effects, progressive disclosure, and durable observations.
+### File discovery
 
-The current question is narrower and testable: can a frozen sparse-observation posterior generalize across different code files and relevance shapes without using holdout references for tuning?
+- build a current repository-level System Two/reference benchmark;
+- define relevant-file coverage/precision metrics;
+- build a canonical progressive-disclosure runtime;
+- make file-level false positives visible as downstream localization cost.
 
-Canonical history: `docs/research/README.md`.
+## Benchmark stance
+
+The current benchmark corpus is intentionally small and version-pinned. R08/R15-R17 cases are mechanism data; R18 cases are fresh holdouts. Broader repositories, languages, and task classes are still required before generalization claims.
+
+See:
+
+- `../README.md`
+- `benchmark.md`
+- `research-path.md`
+- `domains/file-discovery.md`
+- `domains/evidence-localization.md`
+- `research/README.md`
