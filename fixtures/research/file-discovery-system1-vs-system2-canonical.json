@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-system1-vs-system2-canonical",
+  "canonical_run": 36107671466,
+  "subject": {
+    "repository": "BestNathan/nession",
+    "revision": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df"
+  },
+  "cases": 3,
+  "system_one": {
+    "method": "File Discovery V1: all supported file metadata -> independent Jev Noul -> score>=0.65 OR top-1% recall guard",
+    "mean_primary_recall": 1,
+    "mean_selected_files": 13.333333333333334,
+    "mean_model_calls": 18,
+    "mean_input_tokens": 210727.33333333334,
+    "mean_model_wall_time_ms": 6868.286996999981,
+    "mean_estimated_cost_usd": 0.008850548,
+    "pricing_snapshot": "2026-09-25 TypeSafe Jev: $0.042/1M input, output free"
+  },
+  "system_two": {
+    "method": "Claude Code read-only repository investigation with Read/Glob/Grep; source access allowed",
+    "actual_model": "deepseek-flash",
+    "mean_primary_recall": 1,
+    "mean_selected_files": 15.333333333333334,
+    "mean_tool_calls": 30.666666666666668,
+    "mean_duration_ms": 44675.666666666664,
+    "mean_provider_cost_usd": 0.7402056666666667,
+    "note": "provider cost is taken from Claude Code modelUsage for the configured ds environment; costBasis reported as unknown"
+  },
+  "ratios": {
+    "mean_provider_cost_ratio_system2_to_system1": 83.63387969498235,
+    "mean_wall_time_ratio_system2_to_system1": 6.504630148125825
+  },
+  "rows": [
+    {
+      "case_id": "backend_reconnect_lifecycle",
+      "domain": "backend networking / lifecycle",
+      "language": "Rust",
+      "primary_file": "crates/nession-agent/src/connection/server_client.rs",
+      "system_one": {
+        "recall": 1,
+        "selected_files": 18,
+        "model_calls": 18,
+        "input_tokens": 207014,
+        "wall_ms": 7160.433630999974,
+        "cost_usd": 0.008694588
+      },
+      "system_two": {
+        "recall": 1,
+        "selected_files": 18,
+        "tool_calls": 37,
+        "turns": 38,
+        "wall_ms": 58928,
+        "cost_usd": 1.194708,
+        "model": "deepseek-flash"
+      },
+      "cost_ratio": 137.40823601992415,
+      "wall_ratio": 8.22966918440253,
+      "file_jaccard": 0.2
+    },
+    {
+      "case_id": "filesystem_symlink_delete_safety",
+      "domain": "filesystem correctness / safety",
+      "language": "Rust",
+      "primary_file": "crates/nession-agent/src/fs/sandbox.rs",
+      "system_one": {
+        "recall": 1,
+        "selected_files": 11,
+        "model_calls": 18,
+        "input_tokens": 212584,
+        "wall_ms": 4080.4611319999885,
+        "cost_usd": 0.008928528
+      },
+      "system_two": {
+        "recall": 1,
+        "selected_files": 11,
+        "tool_calls": 29,
+        "turns": 30,
+        "wall_ms": 39584,
+        "cost_usd": 0.564302,
+        "model": "deepseek-flash"
+      },
+      "cost_ratio": 63.2021314151672,
+      "wall_ratio": 9.7008643678952,
+      "file_jaccard": 0.29411764705882354
+    },
+    {
+      "case_id": "frontend_request_correlation",
+      "domain": "frontend realtime messaging",
+      "language": "TypeScript",
+      "primary_file": "web/src/platform/socket/MessageRouter.ts",
+      "system_one": {
+        "recall": 1,
+        "selected_files": 11,
+        "model_calls": 18,
+        "input_tokens": 212584,
+        "wall_ms": 9363.96622799998,
+        "cost_usd": 0.008928528
+      },
+      "system_two": {
+        "recall": 1,
+        "selected_files": 17,
+        "tool_calls": 26,
+        "turns": 27,
+        "wall_ms": 35515,
+        "cost_usd": 0.461607,
+        "model": "deepseek-flash"
+      },
+      "cost_ratio": 51.700235469945326,
+      "wall_ratio": 3.792730466477295,
+      "file_jaccard": 0.5555555555555556
+    }
+  ],
+  "interpretation": [
+    "On these three frozen primary-target tasks both methods recovered every primary file.",
+    "System One achieved primary recovery without source access; System2 used iterative source search/read.",
+    "File-set overlap is descriptive only because supporting/context labels are not complete ground truth.",
+    "This establishes a cost/latency mechanism result, not broad generalization."
+  ]
+}
