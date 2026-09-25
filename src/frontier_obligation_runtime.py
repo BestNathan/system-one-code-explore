@@ -30,6 +30,9 @@ from multi_objective_evidence_acquisition import (
     partition_actions,
     read_tile,
 )
+from frontier_obligation_geometry import (
+    build_r15_hybrid_obligations,
+)
 
 
 DEFAULT_TILE_LINES = 32
@@ -429,6 +432,7 @@ def run(
     expansion_threshold=DEFAULT_EXPANSION_THRESHOLD,
     final_utility_threshold=DEFAULT_FINAL_UTILITY_THRESHOLD,
     max_anchor_tiles=DEFAULT_MAX_ANCHOR_TILES,
+    obligation_geometry="q75_components",
 ):
     source_lines = Path(source).read_text(
         encoding="utf-8",
@@ -438,11 +442,22 @@ def run(
     if len(source_lines) != int(frontier["line_count"]):
         raise ValueError("source/frontier line mismatch")
 
-    actions, obligations, geometry = build_frontier_obligations(
-        frontier,
-        tile_lines=tile_lines,
-        quantile=frontier_quantile,
-    )
+    if obligation_geometry == "q75_plus_multiscale_seed":
+        actions, obligations, geometry = build_r15_hybrid_obligations(
+            frontier,
+            tile_lines=tile_lines,
+        )
+    elif obligation_geometry == "q75_components":
+        actions, obligations, geometry = build_frontier_obligations(
+            frontier,
+            tile_lines=tile_lines,
+            quantile=frontier_quantile,
+        )
+        geometry["geometry"] = "q75_components"
+    else:
+        raise ValueError(
+            f"unknown obligation geometry: {obligation_geometry}"
+        )
     actions_by_id = {item["id"]: item for item in actions}
     ordered_ids = [item["id"] for item in actions]
 
@@ -631,6 +646,7 @@ def run(
                 final_utility_threshold
             ),
             "max_anchor_tiles_safety": int(max_anchor_tiles),
+            "obligation_geometry": obligation_geometry,
             "closure_rule": (
                 "closed iff need_before and need_after are both below "
                 "expansion threshold"
@@ -691,6 +707,14 @@ def main(argv=None):
         default=12,
     )
     parser.add_argument(
+        "--obligation-geometry",
+        choices=(
+            "q75_components",
+            "q75_plus_multiscale_seed",
+        ),
+        default="q75_components",
+    )
+    parser.add_argument(
         "--model",
         default=os.getenv("TYPESAFE_MODEL", "jev-latest"),
     )
@@ -724,6 +748,7 @@ def main(argv=None):
         expansion_threshold=args.expansion_threshold,
         final_utility_threshold=args.final_utility_threshold,
         max_anchor_tiles=args.max_anchor_tiles,
+        obligation_geometry=args.obligation_geometry,
     )
     Path(args.output).write_text(
         json.dumps(result, indent=2, ensure_ascii=False) + "\n",
