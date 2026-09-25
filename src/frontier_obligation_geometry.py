@@ -491,6 +491,61 @@ def mass_diverse(actions):
     }
 
 
+
+def ranges_overlap(a, b):
+    return not (int(a[1]) < int(b[0]) or int(b[1]) < int(a[0]))
+
+
+def q75_plus_secondary_peaks(
+    actions,
+    q75_obligations,
+    candidates,
+    *,
+    method,
+):
+    scores = tile_scores(actions)
+    median = quantile_threshold(scores, 0.50)
+    q75_ranges = [
+        tuple(item["tile_index_range"])
+        for item in q75_obligations
+    ]
+    ranges = list(q75_ranges)
+    added = []
+
+    for candidate in candidates:
+        peak = int(candidate["peak_index"])
+        basin = tuple(candidate["basin"])
+        if any(
+            ranges_overlap(basin, q75_range)
+            for q75_range in q75_ranges
+        ):
+            continue
+        if float(scores[peak]) + EPS < float(median):
+            continue
+        ranges.append((peak, peak))
+        added.append({
+            "peak_index": peak,
+            "peak": float(scores[peak]),
+            "basin": [int(basin[0]), int(basin[1])],
+        })
+
+    obligations = ranges_to_obligations(
+        ranges,
+        actions,
+        method,
+        metadata={
+            "base": "q75_components",
+            "secondary_width_tiles": 1,
+            "secondary_minimum_rank": "q50",
+        },
+    )
+    return obligations, {
+        "median_threshold": float(median),
+        "added_secondary_peaks": added,
+        "secondary_count": len(added),
+    }
+
+
 def reference_field(reference):
     n = int(reference["line_count"])
     field = [0.0] * n
@@ -604,6 +659,18 @@ def compare(reference, phase0_run, tile_lines=32):
     local, local_meta = local_prominence(actions)
     multiscale, multiscale_meta = multiscale_prominence(actions)
     mass, mass_meta = mass_diverse(actions)
+    hybrid_local, hybrid_local_meta = q75_plus_secondary_peaks(
+        actions,
+        q75,
+        local_meta["candidate_peaks"],
+        method="q75_plus_local_seed",
+    )
+    hybrid_multiscale, hybrid_multiscale_meta = q75_plus_secondary_peaks(
+        actions,
+        q75,
+        multiscale_meta["clusters"],
+        method="q75_plus_multiscale_seed",
+    )
 
     methods = {
         "q75_components": {
@@ -629,6 +696,14 @@ def compare(reference, phase0_run, tile_lines=32):
         "mass_diverse": {
             "obligations": mass,
             "metadata": mass_meta,
+        },
+        "q75_plus_local_seed": {
+            "obligations": hybrid_local,
+            "metadata": hybrid_local_meta,
+        },
+        "q75_plus_multiscale_seed": {
+            "obligations": hybrid_multiscale,
+            "metadata": hybrid_multiscale_meta,
         },
     }
 
