@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-large-repo-profile-diagnostic",
+  "source_run": 36109538329,
+  "primary_recall": {
+    "baseline_v1": 1.0,
+    "instruction_v2": 1.0,
+    "enriched_state_v3": 1.0
+  },
+  "by_repository": {
+    "nession": {
+      "baseline_v1": {"files":1096,"mean_selected":13.3333333333,"calls":18,"mean_input_tokens":210727.3333333333,"mean_cost_usd":0.008850548,"mean_wall_s":8.689705402,"mean_primary_rank":1.6666666667},
+      "instruction_v2": {"files":1096,"mean_selected":13.0,"calls":18,"mean_input_tokens":396743.3333333333,"mean_cost_usd":0.01666322,"mean_wall_s":9.6841782993,"mean_primary_rank":2.6666666667},
+      "enriched_state_v3": {"files":1096,"mean_selected":12.3333333333,"calls":18,"mean_input_tokens":533481.3333333334,"mean_cost_usd":0.022406216,"mean_wall_s":8.496677358,"mean_primary_rank":1.6666666667}
+    },
+    "codex": {
+      "baseline_v1": {"files":6277,"mean_selected":104.0,"calls":99,"mean_input_tokens":1196768.0,"mean_cost_usd":0.050264256,"mean_wall_s":33.4042009513,"mean_primary_rank":2.3333333333},
+      "instruction_v2": {"files":6277,"mean_selected":68.6666666667,"calls":99,"mean_input_tokens":2261937.0,"mean_cost_usd":0.095001354,"mean_wall_s":43.8261080033,"mean_primary_rank":3.3333333333},
+      "enriched_state_v3": {"files":6277,"mean_selected":66.0,"calls":99,"mean_input_tokens":3036249.0,"mean_cost_usd":0.127522458,"mean_wall_s":54.992262192,"mean_primary_rank":2.0}
+    },
+    "openclaw": {
+      "baseline_v1": {"files":43748,"mean_selected":457.0,"calls":684,"mean_input_tokens":8479545.666666666,"mean_cost_usd":0.356140918,"mean_wall_s":332.6475254537,"mean_primary_rank":4.0},
+      "instruction_v2": {"files":43748,"mean_selected":460.3333333333,"calls":684,"mean_input_tokens":15903053.666666666,"mean_cost_usd":0.667928254,"mean_wall_s":364.3481069257,"mean_primary_rank":3.3333333333},
+      "enriched_state_v3": {"files":43748,"mean_selected":453.3333333333,"calls":684,"mean_input_tokens":20561234.666666668,"mean_cost_usd":0.863571856,"mean_wall_s":311.109471533,"mean_primary_rank":3.0}
+    }
+  },
+  "diagnostic_findings": [
+    "All 27 System One profile/case runs recovered the frozen primary target.",
+    "instruction_v2 materially reduced Codex candidate count (104 -> 68.7) but nearly doubled input tokens because the shared decision contract was repeated inside every file question.",
+    "enriched_state_v3 improved the Nession sandbox target from 0.53 to 0.67, moving it from relative-guard-only to absolute-threshold selection.",
+    "On OpenClaw, semantic enrichment did not materially reduce selected-file count but increased token cost from about $0.356/task baseline to $0.864/task.",
+    "OpenClaw all-file scoring remained cheaper than the frozen System2 reference on observed provider cost, but 684 sequential Jev requests made it slower than System2.",
+    "Next profile should preserve enriched semantics while moving shared instructions from each question into batch-level state."
+  ]
+}
