@@ -39,7 +39,9 @@ that changes our understanding should be linked from a research record.
 | R06 | [Whole-file probability frontier](2026-09-24-r06-whole-file-probability-frontier.md) | baseline | Phase0 should reconstruct a file-length relevance distribution from sparse observations. |
 | R07 | [Posterior reconstruction](2026-09-24-r07-posterior-reconstruction.md) | completed | Path-independent posterior reconstruction recovers much more of the local System One signal than sequential propagation. |
 | R08 | [Online posterior feedback and holdout generalization](2026-09-24-r08-online-posterior-generalization.md) | completed | Single-fixture relevance gains did not generalize to search; support-derived uncertainty collapsed in sparse unread regions and degraded probe selection. |
-| R09 | [Uncertainty calibration and search policy](2026-09-24-r09-uncertainty-calibration-search-policy.md) | current | Keep multi-scale relevance fixed, decouple exploration uncertainty from adaptive-kernel support, and validate search on fresh holdouts. |\n| R10 | [Phase0 to final evidence quality](2026-09-25-r10-final-evidence-quality.md) | completed baseline | Phase0 already yields concentrated concrete evidence, but the fixed top-score selector still retains meaningful false positives. |\n| R11 | [System One relevance prompt calibration](2026-09-25-r11-system-one-prompt-calibration.md) | current parallel — Phase C | Hard negatives exposed 64-line→8-line label leakage; Phase C uses a full-read teacher to score exact micro-targets before comparing System One prompts. |
+| R09 | [Uncertainty calibration and search policy](2026-09-24-r09-uncertainty-calibration-search-policy.md) | current | Keep multi-scale relevance fixed, decouple exploration uncertainty from adaptive-kernel support, and validate search on fresh holdouts. |
+| R10 | [Phase0 to final evidence quality](2026-09-25-r10-final-evidence-quality.md) | completed baseline | Phase0 already yields concentrated concrete evidence, but the fixed top-score selector still retains meaningful false positives. |
+| R11 | [System One relevance prompt calibration](2026-09-25-r11-system-one-prompt-calibration.md) | current parallel — Phase C | Hard negatives exposed 64-line→8-line label leakage; Phase C uses a full-read teacher to score exact micro-targets before comparing System One prompts. |
 
 ## Current research architecture
 
@@ -85,3 +87,6 @@ During the research phase:
   workflow artifacts;
 - external benchmark/reference provenance should still be pinned by repository,
   revision, workflow run, and model/runtime configuration.
+
+| R16 | [Frontier obligation geometry](2026-09-25-r16-frontier-obligation-geometry.md) | completed diagnosis | Prominence recovers secondary modes, but wide basins are too broad; narrow persistent multiscale seeds are the promoted mechanism candidate. |
+| R17 | [Hybrid obligations end-to-end](2026-09-25-r17-hybrid-obligations-end-to-end.md) | completed diagnosis | Narrow persistent secondary peaks can become retained evidence, especially on sequential Phase0, but add false-positive/cost overhead and need fresh validation. |
