@@ -64,11 +64,30 @@ Prefer:
 
 ## Current status
 
-This domain is less mature than in-file evidence localization.
+This domain now has a mechanically converged V1 architecture.
 
-Historical work established useful constraints: directory/file Noul scoring can create a coarse boundary; recursively reintroducing descendants defeats prior decisions; and false-positive files directly multiply downstream cost.
+Historical work plus the V1 convergence gate established a stronger conclusion:
 
-What is still missing is a current canonical runtime and a strong repository-level System Two reference benchmark.
+- semantic directory pruning is not recall-safe because relevant descendants can sit under low-scoring generic parents;
+- the Harness should mechanically enumerate supported file metadata;
+- System One should independently score files, not directories;
+- high-confidence absolute selection is augmented by a small relative recall guard;
+- source bodies remain outside File Discovery.
+
+Canonical V1:
+
+```text
+all supported file metadata
+  -> independent Noul score per file
+  -> score >= 0.65 OR top-1% relative guard
+  -> RelevantFile[]
+```
+
+On the frozen six-case primary-target suite, two repeats recovered all 12/12 targets. Average cost was 18 model calls, ~212k input tokens, and 6.6s model wall time per task on a 1,096-file repository.
+
+See [File Discovery V1 convergence](file-discovery-v1.md).
+
+What remains missing is a broader repository-level reference benchmark with complete primary/supporting labels.
 
 ## Benchmark requirements
 
