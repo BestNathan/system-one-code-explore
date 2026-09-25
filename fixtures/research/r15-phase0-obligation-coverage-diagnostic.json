@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "kind": "r15-phase0-obligation-coverage-diagnostic",
+  "canonical_run": 36077460697,
+  "source_phase0_run": 36004833542,
+  "finding": "R15 resolves every obligation deterministically, but hidden high-value regions can remain uncovered when Phase0 relevance does not expose them as a top-quartile mode.",
+  "fullstack": {
+    "sequential_repeat_1": {
+      "q75": 0.4873,
+      "hidden_core_449_544_tile_relevance": [0.355, 0.324, 0.312],
+      "hidden_core_609_832_tile_relevance": [0.377, 0.371, 0.349, 0.372, 0.374, 0.43, 0.458],
+      "result": "no retained evidence; both core regions lacked obligations"
+    },
+    "sequential_repeat_2": {
+      "q75": 0.4467,
+      "hidden_core_449_544_tile_relevance": [0.396, 0.362, 0.358],
+      "hidden_core_609_832_tile_relevance": [0.33, 0.256, 0.222, 0.237, 0.256, 0.325, 0.407],
+      "result": "no retained evidence; both core regions lacked obligations"
+    },
+    "multi_repeat_1": {
+      "q75": 0.5526,
+      "hidden_core_609_832_tile_relevance": [0.606, 0.613, 0.609, 0.611, 0.611, 0.6, 0.584],
+      "result": "obligation 545-896 satisfied; retained region 641-1024, final utility 0.65"
+    },
+    "multi_repeat_2": {
+      "q75": 0.4849,
+      "hidden_core_609_832_tile_relevance": [0.49, 0.485, 0.475, 0.504, 0.527, 0.52, 0.499],
+      "result": "two core obligations satisfied; retained anchors from 641-1024 and 769-1024"
+    }
+  },
+  "reconnect_example": {
+    "sequential_repeat_1": {
+      "obligations": 4,
+      "satisfied": 2,
+      "exhausted": 2,
+      "retained_lines": 320,
+      "retained_cc_mean": 0.86,
+      "retained_high_precision": 1.0,
+      "retained_high_recall": 0.3333
+    }
+  },
+  "interpretation": [
+    "Hard obligation state prevents evidence-sufficiency collapse.",
+    "Directional closure avoids R13 giant merged-region runaway.",
+    "Post-closure utility successfully rejects some Phase0 false-positive regions.",
+    "Coverage cannot recover a task-relevant region that Phase0 does not expose as an obligation candidate.",
+    "The next geometry study should compare top-quantile connected components with local-mode/prominence obligations using Phase0 only, then validate on fresh holdouts."
+  ]
+}
