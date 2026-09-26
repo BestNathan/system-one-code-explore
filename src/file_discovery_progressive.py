@@ -360,7 +360,8 @@ def aggregate(args):
     for path in sorted(root.glob("**/call-manifest.json")):
         manifest = json.loads(path.read_text(encoding="utf-8"))
         inventory.append({"name": str(path.relative_to(root)), "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest", "retention_days": 90, "physical_calls": manifest.get("physical_calls", 0), "complete": manifest.get("complete", False)})
-    inventory.append({"name": f"issue13-progressive-report-{args.run_id}", "purpose": "Aggregate metrics, Workflow metadata and experiment report", "retention_days": 90})
+    artifact_run_id = args.report_run_id or args.run_id
+    inventory.append({"name": f"issue13-aggregate-{artifact_run_id}", "purpose": "Aggregate metrics, Workflow metadata and experiment report", "retention_days": 90})
     (output / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     metadata = {"workflow_url": args.run_url, "run_id": args.run_id,
                 "commit_sha": args.commit,

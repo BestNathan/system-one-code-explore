@@ -113,6 +113,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: issue13-progressive-report-${{ github.run_id }}
+          name: issue13-aggregate-${{ github.run_id }}
           path: artifacts/report/
           retention-days: 90

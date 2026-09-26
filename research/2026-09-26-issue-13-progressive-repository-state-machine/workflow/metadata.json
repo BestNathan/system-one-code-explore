@@ -1,8 +1,147 @@
 {
-  "workflow_url": null,
-  "run_id": null,
-  "commit_sha": null,
-  "status": "pending",
-  "jobs": {},
-  "artifacts": []
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36253022973",
+  "run_id": "36253022973",
+  "commit_sha": "a52eedc18b5339efc36fb83f9fba1572bac3e41c",
+  "status": "success",
+  "report_workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36253471860",
+  "report_workflow_run_id": "36253471860",
+  "jobs": {
+    "validate": "success",
+    "experiment": "success",
+    "source_report": "failure",
+    "report": "success"
+  },
+  "artifacts": [
+    {
+      "name": "issue13-progressive-codex/codex_approval_routing/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 15,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-codex/codex_approval_routing/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 18,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-codex/codex_mcp_tool_approval/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 38,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-codex/codex_mcp_tool_approval/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 30,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-codex/codex_thread_resume_persistence/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 14,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-codex/codex_thread_resume_persistence/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 23,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_backend_reconnect_lifecycle/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 2,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_backend_reconnect_lifecycle/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 8,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_filesystem_symlink_delete_safety/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 1,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_filesystem_symlink_delete_safety/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 3,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_frontend_request_correlation/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 1,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-nession/nession_frontend_request_correlation/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 8,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_gateway_ws_dispatch/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 124,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_gateway_ws_dispatch/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 151,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_memory_hybrid_search/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 22,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_memory_hybrid_search/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 135,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_skill_source_precedence/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 72,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-openclaw/openclaw_skill_source_precedence/progressive/call-manifest.json",
+      "purpose": "Immutable raw System One calls, retries, outcomes and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 90,
+      "complete": true
+    },
+    {
+      "name": "issue13-progressive-report-36253022973",
+      "purpose": "Aggregate metrics, Workflow metadata and experiment report",
+      "retention_days": 90
+    }
+  ]
 }

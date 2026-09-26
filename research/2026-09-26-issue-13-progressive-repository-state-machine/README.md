@@ -12,15 +12,22 @@ Compare two uncapped arms on the same nine task/revision pairs: (A) semantic wei
 
 ## Experiment Process
 
-The design was registered before execution on `main`. GitHub Actions will run tests, verify the three pinned revisions, execute both arms, and upload raw request/response/retry/error JSONL plus checksums. Progressive-state checkpoints are written after each complete wave so failures preserve the last known deferred frontier. Workflow-only execution is required. The report must distinguish scheduler exhaustion from semantic completion and preserve failures or missing jobs. Current status: preregistered; Workflow run pending.
+The design was registered and run on `main`. Validation and all three repository jobs passed in [experiment Workflow 36253022973](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253022973). Its report job initially failed because aggregate mode incorrectly required a repository argument. [Aggregation Workflow 36253471860](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253471860) reused the three uploaded repository artifacts; no model calls were repeated. Progressive-state checkpoints were written after each complete wave. All 18 arm-level call manifests are complete and retained in the source Workflow artifacts for 90 days. The final experiment status is complete; the acceptance gate failed.
 
 ## Experiment Data
 
 - Frozen task labels and repository revisions: [`data/cases.json`](data/cases.json).
 - Frozen thresholds, model profile, concurrency, and constraints: [`data/design.json`](data/design.json).
-- Workflow metadata and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json), to be populated from the aggregate Workflow artifact.
-- Per-task raw calls, results, and SHA-256 manifests are retained in the repository-specific Workflow artifacts for 90 days. The aggregate summary and report are retained for 90 days. Every artifact is inventoried in `workflow/metadata.json` after the run.
+- Frozen arm-level metrics and p50/p95 state sizes: [`data/summary.json`](data/summary.json).
+- Workflow metadata and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json).
+- Per-task raw calls, retries, outcomes, and SHA-256 manifests are retained in the repository-specific Workflow artifacts for 90 days. The aggregate summary and report are retained in artifact `issue13-aggregate-36253471860` for 90 days. Every artifact is inventoried in `workflow/metadata.json`.
 
 ## Experiment Results
 
-Pending GitHub Actions execution. No result is claimed before the Workflow artifacts are inspected.
+The progressive arm recovered 6/9 primary targets, below the flat/path baseline's 8/9. It reduced file decisions in Nession (33 vs. 47 mean) and Codex (806 vs. 1,400), but directory decisions erased much of the total-state reduction: Nession averaged 58 visible nodes versus 47, while Codex averaged 1,025 versus 1,400 and missed the approval target under a deferred `codex-rs/core/src/tools` frontier. Nession also missed two targets beneath deferred frontiers.
+
+OpenClaw failed the scale gate. The flat/path baseline averaged 4,632 scored files; progressive disclosure averaged 7,414 file decisions plus 303 directory decisions, for 7,716 visible nodes. Its input-token mean rose from 796k to 1.37m. Although it recovered all three OpenClaw targets, it scored more files and consumed more tokens. Across all nine cases, state size had p50 994, p95 9,366, and maximum 9,366 nodes.
+
+No ancestor was irreversibly pruned by implementation. However, unresolved directories remained at scheduler exhaustion, and three targets were missed behind those deferred frontiers. Keeping a node deferred prevents permanent deletion, but does not guarantee recall if the run stops without revisiting it. This policy therefore fails the 9/9 recall and large-repository reduction gates and should not replace the path baseline. Treat the comparison as a one-repeat diagnostic: semantic decisions were not shared between arms, so batch-dependent model noise remains a limitation.
+
+Next research should turn path-retrieval hits and other grounded evidence into explicit durable expansion obligations, with deferred ancestors revisited when an obligation lies below them. Measure directory decisions and total model-visible state against the path baseline before tuning thresholds.
