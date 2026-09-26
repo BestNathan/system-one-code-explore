@@ -71,6 +71,13 @@ candidate reduction, tested separately before composition:
 All execution belongs in GitHub Actions, with a research report for every run.
 See the [algorithm scaling research plan](docs/research/2026-09-25-file-discovery-algorithm-scaling-plan.md).
 
+The first three-repository diagnostic found that four concurrent requests cut
+full-scoring wall time by 3.44–4.02x. Lexical retrieval missed two of nine
+primary targets; hierarchy recovered one but introduced hundreds to thousands
+of module decisions, and same-directory expansion inflated candidates. The next
+iteration targets path abbreviation/compound normalization and removes root
+summary pruning. See the [results](docs/research/2026-09-26-file-discovery-scaling-results.md).
+
 ## Milestone 4 — End-to-end localization
 
 Compose:

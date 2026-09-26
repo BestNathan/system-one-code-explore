@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-uncapped-scaling-v1-summary",
+  "source_run": 36155715068,
+  "code_commit": "ebe7e0748c78704a061f177a2746efde21657ae9",
+  "model_response_version": "jev-1.13.0",
+  "experiment_units": 54,
+  "successful_units": 54,
+  "candidate_count_cap": null,
+  "concurrency": {
+    "workers": 4,
+    "mean_speedup_by_repository": {
+      "BestNathan/nession": 3.4423347758,
+      "openai/codex": 4.0186251308,
+      "openclaw/openclaw": 3.9223598207
+    },
+    "retry_events": 74,
+    "units_with_retries": 25,
+    "rate_limit_retry_events": 0
+  },
+  "mean_results": {
+    "BestNathan/nession": {
+      "lexical": {"primary_recall": 0.6666666667, "scored_files": 26.6666666667, "route_decisions": 0, "logical_input_tokens": 5251},
+      "hierarchy": {"primary_recall": 0.6666666667, "scored_files": 97.6666666667, "route_decisions": 65.6666666667, "logical_input_tokens": 69332.6666666667},
+      "hybrid_cold": {"primary_recall": 0.6666666667, "scored_files": 129.0, "route_decisions": 72.0, "logical_input_tokens": 82236.3333333333}
+    },
+    "openai/codex": {
+      "lexical": {"primary_recall": 1.0, "scored_files": 1357.6666666667, "route_decisions": 0, "logical_input_tokens": 260792},
+      "hierarchy": {"primary_recall": 1.0, "scored_files": 2663.0, "route_decisions": 534.6666666667, "logical_input_tokens": 1004540.3333333334},
+      "hybrid_cold": {"primary_recall": 1.0, "scored_files": 3203.3333333333, "route_decisions": 531.3333333333, "logical_input_tokens": 1105123}
+    },
+    "openclaw/openclaw": {
+      "lexical": {"primary_recall": 0.6666666667, "scored_files": 2324.6666666667, "route_decisions": 0, "logical_input_tokens": 456163.6666666667},
+      "hierarchy": {"primary_recall": 1.0, "scored_files": 7072.0, "route_decisions": 1398.0, "logical_input_tokens": 2529199},
+      "hybrid_cold": {"primary_recall": 1.0, "scored_files": 14512.6666666667, "route_decisions": 1377.3333333333, "logical_input_tokens": 3965193.6666666665}
+    }
+  },
+  "primary_target_misses": [
+    {"case_id": "nession_filesystem_symlink_delete_safety", "policies": ["lexical", "hierarchy", "hybrid"], "stage": "candidate_discovery"},
+    {"case_id": "openclaw_gateway_ws_dispatch", "policies": ["lexical"], "stage": "candidate_discovery"}
+  ]
+}

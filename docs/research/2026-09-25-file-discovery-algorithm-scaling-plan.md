@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-状态：研究方案，尚未实施或运行；本文没有新增实验结果。
+状态：首轮诊断已完成。结果见 [三仓库首轮报告](2026-09-26-file-discovery-scaling-results.md)，Workflow 为 [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068)。
 
 承接 [大仓库扩展性诊断](file-discovery-large-repo-scaling-diagnosis.md)，研究如何在保持相关文件召回的同时，通过算法减少参与 System One 打分的文件和目录，并并发执行独立请求。
 
