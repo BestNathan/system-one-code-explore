@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -117,6 +120,7 @@ class SystemOneDecider:
         self.trace = trace
         self.endpoint = endpoint
         self.model = model
+        self._call_context = threading.local()
 
     def request(self, payload):
         body = json.dumps(payload).encode()
@@ -136,40 +140,71 @@ class SystemOneDecider:
                 if not retryable or attempt == MAX_REQUEST_ATTEMPTS - 1:
                     raise RuntimeError(f"TypeSafe HTTP {exc.code}: {detail[:2000]}") from exc
                 delay = 2 ** attempt
-                self.trace.emit("system_one_retry", status=exc.code, attempt=attempt + 1, delay_seconds=delay)
+                self.trace.emit("system_one_retry", call_id=getattr(self._call_context, "call_id", None),
+                                request_hash=getattr(self._call_context, "request_hash", None),
+                                status=exc.code, attempt=attempt + 1, delay_seconds=delay)
                 time.sleep(delay)
             except urllib.error.URLError as exc:
                 if attempt == MAX_REQUEST_ATTEMPTS - 1:
                     raise RuntimeError(f"TypeSafe transport error: {exc}") from exc
                 delay = 2 ** attempt
-                self.trace.emit("system_one_retry", status="transport", attempt=attempt + 1, delay_seconds=delay)
+                self.trace.emit("system_one_retry", call_id=getattr(self._call_context, "call_id", None),
+                                request_hash=getattr(self._call_context, "request_hash", None),
+                                status="transport", attempt=attempt + 1, delay_seconds=delay)
                 time.sleep(delay)
 
     def send(self, stage, state, questions):
         payload = {"state": state, "model": self.model, "questions": questions}
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        request_hash = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        call_id = "call-" + uuid.uuid4().hex
+        self._call_context.call_id = call_id
+        self._call_context.request_hash = request_hash
         self.trace.emit(
             "system_one_request",
+            call_id=call_id,
+            request_hash=request_hash,
             stage=stage,
             request_bytes=len(json.dumps(payload, ensure_ascii=False).encode("utf-8")),
             question_count=len(questions),
             request=payload,
         )
         started = time.perf_counter()
-        response = self.request(payload)
+        try:
+            response = self.request(payload)
+        except Exception as exc:
+            self.trace.emit(
+                "system_one_error",
+                call_id=call_id,
+                request_hash=request_hash,
+                stage=stage,
+                latency_ms=round((time.perf_counter() - started) * 1000, 3),
+                error_type=type(exc).__name__,
+                message=str(exc),
+            )
+            raise
+        finally:
+            self._call_context.call_id = None
+            self._call_context.request_hash = None
         latency_ms = round((time.perf_counter() - started) * 1000, 3)
         raw_usage = response.get("usage", {})
         self.trace.emit(
             "system_one_response",
+            call_id=call_id,
+            request_hash=request_hash,
             stage=stage,
             latency_ms=latency_ms,
             model=response.get("model"),
             usage=raw_usage,
             answers=response.get("answers", {}),
+            response=response,
         )
         return response, {
             "model_calls": 1,
             "input_tokens": int(raw_usage.get("input_tokens", 0) or 0),
             "output_tokens": int(raw_usage.get("output_tokens", 0) or 0),
+            "call_id": call_id,
+            "request_hash": request_hash,
         }
 
     def score_candidates(self, query, stage, candidates):
