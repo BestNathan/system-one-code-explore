@@ -165,6 +165,16 @@ class ScalingTests(unittest.TestCase):
         self.assertGreaterEqual(counts[1], counts[2])
         self.assertIn("src/fs/area1/opaque.py", frontier[0]["paths"])
 
+    def test_primary_safe_frontier_uses_exact_minimum_target_score(self):
+        from file_discovery_adaptive import semantic_weighted_primary_safe_frontier
+        items = [candidate("src/fs/sandbox.py"), candidate("src/fs/other.py"),
+                 candidate("unrelated/item.py")]
+        frontier = semantic_weighted_primary_safe_frontier(
+            items, "filesystem symlink delete safety", ["src/fs/sandbox.py"])
+        self.assertEqual(frontier["primary_recall"], 1.0)
+        self.assertIn("src/fs/sandbox.py", frontier["candidate_paths"])
+        self.assertEqual(frontier["threshold"], frontier["primary_scores"]["src/fs/sandbox.py"])
+
     def test_provenance_rescue_replaces_repository_wide_relative_guard(self):
         from file_discovery_selection import select_relevant
         selected, metadata = select_relevant(

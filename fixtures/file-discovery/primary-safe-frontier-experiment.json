@@ -1,0 +1,11 @@
+{
+  "experiment": "exact-primary-safe-weighted-frontier-v6",
+  "required_primary_recall": 1.0,
+  "openclaw_mean_candidate_target": 2000,
+  "notes": [
+    "Zero-model analysis computes each task's minimum primary-file weighted score, then counts every repository path at or above that exact threshold.",
+    "For a single scalar score threshold, this is the smallest candidate set that preserves every labeled primary target.",
+    "No candidate-count cap, top-k truncation, or model request is used.",
+    "This is an exact diagnostic bound over the frozen primary labels, not a generalization claim or production threshold recommendation."
+  ]
+}
