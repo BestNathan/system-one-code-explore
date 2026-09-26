@@ -1,0 +1,96 @@
+name: File Discovery — Exact Primary-Safe Frontier
+
+on:
+  push:
+    branches: [main]
+    paths: [fixtures/file-discovery/primary-safe-frontier-experiment.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: file-discovery-primary-safe-frontier
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run tests before analysis
+        run: python3 -m unittest discover -s tests -v
+
+  analyze:
+    needs: validate
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - slug: nession
+            repository: BestNathan/nession
+            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+          - slug: codex
+            repository: openai/codex
+            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
+          - slug: openclaw
+            repository: openclaw/openclaw
+            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.revision }}
+          path: subject
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compute exact primary-safe thresholds
+        run: |
+          test "$(git -C subject rev-parse HEAD)" = "${{ matrix.revision }}"
+          python3 src/file_discovery_primary_safe_frontier.py \
+            --root subject --repository '${{ matrix.repository }}' \
+            --output-dir artifacts/${{ matrix.slug }} \
+            --run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          cat artifacts/${{ matrix.slug }}/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fd-primary-safe-${{ matrix.slug }}
+          path: artifacts/${{ matrix.slug }}/
+          retention-days: 90
+          if-no-files-found: warn
+
+  report:
+    if: always()
+    needs: [validate, analyze]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: fd-primary-safe-*
+          path: artifacts/raw
+      - name: Aggregate exact candidate minima
+        run: |
+          python3 src/file_discovery_primary_safe_frontier.py \
+            --aggregate artifacts/raw --output-dir artifacts/report \
+            --run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          cat artifacts/report/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fd-primary-safe-report-${{ github.run_id }}
+          path: artifacts/report/
+          retention-days: 90

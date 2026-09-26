@@ -197,6 +197,34 @@ def semantic_weighted_threshold_frontier(candidates, query, thresholds):
     return rows
 
 
+def semantic_weighted_primary_safe_frontier(candidates, query, primary_paths):
+    """Return the minimum score-threshold set that retains every labeled target."""
+    evidence = semantic_weighted_evidence(candidates, query, include_ineligible=True)
+    primary = sorted(set(primary_paths))
+    primary_scores = {path: evidence[path]["weighted_score"]
+                      for path in primary if path in evidence}
+    missing = sorted(set(primary) - primary_scores.keys())
+    if missing:
+        threshold = None
+        selected = set()
+    else:
+        threshold = min(primary_scores.values()) if primary_scores else None
+        selected = {path for path, item in evidence.items()
+                    if item["weighted_score"] >= threshold} if threshold is not None else set()
+    recovered = set(primary) & selected
+    return {
+        "threshold": threshold,
+        "candidate_count": len(selected),
+        "candidate_paths": sorted(selected),
+        "primary_scores": primary_scores,
+        "primary_target_count": len(primary),
+        "recovered_primary_count": len(recovered),
+        "primary_recall": len(recovered) / len(primary) if primary else 1.0,
+        "missing_primary": sorted(set(primary) - recovered),
+        "score_by_path": {path: item["weighted_score"] for path, item in evidence.items()},
+    }
+
+
 def build_tree(candidates, fanout=32):
     """Virtual grouping is a representation width; every child is retained."""
     raw = {"dirs": {}, "files": [], "prefix": "."}
