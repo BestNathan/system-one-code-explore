@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-semantic-routing-v2-summary",
+  "source_run": 36213648492,
+  "code_commit": "919aa70b13756105446c7914e6fe626796cd7a4d",
+  "model_response_version": "jev-1.13.0",
+  "experiment_units": 36,
+  "successful_units": 36,
+  "candidate_count_cap": null,
+  "candidate_primary_recall": 1.0,
+  "final_primary_recall": 0.8888888889,
+  "failed_final_case": {
+    "case_id": "nession_filesystem_symlink_delete_safety",
+    "path": "crates/nession-agent/src/fs/sandbox.rs",
+    "score": 0.53,
+    "failure_stage": "relative_guard_selection"
+  },
+  "semantic_lexical_means": {
+    "BestNathan/nession": {"primary_candidate_recall": 1.0, "primary_final_recall": 0.6666666667, "scored_files": 258.3333333333, "route_decisions": 0, "logical_input_tokens": 49750},
+    "openai/codex": {"primary_candidate_recall": 1.0, "primary_final_recall": 1.0, "scored_files": 1357.6666666667, "route_decisions": 0, "logical_input_tokens": 260792},
+    "openclaw/openclaw": {"primary_candidate_recall": 1.0, "primary_final_recall": 1.0, "scored_files": 2654.6666666667, "route_decisions": 0, "logical_input_tokens": 520432}
+  },
+  "research_decisions": [
+    "retain semantic lexical retrieval for the next comparison",
+    "stop the current hierarchy V2 line because directory cost did not improve",
+    "stop adaptive V2 because union cost increased without primary-recall gain",
+    "replay selection using the original enumerated population for the relative guard"
+  ]
+}

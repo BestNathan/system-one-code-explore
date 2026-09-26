@@ -46,6 +46,7 @@ Rxx IDs are chronological experiments, not the architecture.
 - [Large-repository scaling diagnosis](file-discovery-large-repo-scaling-diagnosis.md) — observed all-file scoring and corrected System2 cost interpretation.
 - [Algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md) — uncapped research design for retrieval, adaptive routing, and independent-request concurrency.
 - [Three-repository scaling results](2026-09-26-file-discovery-scaling-results.md) — four concurrent requests reduced full-scoring latency by 3.44–4.02×; lexical retrieval was cheapest but missed 2/9 targets, hierarchy retained 8/9 while adding substantial directory cost, and same-directory rescue was rejected.
+- [Semantic path and root-safe routing V2](2026-09-26-file-discovery-semantic-routing-v2-results.md) — semantic aliases recovered 9/9 targets into the candidate set; final selection remained 8/9 because candidate reduction incorrectly shrank the relative recall guard. Hierarchy and adaptive union were rejected on directory/token cost.
 
 ## Current conceptual architecture
 

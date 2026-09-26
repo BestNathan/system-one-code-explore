@@ -78,6 +78,13 @@ of module decisions, and same-directory expansion inflated candidates. The next
 iteration targets path abbreviation/compound normalization and removes root
 summary pruning. See the [results](docs/research/2026-09-26-file-discovery-scaling-results.md).
 
+The second diagnostic recovered all 9/9 primary targets into the candidate set.
+It exposed a downstream selection bug: the top-1% recall guard was recomputed
+from the reduced candidate set instead of the original repository population.
+The next step is a zero-model replay with stable selection semantics. Current
+hierarchy/adaptive routing is paused because its directory and token cost did
+not beat semantic path retrieval. See the [V2 results](docs/research/2026-09-26-file-discovery-semantic-routing-v2-results.md).
+
 ## Milestone 4 — End-to-end localization
 
 Compose:
