@@ -268,6 +268,46 @@ class ScalingTests(unittest.TestCase):
         self.assertEqual(event["request_hash"], "sha256:request")
         self.assertTrue(event["logical_call_id"].startswith("logical-"))
 
+    def test_shared_system_one_client_owns_the_call_contract(self):
+        spec = importlib.util.find_spec("system_one_client")
+        self.assertIsNotNone(spec, "missing shared System One client")
+        from system_one_client import SystemOneClient
+
+        class RecordingTrace:
+            def __init__(self):
+                self.events = []
+
+            def emit(self, event, **data):
+                self.events.append({"event": event, **data})
+
+        trace = RecordingTrace()
+        client = SystemOneClient("secret", trace, model="pinned-model")
+        response, usage = client.call(
+            "test_stage", {"goal": "find target"}, {"q": {"type": "noul"}},
+            transport=lambda payload: {
+                "id": "response-1", "model": payload["model"],
+                "answers": {"q": {"type": "noul", "noul": 0.8}},
+                "usage": {"input_tokens": 5, "output_tokens": 1},
+            },
+        )
+        self.assertEqual(response["id"], "response-1")
+        self.assertEqual(usage["model_calls"], 1)
+        self.assertEqual(trace.events[0]["event"], "system_one_request")
+        self.assertEqual(trace.events[-1]["event"], "system_one_response")
+
+    def test_system_one_decider_delegates_to_shared_client(self):
+        from system_one_code_locator import SystemOneDecider, Trace
+        from system_one_client import SystemOneClient
+
+        decider = SystemOneDecider("secret", Trace(None))
+        self.assertIsInstance(getattr(decider, "client", None), SystemOneClient)
+
+    def test_shared_client_is_the_only_http_transport_boundary(self):
+        source_root = Path(__file__).resolve().parents[1] / "src"
+        offenders = sorted(path.name for path in source_root.glob("*.py")
+                           if "urllib.request" in path.read_text(encoding="utf-8"))
+        self.assertEqual(offenders, ["system_one_client.py"])
+
 
 class ScalingReportTests(unittest.TestCase):
     def test_report_preserves_failed_arm_and_expected_count(self):
