@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-26",
+  "run": {
+    "database_id": 36229213515,
+    "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515",
+    "display_title": "research: test weighted file retrieval and provenance rescue",
+    "event": "push",
+    "branch": "main",
+    "head_sha": "e86e927c2a5d9fb281bd3d3925bb13761de25832",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-09-26T08:15:03Z",
+    "completed_at": "2026-09-26T08:17:38Z",
+    "jobs": [
+      {
+        "database_id": 108369029296,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515/job/108369029296"
+      },
+      {
+        "database_id": 108369050647,
+        "name": "experiment (nession)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515/job/108369050647"
+      },
+      {
+        "database_id": 108369050622,
+        "name": "experiment (codex)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515/job/108369050622"
+      },
+      {
+        "database_id": 108369050659,
+        "name": "experiment (openclaw)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515/job/108369050659"
+      },
+      {
+        "database_id": 108369365388,
+        "name": "report",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515/job/108369365388"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "fd-scaling-nession",
+      "purpose": "Nine Nession task/arm outputs including raw model calls, manifests, metrics, and report.",
+      "size_bytes": 141917,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:15:03Z"
+    },
+    {
+      "name": "fd-scaling-codex",
+      "purpose": "Nine Codex task/arm outputs including raw model calls, manifests, metrics, and report.",
+      "size_bytes": 1056586,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:15:03Z"
+    },
+    {
+      "name": "fd-scaling-openclaw",
+      "purpose": "Nine OpenClaw task/arm outputs including raw model calls, manifests, metrics, and report.",
+      "size_bytes": 2887651,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:15:03Z"
+    },
+    {
+      "name": "fd-scaling-report-36229213515",
+      "purpose": "Aggregate experiment JSON and Markdown report for all three repositories and 27 units.",
+      "size_bytes": 12567,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:15:03Z"
+    }
+  ]
+}

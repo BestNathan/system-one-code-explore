@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "experiment": "concept-weighted-retrieval-provenance-rescue-v3",
+  "workflow_run_id": 36229213515,
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515",
+  "code_sha": "e86e927c2a5d9fb281bd3d3925bb13761de25832",
+  "units": 27,
+  "successful_units": 27,
+  "physical_system_one_calls": 497,
+  "directory_model_decisions": 0,
+  "arms": {
+    "semantic_lexical_stable_c4": {
+      "primary_recall": 1.0,
+      "mean_scored_files": 1423.56,
+      "mean_selected_files": 181.89,
+      "mean_logical_input_tokens": 276991.22,
+      "physical_calls": 203
+    },
+    "semantic_weighted_stable_c4": {
+      "primary_recall": 0.8888888889,
+      "mean_scored_files": 2059.89,
+      "mean_selected_files": 185.89,
+      "mean_logical_input_tokens": 403468.56,
+      "physical_calls": 294
+    },
+    "semantic_weighted_rescue_c4": {
+      "primary_recall": 0.8888888889,
+      "mean_scored_files": 2059.89,
+      "mean_selected_files": 144.22,
+      "mean_logical_input_tokens": 403468.56,
+      "physical_calls": 0
+    }
+  },
+  "repository_means": {
+    "BestNathan/nession": {
+      "broad_candidate_recall": 1.0,
+      "broad_scored_files": 258.33,
+      "weighted_candidate_recall": 1.0,
+      "weighted_scored_files": 51.0,
+      "broad_input_tokens": 49749.67,
+      "weighted_input_tokens": 9962.0
+    },
+    "openai/codex": {
+      "broad_candidate_recall": 1.0,
+      "broad_scored_files": 1357.67,
+      "weighted_candidate_recall": 1.0,
+      "weighted_scored_files": 1400.0,
+      "broad_input_tokens": 260792.0,
+      "weighted_input_tokens": 269023.33
+    },
+    "openclaw/openclaw": {
+      "broad_candidate_recall": 1.0,
+      "broad_scored_files": 2654.67,
+      "weighted_candidate_recall": 0.6666666667,
+      "weighted_scored_files": 4728.67,
+      "broad_input_tokens": 520432.0,
+      "weighted_input_tokens": 931420.33
+    }
+  },
+  "weighted_miss": {
+    "case_id": "openclaw_gateway_ws_dispatch",
+    "primary_file": "src/gateway/server/ws-connection/message-handler.ts",
+    "failure_stage": "candidate_not_discovered",
+    "diagnosis": "PascalCase WebSocket was split into web and socket before concept alias normalization."
+  },
+  "decision": "reject weighted retrieval for large repositories pending a separate CamelCase normalization experiment; stable selection rescue did not replace the repository-wide guard"
+}
