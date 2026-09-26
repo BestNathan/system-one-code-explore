@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-26",
+  "run": {
+    "database_id": 36231288979,
+    "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979",
+    "display_title": "File Discovery — Leave-One-Task-Out Threshold Validation",
+    "event": "workflow_dispatch",
+    "branch": "main",
+    "head_sha": "0b75c676b8e158f123322ea36cff4abdb8506e91",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-09-26T08:56:42Z",
+    "completed_at": "2026-09-26T08:58:07Z",
+    "jobs": [
+      {"database_id": 108374812135, "name": "validate", "status": "completed", "conclusion": "success", "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979/job/108374812135"},
+      {"database_id": 108374836724, "name": "analyze (nession)", "status": "completed", "conclusion": "success", "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979/job/108374836724"},
+      {"database_id": 108374836735, "name": "analyze (codex)", "status": "completed", "conclusion": "success", "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979/job/108374836735"},
+      {"database_id": 108374836743, "name": "analyze (openclaw)", "status": "completed", "conclusion": "success", "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979/job/108374836743"},
+      {"database_id": 108374965036, "name": "report", "status": "completed", "conclusion": "success", "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979/job/108374965036"}
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "fd-threshold-validation-nession",
+      "purpose": "Per-task leave-one-out thresholds, candidate counts, recall, and omissions for Nession.",
+      "size_bytes": 908,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:56:44Z"
+    },
+    {
+      "name": "fd-threshold-validation-codex",
+      "purpose": "Per-task leave-one-out thresholds, candidate counts, recall, and omissions for Codex.",
+      "size_bytes": 878,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:56:44Z"
+    },
+    {
+      "name": "fd-threshold-validation-openclaw",
+      "purpose": "Per-task leave-one-out thresholds, candidate counts, recall, and omissions for OpenClaw.",
+      "size_bytes": 905,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:56:44Z"
+    },
+    {
+      "name": "fd-threshold-validation-report-36231288979",
+      "purpose": "Aggregate held-out predictions and Markdown analysis for all nine tasks.",
+      "size_bytes": 2257,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:56:44Z"
+    }
+  ]
+}

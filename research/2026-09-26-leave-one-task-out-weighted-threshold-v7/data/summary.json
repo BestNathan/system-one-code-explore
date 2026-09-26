@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "experiment": "leave-one-task-out-weighted-threshold-validation-v7",
+  "workflow_run_id": 36231288979,
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979",
+  "code_sha": "0b75c676b8e158f123322ea36cff4abdb8506e91",
+  "successful_repository_jobs": 3,
+  "model_calls": 0,
+  "directory_model_decisions": 0,
+  "operational_gate": {
+    "required_primary_recall": 1.0,
+    "required_openclaw_mean_candidate_count_below": 2000,
+    "openclaw_primary_recall": 0.6666666667,
+    "openclaw_mean_candidate_count": 455.0,
+    "passed": false
+  },
+  "repository_results": [
+    {"repository": "openai/codex", "tasks": 3, "primary_recall": 0.6666666667, "mean_candidate_count": 442.7},
+    {"repository": "BestNathan/nession", "tasks": 3, "primary_recall": 0.6666666667, "mean_candidate_count": 33.0},
+    {"repository": "openclaw/openclaw", "tasks": 3, "primary_recall": 0.6666666667, "mean_candidate_count": 455.0}
+  ],
+  "openclaw_miss": {
+    "held_out_case": "openclaw_gateway_ws_dispatch",
+    "primary_file": "src/gateway/server/ws-connection/message-handler.ts",
+    "threshold": 18.9608,
+    "primary_file_weighted_score": 13.1513,
+    "candidate_count": 371
+  },
+  "decision": "Repository-level weighted thresholds do not transfer reliably across held-out tasks: every repository recalled 2/3 tasks despite small candidate sets. The V6 full-recall threshold was label-calibrated and is not deployable as-is."
+}

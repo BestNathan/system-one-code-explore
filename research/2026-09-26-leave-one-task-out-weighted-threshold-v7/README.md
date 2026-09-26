@@ -12,15 +12,16 @@ The suite has only three diagnostic tasks per repository, so this check measures
 
 ## Experiment Process
 
-V6 found that repository-shared thresholds calibrated on all task labels retained 3/3 OpenClaw targets at 802 candidates per task. Because those same labels set the threshold, V6 is an optimistic bound. V7 leaves each task out and calibrates only on the other two tasks in the same repository. GitHub Actions runs the full path-score analysis and stores per-task predictions and aggregates. No model calls are made.
+V6 found that repository-shared thresholds calibrated on all task labels retained 3/3 OpenClaw targets at 802 candidates per task. Because those same labels set the threshold, V6 is an optimistic bound. Workflow [36231288979](https://github.com/BestNathan/system-one-code-explore/actions/runs/36231288979) left each task out and calibrated only on the other two tasks in the same repository. All three repository jobs and the aggregate completed successfully; no model calls were made.
 
 ## Experiment Data
 
 - Frozen cross-validation rule: [`data/threshold-validation-experiment.json`](data/threshold-validation-experiment.json)
 - Frozen tasks and repository revisions: [`data/cases.json`](data/cases.json)
+- Aggregate held-out predictions: [`data/summary.json`](data/summary.json)
 - Workflow, jobs, and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json)
 - Repository artifacts contain each held-out threshold, candidate count, primary recall, and misses. The aggregate artifact is retained for 90 days. No raw model-call data is expected because there are no calls.
 
 ## Experiment Results
 
-Pending the GitHub Actions run. The result will determine whether the V6 threshold transfers between these tasks or whether new held-out tasks are required before threshold tuning can guide a production mechanism.
+Leave-one-task-out recall was 2/3 in each repository. OpenClaw averaged 455 candidates but missed `src/gateway/server/ws-connection/message-handler.ts`: its held-out threshold was 18.9608, above that file's 13.1513 score. This confirms the 802-candidate V6 result depended on seeing the same tasks' labels. A fixed repository threshold is too high for lower-score task types and does not provide stable recall. Keep broad semantic retrieval as the current baseline; investigate query-adaptive uncertainty rescue on fresh tasks before considering weighted scores for production.
