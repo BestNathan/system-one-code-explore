@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "experiment": "exact-primary-safe-weighted-frontier-v6",
+  "workflow_run_id": 36230858823,
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823",
+  "code_sha": "987e1e64c86ef95791b264c22975d14f11249092",
+  "successful_repository_jobs": 3,
+  "model_calls": 0,
+  "directory_model_decisions": 0,
+  "operational_gate": {
+    "openclaw_primary_recall": 1.0,
+    "openclaw_mean_candidate_count": 802.3,
+    "required_primary_recall": 1.0,
+    "required_mean_candidate_count_below": 2000,
+    "passed_on_frozen_labels": true,
+    "threshold_calibration_used_primary_labels": true
+  },
+  "repository_results": [
+    {
+      "repository": "openclaw/openclaw",
+      "tasks": 3,
+      "oracle_minimum_candidate_mean": 536.7,
+      "oracle_primary_recall": 1.0,
+      "shared_threshold": 13.1513,
+      "shared_candidate_mean": 802.3,
+      "shared_primary_recall": 1.0
+    },
+    {
+      "repository": "openai/codex",
+      "tasks": 3,
+      "oracle_minimum_candidate_mean": 248.0,
+      "oracle_primary_recall": 1.0,
+      "shared_threshold": 8.6984,
+      "shared_candidate_mean": 570.7,
+      "shared_primary_recall": 1.0
+    },
+    {
+      "repository": "BestNathan/nession",
+      "tasks": 3,
+      "oracle_minimum_candidate_mean": 10.0,
+      "oracle_primary_recall": 1.0,
+      "shared_threshold": 7.8416,
+      "shared_candidate_mean": 34.3,
+      "shared_primary_recall": 1.0
+    }
+  ],
+  "decision": "The weighted score admits an uncapped full-primary-recall candidate set below 2,000 on all frozen repositories, but thresholds were calibrated with those same labels and require held-out validation."
+}

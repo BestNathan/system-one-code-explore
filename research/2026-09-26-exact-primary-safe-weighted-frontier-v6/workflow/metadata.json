@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-26",
+  "run": {
+    "database_id": 36230858823,
+    "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823",
+    "display_title": "File Discovery — Exact Primary-Safe Frontier",
+    "event": "workflow_dispatch",
+    "branch": "main",
+    "head_sha": "987e1e64c86ef95791b264c22975d14f11249092",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-09-26T08:47:53Z",
+    "completed_at": "2026-09-26T08:49:05Z",
+    "jobs": [
+      {
+        "database_id": 108373625935,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823/job/108373625935"
+      },
+      {
+        "database_id": 108373653421,
+        "name": "analyze (nession)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823/job/108373653421"
+      },
+      {
+        "database_id": 108373653422,
+        "name": "analyze (codex)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823/job/108373653422"
+      },
+      {
+        "database_id": 108373653424,
+        "name": "analyze (openclaw)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823/job/108373653424"
+      },
+      {
+        "database_id": 108373752646,
+        "name": "report",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823/job/108373752646"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "fd-primary-safe-nession",
+      "purpose": "Per-task exact target scores, threshold candidate counts, and shared-threshold comparison for Nession.",
+      "size_bytes": 1068,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:47:55Z"
+    },
+    {
+      "name": "fd-primary-safe-codex",
+      "purpose": "Per-task exact target scores, threshold candidate counts, and shared-threshold comparison for Codex.",
+      "size_bytes": 1022,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:47:55Z"
+    },
+    {
+      "name": "fd-primary-safe-openclaw",
+      "purpose": "Per-task exact target scores, threshold candidate counts, and shared-threshold comparison for OpenClaw.",
+      "size_bytes": 1088,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:47:55Z"
+    },
+    {
+      "name": "fd-primary-safe-report-36230858823",
+      "purpose": "Aggregate per-task oracle bounds, repository-shared thresholds, and Markdown results for all nine tasks.",
+      "size_bytes": 2592,
+      "retention_days": 90,
+      "expires_at": "2026-12-25T08:47:55Z"
+    }
+  ]
+}
