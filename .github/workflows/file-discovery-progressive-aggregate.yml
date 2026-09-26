@@ -1,0 +1,53 @@
+name: Aggregate File Discovery Issue 13 Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Source experiment run ID whose repository artifacts should be aggregated
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download the completed experiment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: issue13-progressive-*
+          path: artifacts/raw
+      - name: Read source run status and aggregate without repeating model calls
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          source_url="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          source_commit="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          validate_status="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs --jq '[.jobs[] | select(.name == "validate") | .conclusion][0]')"
+          experiment_status="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs --jq '[.jobs[] | select(.name | startswith("experiment (")) | .conclusion] | if all(. == "success") then "success" else "incomplete" end')"
+          source_report_status="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs --jq '[.jobs[] | select(.name == "report") | .conclusion][0]')"
+          python3 src/file_discovery_progressive.py \
+            --aggregate artifacts/raw --output-dir artifacts/report \
+            --run-url "$source_url" --run-id "$SOURCE_RUN_ID" --commit "$source_commit" \
+            --validate-status "$validate_status" --experiment-status "$experiment_status" \
+            --source-report-status "$source_report_status" \
+            --report-run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            --report-run-id '${{ github.run_id }}'
+          cat artifacts/report/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: issue13-aggregate-${{ github.run_id }}
+          path: artifacts/report/
+          retention-days: 90

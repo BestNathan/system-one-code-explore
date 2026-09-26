@@ -208,11 +208,23 @@ def run_case(args):
                 selected = {item["path"] for item in result["promoted_files"]}
                 primary = set(case["primary_files"])
                 scored = set(result["file_scores"])
+                missing = primary - selected
+                causes = {}
+                for path in sorted(missing):
+                    if path in scored:
+                        causes[path] = "file_score_rejected"
+                    elif arm == "flat_path":
+                        causes[path] = "path_retrieval_omission"
+                    else:
+                        ancestors = [node["path"] for node in result["deferred_unresolved"]
+                                     if path.startswith(node["path"].rstrip("/") + "/")]
+                        causes[path] = ("deferred_frontier_miss: " + max(ancestors, key=len)
+                                        if ancestors else "unvisited_without_deferred_ancestor")
                 row = {"case_id": case["id"], "repository": args.repository,
                        "arm": arm, "status": "success", **result,
                        "primary_recall": len(primary & selected) / len(primary),
                        "candidate_recall": len(primary & scored) / len(primary),
-                       "missing_primary": sorted(primary - selected),
+                       "missing_primary": sorted(missing), "missing_primary_causes": causes,
                        "primary_scores": {path: result["file_scores"].get(path) for path in sorted(primary)},
                        "usage": scorer.usage}
             except Exception as exc:
@@ -252,6 +264,7 @@ def run_case(args):
 def render_report(payload):
     lines = ["# Issue 13 — Progressive Repository State Machine", "",
              f"- Workflow: {payload['run_url']}",
+             *([f"- Report aggregation run: {payload['report_run_url']}"] if payload.get("report_run_url") else []),
              f"- Repository: `{payload.get('repository', 'aggregate')}`",
              "- Deferred directories remain unresolved state; scheduler exhaustion is not semantic completion.",
              "- No fixed candidate cap or ancestor-score pruning is used.", "",
@@ -266,7 +279,9 @@ def render_report(payload):
         lines.append(f"| {row['case_id']} | {row['arm']} | success | {row['primary_recall']:.0%} | {row['candidate_recall']:.0%} | {row.get('total_repository_file_count', '—')} | {row['file_decisions']} | {row.get('directory_decisions', 0)} | {row['model_visible_nodes']} | {unresolved} | {usage.get('input_tokens', 0)} | {usage.get('model_calls', 0)} | {row['wall_time_ms']/1000:.1f} |")
     lines += ["", "## Omitted Primary Targets", ""]
     misses = [row for row in payload["rows"] if row.get("status") == "success" and row.get("missing_primary")]
-    lines.extend([f"- {row['case_id']} / {row['arm']}: {', '.join(row['missing_primary'])}" for row in misses]
+    lines.extend([f"- {row['case_id']} / {row['arm']}: " + "; ".join(
+        f"{path} ({row.get('missing_primary_causes', {}).get(path, 'unclassified')})"
+        for path in row["missing_primary"]) for row in misses]
                  or ["- None among successful task arms."])
     lines += ["", "## Methodology Notes", "",
               "- The flat/path and progressive arms are full-policy comparisons. System One decisions are not counterfactually shared across different batch states; interpret recall differences together with this decision-noise limitation.",
@@ -300,6 +315,20 @@ def aggregate(args):
     reports = [json.loads(path.read_text(encoding="utf-8"))
                for path in sorted(root.glob("**/progress.json"))]
     rows = [row for report in reports for row in report.get("rows", [])]
+    for row in rows:
+        if row.get("status") != "success" or not row.get("missing_primary"):
+            continue
+        causes = row.setdefault("missing_primary_causes", {})
+        for path in row["missing_primary"]:
+            if path in row.get("file_scores", {}):
+                causes[path] = "file_score_rejected"
+            elif row.get("arm") == "flat_path":
+                causes[path] = "path_retrieval_omission"
+            else:
+                ancestors = [node["path"] for node in row.get("deferred_unresolved", [])
+                             if path.startswith(node["path"].rstrip("/") + "/")]
+                causes[path] = ("deferred_frontier_miss: " + max(ancestors, key=len)
+                                if ancestors else "unvisited_without_deferred_ancestor")
     expected = 18
     seen = {(row.get("case_id"), row.get("arm")) for row in rows}
     for case in json.loads(Path(args.cases).read_text(encoding="utf-8"))["cases"]:
@@ -310,7 +339,8 @@ def aggregate(args):
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
     payload = {"run_url": args.run_url, "rows": rows, "expected_rows": expected,
-               "run_id": args.run_id, "commit": args.commit}
+               "run_id": args.run_id, "commit": args.commit,
+               "report_run_url": args.report_run_url, "report_run_id": args.report_run_id}
     def percentile(values, fraction):
         ordered = sorted(values)
         if not ordered:
@@ -335,7 +365,10 @@ def aggregate(args):
     metadata = {"workflow_url": args.run_url, "run_id": args.run_id,
                 "commit_sha": args.commit,
                 "status": "success" if args.validate_status == "success" and args.experiment_status == "success" and len(rows) == expected and all(row.get("status") == "success" for row in rows) else "incomplete",
-                "jobs": {"validate": args.validate_status, "experiment": args.experiment_status, "report": "success"},
+                "report_workflow_url": args.report_run_url,
+                "report_workflow_run_id": args.report_run_id,
+                "jobs": {"validate": args.validate_status, "experiment": args.experiment_status,
+                         "source_report": args.source_report_status, "report": "success"},
                 "artifacts": inventory}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
@@ -343,7 +376,7 @@ def aggregate(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root")
-    parser.add_argument("--repository", required=True)
+    parser.add_argument("--repository")
     parser.add_argument("--cases", default="fixtures/file-discovery/system1-vs-system2-cases.json")
     parser.add_argument("--config", default="fixtures/file-discovery/progressive-state-machine.json")
     parser.add_argument("--output-dir", required=True)
@@ -353,11 +386,16 @@ def main():
     parser.add_argument("--commit")
     parser.add_argument("--validate-status", default="unknown")
     parser.add_argument("--experiment-status", default="unknown")
+    parser.add_argument("--report-run-url")
+    parser.add_argument("--report-run-id")
+    parser.add_argument("--source-report-status")
     args = parser.parse_args()
     if args.aggregate:
         aggregate(args)
         print((Path(args.output_dir) / "report.md").read_text(encoding="utf-8"))
         return
+    if not args.repository:
+        parser.error("--repository is required when running an experiment")
     rows = run_case(args)
     print(json.dumps({"repository": args.repository, "rows": len(rows),
                       "failed": sum(row["status"] != "success" for row in rows)}, indent=2))

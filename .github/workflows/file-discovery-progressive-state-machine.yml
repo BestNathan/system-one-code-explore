@@ -105,7 +105,9 @@ jobs:
             --aggregate artifacts/raw --output-dir artifacts/report \
             --run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
             --run-id '${{ github.run_id }}' --commit '${{ github.sha }}' \
-            --validate-status "$VALIDATE_RESULT" --experiment-status "$EXPERIMENT_RESULT"
+            --validate-status "$VALIDATE_RESULT" --experiment-status "$EXPERIMENT_RESULT" \
+            --report-run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            --report-run-id '${{ github.run_id }}'
           cat artifacts/report/report.md >> "$GITHUB_STEP_SUMMARY"
           cat artifacts/report/metadata.json
       - uses: actions/upload-artifact@v4
