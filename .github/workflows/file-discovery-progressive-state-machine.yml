@@ -1,0 +1,116 @@
+name: File Discovery — Progressive Repository State Machine (Issue 13)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - fixtures/file-discovery/progressive-state-machine.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: file-discovery-progressive-state-machine
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run tests before experiment
+        run: python3 -m unittest discover -s tests -v
+
+  experiment:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: typesafe
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - slug: nession
+            repository: BestNathan/nession
+            revision: 7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df
+          - slug: codex
+            repository: openai/codex
+            revision: d7b07d45517a793acfba4cbf8de697d723cceb46
+          - slug: openclaw
+            repository: openclaw/openclaw
+            revision: 932abb0a841b522ebaa5b81921119a61b6a80b21
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.revision }}
+          path: subject
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify revision and run both arms
+        env:
+          TYPESAFE_MODEL: ${{ vars.TYPESAFE_MODEL || 'jev-latest' }}
+          TYPESAFE_API_URL: ${{ vars.TYPESAFE_API_URL || 'https://api.typesafe.ai/v1/systemone' }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.TYPESAFE_KEY || secrets.SYSTEM_ONE_API_KEY || secrets.TYPE_SAFE_API_KEY || vars.TYPESAFE_API_KEY || vars.TYPESAFE_KEY || vars.SYSTEM_ONE_API_KEY || vars.TYPE_SAFE_API_KEY }}
+        run: |
+          test "$GITHUB_ACTOR" = BestNathan
+          test -n "$TYPESAFE_API_KEY"
+          test "$(git -C subject rev-parse HEAD)" = "${{ matrix.revision }}"
+          python3 src/file_discovery_progressive.py \
+            --root subject --repository '${{ matrix.repository }}' \
+            --output-dir artifacts/${{ matrix.slug }} \
+            --run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+      - name: Add task results to the run summary
+        if: always()
+        run: |
+          if [ -f artifacts/${{ matrix.slug }}/report.md ]; then
+            cat artifacts/${{ matrix.slug }}/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: issue13-progressive-${{ matrix.slug }}
+          path: artifacts/${{ matrix.slug }}/
+          retention-days: 90
+          if-no-files-found: warn
+
+  report:
+    if: always()
+    needs: [validate, experiment]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: issue13-progressive-*
+          path: artifacts/raw
+      - name: Aggregate results and create Workflow metadata
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          EXPERIMENT_RESULT: ${{ needs.experiment.result }}
+        run: |
+          python3 src/file_discovery_progressive.py \
+            --aggregate artifacts/raw --output-dir artifacts/report \
+            --run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            --run-id '${{ github.run_id }}' --commit '${{ github.sha }}' \
+            --validate-status "$VALIDATE_RESULT" --experiment-status "$EXPERIMENT_RESULT"
+          cat artifacts/report/report.md >> "$GITHUB_STEP_SUMMARY"
+          cat artifacts/report/metadata.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: issue13-progressive-report-${{ github.run_id }}
+          path: artifacts/report/
+          retention-days: 90

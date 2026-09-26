@@ -1,0 +1,23 @@
+{
+  "experiment": "issue-13-progressive-repository-state-machine",
+  "model": "jev-latest",
+  "profile": "compact_state_v4",
+  "repeats": 1,
+  "expansion_threshold": 0.55,
+  "file_threshold": 0.65,
+  "workers": 4,
+  "batch_size": 64,
+  "repository_revisions": {
+    "BestNathan/nession": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+    "openai/codex": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+    "openclaw/openclaw": "932abb0a841b522ebaa5b81921119a61b6a80b21"
+  },
+  "notes": [
+    "No hard candidate-count cap, top-k, source-body read, or ancestor-score pruning is permitted.",
+    "The flat control uses uncapped semantic weighted path retrieval followed by System One file scoring.",
+    "Progressive disclosure starts at root direct children; expansion reveals one directory level.",
+    "Directories below both frozen thresholds remain deferred and unresolved, not deleted or marked irrelevant.",
+    "The nine frozen primary-target tasks are diagnostic; one repeat does not establish generalization.",
+    "All System One requests use the shared SystemOneClient through the existing decider adapter and preserve physical-call JSONL records."
+  ]
+}
