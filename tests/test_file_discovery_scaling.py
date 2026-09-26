@@ -154,6 +154,17 @@ class ScalingTests(unittest.TestCase):
         self.assertIn(target["path"], semantic_weighted_matches(
             [target], "Gateway WebSocket request dispatch"))
 
+    def test_weighted_threshold_frontier_includes_ineligible_paths_and_is_monotonic(self):
+        from file_discovery_adaptive import semantic_weighted_threshold_frontier
+        items = [candidate(f"src/fs/area{index}/opaque.py") for index in range(1, 5)]
+        items.extend(candidate(f"misc/unrelated_{index}.py") for index in range(4))
+        frontier = semantic_weighted_threshold_frontier(
+            items, "filesystem deletion", [0.0, 2.0, 100.0])
+        counts = [len(row["paths"]) for row in frontier]
+        self.assertGreater(counts[0], counts[1])
+        self.assertGreaterEqual(counts[1], counts[2])
+        self.assertIn("src/fs/area1/opaque.py", frontier[0]["paths"])
+
     def test_provenance_rescue_replaces_repository_wide_relative_guard(self):
         from file_discovery_selection import select_relevant
         selected, metadata = select_relevant(
