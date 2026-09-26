@@ -275,7 +275,7 @@ def render_report(payload):
             lines.append(f"| {row.get('case_id')} | {row.get('arm')} | {row.get('status')}: {str(row.get('error', 'missing'))[:120]} | — | — | — | — | — | — | — | — | — | — |")
             continue
         usage = row.get("physical_usage", {})
-        unresolved = len(row.get("deferred_unresolved", []))
+        unresolved = row.get("deferred_unresolved_count", len(row.get("deferred_unresolved", [])))
         lines.append(f"| {row['case_id']} | {row['arm']} | success | {row['primary_recall']:.0%} | {row['candidate_recall']:.0%} | {row.get('total_repository_file_count', '—')} | {row['file_decisions']} | {row.get('directory_decisions', 0)} | {row['model_visible_nodes']} | {unresolved} | {usage.get('input_tokens', 0)} | {usage.get('model_calls', 0)} | {row['wall_time_ms']/1000:.1f} |")
     lines += ["", "## Omitted Primary Targets", ""]
     misses = [row for row in payload["rows"] if row.get("status") == "success" and row.get("missing_primary")]
@@ -354,6 +354,20 @@ def aggregate(args):
         "max_model_visible_nodes": max((row["model_visible_nodes"] for row in successful), default=0),
         "p95_peak_in_flight": percentile([row.get("usage", {}).get("peak_in_flight", 0) for row in successful], 0.95),
     }
+    summary_fields = (
+        "case_id", "repository", "arm", "status", "total_repository_file_count",
+        "enumerated_file_count", "candidate_file_count", "file_decisions",
+        "directory_decisions", "model_visible_nodes", "metadata_nodes_seen",
+        "step_count", "max_live_wave_nodes", "primary_recall", "candidate_recall",
+        "missing_primary", "missing_primary_causes", "primary_scores", "completion",
+        "wall_time_ms", "usage", "physical_usage", "pricing", "error",
+    )
+    payload["rows"] = [
+        {**{key: row[key] for key in summary_fields if key in row},
+         "deferred_unresolved_count": len(row.get("deferred_unresolved", [])),
+         "expanded_directory_count": len(row.get("expanded_directories", []))}
+        for row in rows
+    ]
     (output / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (output / "report.md").write_text(render_report(payload), encoding="utf-8")
     inventory = []
