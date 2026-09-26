@@ -134,9 +134,36 @@ class ScalingTests(unittest.TestCase):
         self.assertTrue({"websocket", "ws"} <= semantic_tokens("WebSocket dispatch"))
 
     def test_semantic_aliases_do_not_create_generic_file_system_evidence(self):
-        from file_discovery_adaptive import semantic_tokens
-        self.assertEqual(semantic_tokens("filesystem"), {"filesystem", "fs"})
-        self.assertEqual(semantic_tokens("WebSocket"), {"websocket", "ws"})
+        from file_discovery_adaptive import SEMANTIC_ALIASES
+        self.assertEqual(SEMANTIC_ALIASES["filesystem"], {"fs"})
+        self.assertEqual(SEMANTIC_ALIASES["websocket"], {"ws"})
+
+    def test_semantic_retrieval_counts_aliases_as_one_concept(self):
+        from file_discovery_adaptive import semantic_weighted_matches
+        items = [candidate("src/fs/sandbox.py"),
+                 candidate("src/file/system/other.py"),
+                 candidate("src/other.py")]
+        self.assertEqual(semantic_weighted_matches(items, "filesystem"),
+                         {"src/fs/sandbox.py"})
+
+    def test_provenance_rescue_replaces_repository_wide_relative_guard(self):
+        from file_discovery_selection import select_relevant
+        selected, metadata = select_relevant(
+            {"src/fs/sandbox.py": 0.53, "src/generic.py": 0.60,
+             "src/clear.py": 0.90},
+            enumerated_file_count=5000,
+            file_threshold=0.65,
+            policy="provenance_rescue",
+            rescue_threshold=0.50,
+            evidence={
+                "src/fs/sandbox.py": {"rare_concepts": ["filesystem"]},
+                "src/generic.py": {"rare_concepts": []},
+                "src/clear.py": {"rare_concepts": []},
+            })
+        self.assertEqual({item["path"] for item in selected},
+                         {"src/fs/sandbox.py", "src/clear.py"})
+        self.assertEqual(metadata["selection_policy"], "provenance_rescue")
+        self.assertEqual(metadata["relative_fallback_scored_count"], 0)
 
     def test_semantic_lexical_recovers_first_round_misses(self):
         from file_discovery_adaptive import semantic_lexical_matches
