@@ -1,6 +1,6 @@
 # Research Log
 
-This directory is the canonical chronological history for **System One Code Explore**.
+This directory preserves the historical chronological research for **System One Code Explore**. New experiments are recorded under [`../../research/`](../../research/README.md), one directory per experiment.
 
 The project is intentionally experimental. Implementations may be replaced; the durable artifact is the research path: question, hypothesis, controlled setup, evidence, result, rejected ideas, and next direction.
 
@@ -44,10 +44,10 @@ Rxx IDs are chronological experiments, not the architecture.
 ## File Discovery scaling follow-up
 
 - [Large-repository scaling diagnosis](file-discovery-large-repo-scaling-diagnosis.md) — observed all-file scoring and corrected System2 cost interpretation.
-- [Algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md) — uncapped research design for retrieval, adaptive routing, and independent-request concurrency.
-- [Three-repository scaling results](2026-09-26-file-discovery-scaling-results.md) — four concurrent requests reduced full-scoring latency by 3.44–4.02×; lexical retrieval was cheapest but missed 2/9 targets, hierarchy retained 8/9 while adding substantial directory cost, and same-directory rescue was rejected.
-- [Semantic path and root-safe routing V2](2026-09-26-file-discovery-semantic-routing-v2-results.md) — semantic aliases recovered 9/9 targets into the candidate set; final selection remained 8/9 because candidate reduction incorrectly shrank the relative recall guard. Hierarchy and adaptive union were rejected on directory/token cost.
-- [Stable relative-guard replay](2026-09-26-file-discovery-stable-selection-replay.md) — zero-model replay restored 9/9 final recall by keeping the original repository population, while showing that a full-repository 1% guard still promotes hundreds of OpenClaw files.
+- [Algorithmic reduction and concurrent requests](../../research/2026-09-26-file-discovery-scaling-v1/plan.md) — uncapped research design for retrieval, adaptive routing, and independent-request concurrency.
+- [Three-repository scaling results](../../research/2026-09-26-file-discovery-scaling-v1/) — four concurrent requests reduced full-scoring latency by 3.44–4.02×; lexical retrieval was cheapest but missed 2/9 targets, hierarchy retained 8/9 while adding substantial directory cost, and same-directory rescue was rejected.
+- [Semantic path and root-safe routing V2](../../research/2026-09-26-file-discovery-semantic-routing-v2/) — semantic aliases recovered 9/9 targets into the candidate set; final selection remained 8/9 because candidate reduction incorrectly shrank the relative recall guard. Hierarchy and adaptive union were rejected on directory/token cost.
+- [Stable relative-guard replay](../../research/2026-09-26-file-discovery-stable-selection-replay/) — zero-model replay restored 9/9 final recall by keeping the original repository population, while showing that a full-repository 1% guard still promotes hundreds of OpenClaw files.
 
 ## Current conceptual architecture
 

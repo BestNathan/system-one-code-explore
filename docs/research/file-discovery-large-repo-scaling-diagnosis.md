@@ -4,7 +4,7 @@
 
 Mechanism diagnosis after the Nession / OpenClaw / Codex large-repository benchmark.
 
-Follow-up: [algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md)
+Follow-up: [algorithmic reduction and concurrent requests](../../research/2026-09-26-file-discovery-scaling-v1/plan.md)
 revises the next research direction: no cumulative file/directory count caps or
 fixed candidate quotas. Study natural reduction through retrieval and adaptive
 routing, plus independent-request concurrency, on Nession, Codex, and OpenClaw.

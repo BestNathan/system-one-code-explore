@@ -1,16 +1,24 @@
 # File Discovery：稳定相对保护回放
 
-## 状态
-
-完成零模型回放。来源 Workflow：[36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492)，回放 Workflow：[36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855)。回放直接使用已保存文件分数，没有新增 System One 调用。
-
-## 问题
+## 实验目标
 
 候选塑形后，top-1% 相对保护应以缩减后的候选数还是机械枚举的原始仓库文件数为总体？
 
+## 实验方案
+
 V1 的保护语义建立在全仓库总体上。若改用候选数，同一个文件即使模型分数不变，也会因为上游算法缩小候选而失去保护。回放将总体固定为原始仓库文件数，并把保护数限制在实际已打分候选数内。
 
-## 结果
+## 实验过程
+
+完成零模型回放。来源 Workflow：[36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492)，回放 Workflow：[36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855)。回放直接使用已保存文件分数，没有新增 System One 调用。
+
+回放 Workflow 下载 V2 artifacts，使用相同文件分数分别执行旧分母与稳定仓库总体分母的选择逻辑，再上传逐任务回放表。提交内保存了 [固定汇总](data/summary.json) 和 [来源/回放 Workflow、Job 与产物元数据](workflow/metadata.json)。
+
+| 产物 | 用途 | 保留期 |
+| --- | --- | --- |
+| `fd-stable-selection-replay-36214118855` | 四个方案的逐任务回放、候选排名和聚合报告 | 90 天，至 2026-12-25 |
+
+## 实验数据
 
 | 方案 | 案例 | 原选择召回 | 稳定总体回放召回 | 回放入选文件均值 |
 | --- | ---: | ---: | ---: | ---: |
@@ -23,7 +31,7 @@ Nession 文件系统任务的 `crates/nession-agent/src/fs/sandbox.rs` 在四个
 
 其他案例的主要目标召回没有下降。Codex 保护名额为 63；OpenClaw 为 438。由于分数并列，实际入选可以略多于保护名额。
 
-## 解释
+### 数据解释
 
 稳定总体是正确的 A/B 语义：候选塑形不应暗中改变下游选择策略。它也说明 V1 的相对保护不适合作为最终生产选择策略。
 
@@ -34,7 +42,7 @@ OpenClaw 的语义词法方案每任务最终入选约 442–456 个文件。即
 - 全仓库相对保护用于与 V1 做语义稳定的研究对照；
 - 生产候选选择需要使用明确的检索证据和文件分数决定低分救援，不能永久依赖全仓库 1%。
 
-## 结论与下一步
+## 实验结果
 
 1. 研究对照统一使用原始仓库总体计算相对保护。
 2. 当前三个层级/组合方案仍不晋级；稳定选择没有改变其高目录成本。

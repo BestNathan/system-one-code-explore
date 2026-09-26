@@ -2,18 +2,21 @@
 
 ## 项目结构
 
-- `src/`：Python 源码，包括文件发现、文件内证据定位、基准测试与评估模块，目前主要采用扁平布局。
+- `src/`：文件发现、证据定位、基准和评估代码。
 - `tests/`：单元测试与回归测试。
-- `fixtures/`：仓库样本、固定研究输入与定价快照。
-- `docs/domains/`：文件发现与证据定位的领域说明。
-- `docs/research/`：研究过程与结论。
-- `docs/experiments/`：实验协议与结果。
-- `docs/pilots/`：早期探索记录。
-- `.github/workflows/`：GitHub Actions 工作流。
-- `README.md`、`ROADMAP.md`：项目介绍与路线图。
-- `docs/project-structure.md`：当前结构与目标结构说明。
+- `fixtures/`：固定输入、仓库样本和可复用参考数据。
+- `research/`：当前及后续实验记录；一个实验对应一个独立目录。
+- `docs/research/`：迁移前的历史研究记录，只作历史索引。
+- `.github/workflows/`：测试、实验、汇总和产物上传入口。
+- `README.md`：项目入口，并按时间追踪实验进展。
 
 ## 约束
 
-- 所有运行（包括测试、实验、基准测试和脚本执行）都必须通过 GitHub Actions Workflow 完成，不得在本地运行。
-- 每次研究都必须生成研究报告，保存到 `docs/research/`，记录研究目标、方法、结果与结论，并关联对应的 Workflow 运行及产物。
+- 实验直接在 `main` 上开发、提交和运行，不创建实验分支或实验工作树。
+- 所有项目运行，包括测试、实验、基准测试和项目脚本，只能通过 GitHub Actions Workflow 执行；本地只允许编辑文件、检查 Git 状态和读取已有数据。
+- 开始实验前，在 `research/YYYY-MM-DD-<experiment-name>/` 建立目录，并冻结任务、仓库 revision、模型、参数、对照组、指标和停止条件。
+- 每个实验目录必须包含 `README.md`，且明确包含“实验目标”“实验方案”“实验过程”“实验数据”“实验结果”五个二级标题。失败、中止或无显著结果也必须完整记录。
+- `data/` 保存可提交的固定输入、汇总和关键结果；不得只在正文中手工抄写指标。大体积原始结果保存在 GitHub Actions artifacts。
+- `workflow/metadata.json` 必须记录 Workflow URL、run ID、commit SHA、状态、Jobs 和产物清单。报告必须链接该 Workflow，并说明产物名称、用途和保留期。
+- 实验流程为：定义并预注册方案 → 提交 `main` → 由 Workflow 运行 → 检查 Jobs 与 artifacts → 固化数据和结论 → 更新实验目录、`research/README.md` 与根 `README.md` → 再由 Workflow 验证最终提交。
+- 不得把候选数硬上限当作算法优化；应报告召回、文件打分数、目录判断数、tokens、调用次数、延迟和失败案例，并从算法上降低规模。

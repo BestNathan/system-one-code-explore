@@ -245,10 +245,22 @@ R18-R19
   -> shared semantic-decision cache / counterfactual-safe comparison
 ```
 
-The canonical chronological log remains in
-[docs/research/README.md](docs/research/README.md).
+Historical work remains in [docs/research/README.md](docs/research/README.md).
+New experiments and their execution evidence are tracked in
+[research/README.md](research/README.md).
 
 See [Research path](docs/research-path.md) for the problem-oriented view.
+
+## Experiment progress
+
+| Date | Experiment | Status | Workflow | Result |
+| --- | --- | --- | --- | --- |
+| 2026-09-26 | [File Discovery scaling V1](research/2026-09-26-file-discovery-scaling-v1/) | completed | [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068) | Four-way request concurrency delivered 3.44–4.02× speedup; lexical discovery recalled 7/9 primary targets. |
+| 2026-09-26 | [Semantic routing V2](research/2026-09-26-file-discovery-semantic-routing-v2/) | completed | [36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492) | Semantic aliases reached 9/9 candidate recall; hierarchy and adaptive routing were rejected for directory/token cost. |
+| 2026-09-26 | [Stable selection replay](research/2026-09-26-file-discovery-stable-selection-replay/) | completed | [36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855) | Stable population semantics restored 9/9 final recall without model calls; OpenClaw selectivity remains unresolved. |
+
+The [experiment log](research/README.md) links the complete goal, plan, process,
+data, result, Workflow jobs, and artifact inventory for every new experiment.
 
 ## Target project structure
 
@@ -265,7 +277,7 @@ system-one-code-explore/
 │   ├── domains/
 │   │   ├── file-discovery.md
 │   │   └── evidence-localization.md
-│   ├── research/          # canonical chronological research records
+│   ├── research/          # historical research records
 │   ├── experiments/       # experiment protocols/results
 │   └── pilots/            # early exploratory traces
 ├── src/
@@ -275,6 +287,7 @@ system-one-code-explore/
 ├── fixtures/
 │   ├── repository/        # synthetic/local fixtures
 │   └── research/          # pinned references and canonical aggregates
+├── research/              # one auditable directory per new experiment
 └── .github/workflows/     # reproducible experiment runners
 ```
 
@@ -360,4 +373,5 @@ For architecture and repository organization:
 For the full experimental record:
 
 - [Research path](docs/research-path.md)
-- [Chronological research log](docs/research/README.md)
+- [Current experiment log](research/README.md)
+- [Historical research log](docs/research/README.md)

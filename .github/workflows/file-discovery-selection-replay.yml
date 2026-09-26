@@ -2,10 +2,9 @@ name: File Discovery — Stable Selection Replay
 
 on:
   push:
-    branches: [research/file-discovery-algorithm-scaling-20260925]
+    branches: [main]
     paths:
       - fixtures/file-discovery/selection-replay.json
-      - .github/workflows/file-discovery-selection-replay.yml
   workflow_dispatch:
 
 permissions:

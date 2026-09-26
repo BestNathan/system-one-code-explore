@@ -69,28 +69,28 @@ candidate reduction, tested separately before composition:
   primary/supporting recall, tokens/cost, latency tails, and failures.
 
 All execution belongs in GitHub Actions, with a research report for every run.
-See the [algorithm scaling research plan](docs/research/2026-09-25-file-discovery-algorithm-scaling-plan.md).
+See the [algorithm scaling research plan](research/2026-09-26-file-discovery-scaling-v1/plan.md).
 
 The first three-repository diagnostic found that four concurrent requests cut
 full-scoring wall time by 3.44–4.02x. Lexical retrieval missed two of nine
 primary targets; hierarchy recovered one but introduced hundreds to thousands
 of module decisions, and same-directory expansion inflated candidates. The next
 iteration targets path abbreviation/compound normalization and removes root
-summary pruning. See the [results](docs/research/2026-09-26-file-discovery-scaling-results.md).
+summary pruning. See the [results](research/2026-09-26-file-discovery-scaling-v1/).
 
 The second diagnostic recovered all 9/9 primary targets into the candidate set.
 It exposed a downstream selection bug: the top-1% recall guard was recomputed
 from the reduced candidate set instead of the original repository population.
 The next step is a zero-model replay with stable selection semantics. Current
 hierarchy/adaptive routing is paused because its directory and token cost did
-not beat semantic path retrieval. See the [V2 results](docs/research/2026-09-26-file-discovery-semantic-routing-v2-results.md).
+not beat semantic path retrieval. See the [V2 results](research/2026-09-26-file-discovery-semantic-routing-v2/).
 
 Zero-model replay confirmed that the stable V1 comparison must calculate the
 relative guard from the original repository population: final primary recall
 returned to 9/9. This also retains roughly 438 OpenClaw files per task, so the
 next production-policy research replaces the blanket relative guard with
 provenance-aware rescue and validates it on fresh tasks. See the
-[selection replay](docs/research/2026-09-26-file-discovery-stable-selection-replay.md).
+[selection replay](research/2026-09-26-file-discovery-stable-selection-replay/).
 
 ## Milestone 4 — End-to-end localization
 

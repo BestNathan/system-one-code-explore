@@ -2,9 +2,9 @@
 
 ## 状态与目标
 
-状态：首轮诊断已完成。结果见 [三仓库首轮报告](2026-09-26-file-discovery-scaling-results.md)，Workflow 为 [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068)。
+状态：首轮诊断已完成。结果见 [三仓库首轮报告](README.md)，Workflow 为 [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068)。
 
-承接 [大仓库扩展性诊断](file-discovery-large-repo-scaling-diagnosis.md)，研究如何在保持相关文件召回的同时，通过算法减少参与 System One 打分的文件和目录，并并发执行独立请求。
+承接 [大仓库扩展性诊断](../../docs/research/file-discovery-large-repo-scaling-diagnosis.md)，研究如何在保持相关文件召回的同时，通过算法减少参与 System One 打分的文件和目录，并并发执行独立请求。
 
 **不设文件或目录累计打分数量上限，不采用固定 top-k、候选配额或达到数量即停止。** 数量应由任务相关性、检索证据和探索状态自然决定。十倍缩减、2,000 个文件及旧方案的 128–512 个文件仅可作为观察结果的参考，不能作为截断规则或通过实验的替代证据。
 
@@ -101,6 +101,6 @@
 - 对比并发 V1 的总体收益，纳入冷/热索引成本；如另测 System2 升级，单独列出升级成本和未解决任务，不混作纯 System One 的成功结果。
 - 对新增结果给出质量与成本权衡、失败机制及下一变量，不以达到指定数量替代算法改进证据。
 
-每次研究报告保存到 `docs/research/`，包含冻结配置、代码和目标仓库 commit、Workflow URL、产物链接、各任务指标、失败/未解决案例及结论。候选来源、路由轨迹、停止依据和原始用量作为 Workflow 产物，失败时也上传可用结果。
+每次实验保存在根目录 `research/` 的独立目录，包含冻结配置、代码和目标仓库 commit、Workflow URL、产物链接、各任务指标、失败/未解决案例及结论。候选来源、路由轨迹、停止依据和原始用量作为 Workflow 产物，失败时也上传可用结果。
 
 当前结论仅为研究设计：通过检索、摘要、按需展开和复用减少不必要判断，通过并发减少独立请求等待；实际缩减量及召回效果由三仓库实验测量。

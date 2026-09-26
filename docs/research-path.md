@@ -1,6 +1,6 @@
 # Research Path
 
-This is the problem-oriented view of the research. The chronological source of truth remains `docs/research/README.md`.
+This is the problem-oriented view of the research. Historical work remains in `docs/research/README.md`; new experiment records are indexed by `research/README.md`.
 
 ## Project thesis
 

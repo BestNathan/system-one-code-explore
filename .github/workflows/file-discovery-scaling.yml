@@ -2,7 +2,7 @@ name: File Discovery — Algorithm Scaling Experiment
 
 on:
   push:
-    branches: [research/file-discovery-algorithm-scaling-20260925]
+    branches: [main]
     paths: [fixtures/file-discovery/scaling-experiment.json]
   workflow_dispatch:
 

@@ -30,7 +30,7 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 - [ ] Add `.github/workflows/file-discovery-scaling.yml`, branch-scoped automatic start when the experiment config changes, with the existing owner/environment controls, CI gating and artifact upload on failure.
 - [ ] Freeze `fixtures/file-discovery/scaling-experiment.json`: first repeat, nine cases, `all/c1`, `all/c4`, `lexical/c4`, `hierarchy/c4`, `hybrid/c4`, plus an independent cold `hybrid/c4` latency arm. Baseline V1 file prompts, route/uncertainty thresholds 0.5, file threshold 0.65, all frozen before seeing results. Run jobs sequentially to isolate credential-level concurrency.
 - [ ] Report original inputs, candidate recall before file scoring, final primary recall, file/card counts, token/call usage, costs, request latency sum versus wall time, failures, retries, and unresolved subtrees. Reuse the frozen System2 reference only as historical context, not a new paid arm.
-- [x] Download Workflow reports, review failure traces and summarize findings in `docs/research/`; link artifacts and commit IDs. First-run report: `docs/research/2026-09-26-file-discovery-scaling-results.md`.
+- [x] Download Workflow reports, review failure traces and summarize findings in `research/`; link artifacts and commit IDs. First-run report: `research/2026-09-26-file-discovery-scaling-v1/README.md`.
 
 ## 5. Second mechanism iteration
 
