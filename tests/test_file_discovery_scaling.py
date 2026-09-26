@@ -146,6 +146,14 @@ class ScalingTests(unittest.TestCase):
         self.assertEqual(semantic_weighted_matches(items, "filesystem"),
                          {"src/fs/sandbox.py"})
 
+    def test_pascal_case_aliases_map_to_one_concept(self):
+        from file_discovery_adaptive import semantic_concepts, semantic_weighted_matches
+        self.assertEqual(semantic_concepts("Gateway WebSocket"),
+                         {"gateway", "websocket"})
+        target = candidate("src/gateway/server/ws-connection/message-handler.ts")
+        self.assertIn(target["path"], semantic_weighted_matches(
+            [target], "Gateway WebSocket request dispatch"))
+
     def test_provenance_rescue_replaces_repository_wide_relative_guard(self):
         from file_discovery_selection import select_relevant
         selected, metadata = select_relevant(
