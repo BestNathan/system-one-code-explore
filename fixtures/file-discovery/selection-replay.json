@@ -1,0 +1,13 @@
+{
+  "experiment": "repository-population-relative-guard-replay-v1",
+  "source_run_id": 36213648492,
+  "source_code_commit": "919aa70b13756105446c7914e6fe626796cd7a4d",
+  "relative_fallback_fraction": 0.01,
+  "relative_fallback_population": "enumerated_repository_files",
+  "model_calls": 0,
+  "notes": [
+    "Replay only; use saved file scores from the semantic-routing V2 workflow.",
+    "The guard count is derived from the mechanically enumerated repository population, then capped by the number of scored candidates.",
+    "No candidate count limit, top-k candidate truncation, or new model request is introduced."
+  ]
+}

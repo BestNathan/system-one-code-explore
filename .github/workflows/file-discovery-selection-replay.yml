@@ -1,0 +1,44 @@
+name: File Discovery — Stable Selection Replay
+
+on:
+  push:
+    branches: [research/file-discovery-algorithm-scaling-20260925]
+    paths:
+      - fixtures/file-discovery/selection-replay.json
+      - .github/workflows/file-discovery-selection-replay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify selection implementation
+        run: python3 -m unittest discover -s tests -v
+      - name: Download semantic-routing V2 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36213648492
+          pattern: fd-scaling-*
+          path: artifacts/source
+      - name: Replay stable repository-population guard
+        run: |
+          python3 src/file_discovery_selection_replay.py \
+            --artifact-root artifacts/source \
+            --source-run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/36213648492' \
+            --replay-run-url '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            --output-dir artifacts/replay
+          cat artifacts/replay/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fd-stable-selection-replay-${{ github.run_id }}
+          path: artifacts/replay/
+          retention-days: 90

@@ -40,6 +40,13 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 - [ ] Run `semantic_lexical`, `hierarchy_v2`, and `adaptive_v2` across the same frozen nine cases. Reuse run 36155715068 as the full-scoring baseline rather than paying for it again.
 - [ ] Produce a second research report and decide whether the mechanism is ready for repeats and fresh tasks.
 
+## 6. Stable selection replay
+
+- [x] Diagnose the remaining miss as a relative-guard population change: the target was scored 0.53 but the top-1% guard shrank from 11 files to 1.
+- [x] Add failing CI tests requiring the guard to use the original enumerated repository population. Red run: [36214019935](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214019935).
+- [x] Implement stable selection and artifact replay. Green run: [36214078706](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214078706).
+- [ ] Replay run 36213648492 artifacts in GitHub Actions with zero model calls and record final recall/selectivity changes.
+
 ## 4. Review and completion
 
 - [ ] Request independent code review, fix important issues, and verify final CI remotely.
