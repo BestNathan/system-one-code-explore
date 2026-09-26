@@ -57,11 +57,11 @@ def replay(root, cases):
 
 
 def markdown(payload):
-    lines = ["# File Discovery 稳定相对保护回放", "",
-             f"- 来源 Workflow: {payload['source_run_url']}",
-             f"- 回放 Workflow: {payload['replay_run_url']}",
-             "- 模型调用：0；仅重放已保存的候选分数。", "",
-             "| Case | Arm | 文件打分 | 旧入选 | 回放入选 | 旧召回 | 回放召回 | 保护名额 |",
+    lines = ["# File Discovery Stable Relative-Guard Replay", "",
+             f"- Source Workflow: {payload['source_run_url']}",
+             f"- Replay Workflow: {payload['replay_run_url']}",
+             "- Model calls: 0; this run only replays saved candidate scores.", "",
+             "| Case | Arm | Scored files | Original selected | Replay selected | Original recall | Replay recall | Guard count |",
              "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for row in payload["rows"]:
         lines.append(
@@ -73,19 +73,19 @@ def markdown(payload):
     groups = defaultdict(list)
     for row in payload["rows"]:
         groups[row["arm"]].append(row)
-    lines += ["", "## 汇总", "",
-              "| Arm | 案例 | 旧召回 | 回放召回 | 入选文件均值 |",
+    lines += ["", "## Summary", "",
+              "| Arm | Cases | Original recall | Replay recall | Mean selected files |",
               "| --- | ---: | ---: | ---: | ---: |"]
     for arm, rows in sorted(groups.items()):
         old = sum(r["old_primary_recall"] for r in rows) / len(rows)
         new = sum(r["replay_primary_recall"] for r in rows) / len(rows)
         selected = sum(r["replay_selected_file_count"] for r in rows) / len(rows)
         lines.append(f"| {arm} | {len(rows)} | {old:.1%} | {new:.1%} | {selected:.1f} |")
-    lines += ["", "## 新恢复目标", ""]
+    lines += ["", "## Newly Recovered Targets", ""]
     recovered = [(r["case_id"], r["arm"], path) for r in payload["rows"] for path in r["newly_selected_primary"]]
     lines.extend(f"- {case} / {arm}: `{path}`" for case, arm, path in recovered)
     if not recovered:
-        lines.append("- 无。")
+        lines.append("- None.")
     return "\n".join(lines) + "\n"
 
 

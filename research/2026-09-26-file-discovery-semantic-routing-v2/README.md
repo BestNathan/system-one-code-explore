@@ -1,33 +1,31 @@
-# File Discovery V2：语义路径补漏与根安全路由结果
+# File Discovery V2: Semantic Path Rescue and Root-Safe Routing
 
-## 实验目标
+## Experiment Goal
 
-验证确定性路径语义正规化能否补回首轮 `filesystem/fs` 与 `websocket/ws` 两类遗漏，并验证从顶层模块卡开始的根安全路由能否同时降低文件和目录判断规模。候选数量不设硬上限，以主要目标召回、文件打分数、目录判断数和输入 tokens 评价算法。
+Test whether deterministic path-semantic normalization repairs the `filesystem/fs` and `websocket/ws` misses, and whether routing from top-level module cards reduces both file and directory decisions. Candidate counts remained uncapped.
 
-## 实验方案
+## Experiment Design
 
-1. 对任务和路径对称扩展常见代码缩写，包含 `filesystem/fs`、`websocket/ws` 等通用词汇；仍按证据阈值保留完整命中集合，没有 top-k。
-2. 层级路由从顶层或虚拟模块卡开始，仓库根摘要不再作为整棵树的单点剪枝。
-3. 移除首轮无效的同目录邻居扩张。
+1. Expand common code abbreviations symmetrically in queries and paths while retaining every evidence-qualified match.
+2. Begin hierarchical routing at top-level or virtual module cards so one root summary cannot prune the entire repository.
+3. Remove the ineffective same-directory expansion from V1.
 
-## 实验过程
+## Experiment Process
 
-完成第二轮机制诊断。Workflow：[36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492)，代码 commit：`919aa70b13756105446c7914e6fe626796cd7a4d`。36/36 个实验单元成功，模型响应版本为 `jev-1.13.0`，无重试或 429。
+[Workflow 36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492) ran commit `919aa70b13756105446c7914e6fe626796cd7a4d`. All 36 units succeeded with model response version `jev-1.13.0`, with no retries or 429 responses. The full-scoring baseline came from the [V1 experiment](../2026-09-26-file-discovery-scaling-v1/), avoiding another paid baseline run. These nine tasks were already used for diagnosis and do not establish fresh-task generalization.
 
-本轮没有重复付费运行全量基线，基线沿用 [首轮报告](../2026-09-26-file-discovery-scaling-v1/)。三个仓库和九个任务均为已用于诊断的冻结案例，因此结果不构成新任务泛化证据。
+The repository contains the [fixed summary](data/summary.json) and [Workflow, job, and artifact metadata](workflow/metadata.json).
 
-提交内保存了 [固定汇总](data/summary.json) 和 [Workflow、Jobs 与产物元数据](workflow/metadata.json)；三个仓库明细和聚合报告保存在 Actions artifacts。
-
-| 产物 | 用途 | 保留期 |
+| Artifact | Purpose | Retention |
 | --- | --- | --- |
-| `fd-scaling-nession` | Nession V2 逐任务结果、轨迹和用量 | 30 天，至 2026-10-26 |
-| `fd-scaling-codex` | Codex V2 逐任务结果、轨迹和用量 | 30 天，至 2026-10-26 |
-| `fd-scaling-openclaw` | OpenClaw V2 逐任务结果、轨迹和用量 | 30 天，至 2026-10-26 |
-| `fd-scaling-report-36213648492` | 36 个实验单元的聚合 JSON 与 Markdown | 90 天，至 2026-12-25 |
+| `fd-scaling-nession` | Nession V2 task results, traces, and usage | 30 days, through 2026-10-26 |
+| `fd-scaling-codex` | Codex V2 task results, traces, and usage | 30 days, through 2026-10-26 |
+| `fd-scaling-openclaw` | OpenClaw V2 task results, traces, and usage | 30 days, through 2026-10-26 |
+| `fd-scaling-report-36213648492` | Aggregate JSON and Markdown for all 36 units | 90 days, through 2026-12-25 |
 
-## 实验数据
+## Experiment Data
 
-| 仓库 | 方案 | 候选召回 | 最终召回 | 文件打分均值 | 目录判断均值 | 输入 tokens 均值 |
+| Repository | Policy | Candidate recall | Final recall | Mean scored files | Mean directory decisions | Mean input tokens |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | Nession | semantic lexical | 3/3 | 2/3 | 258.3 | 0 | 49,750 |
 | Nession | hierarchy V2 | 3/3 | 2/3 | 179.3 | 108.3 | 120,198 |
@@ -39,37 +37,14 @@
 | OpenClaw | hierarchy V2 | 3/3 | 3/3 | 7,773.0 | 1,425.3 | 2,707,812 |
 | OpenClaw | adaptive V2 cold | 3/3 | 3/3 | 8,732.7 | 1,430.3 | 2,899,232 |
 
-语义路径检索修复了首轮两个候选遗漏：
+Semantic aliases restored both V1 misses and reached 9/9 candidate recall. Some tasks expanded substantially: the Nession frontend case grew from 21 to 657 files, while the OpenClaw Gateway case grew from 3,994 to 4,984.
 
-- `filesystem -> fs` 使 `crates/nession-agent/src/fs/sandbox.rs` 进入候选；
-- `websocket -> ws` 使 `src/gateway/server/ws-connection/message-handler.ts` 进入候选。
+The remaining final-selection miss was `crates/nession-agent/src/fs/sandbox.rs`, scored at 0.53. Full V1 scoring protected it through a repository-wide top-1% guard. Candidate reduction incorrectly recomputed that 1% from only 71 scored candidates, shrinking the protected population from about 11 files to one.
 
-因此候选阶段达到 9/9 主要目标召回。代价是部分任务扩张明显：Nession 前端请求关联从首轮词法的 21 个文件增至 657 个；OpenClaw Gateway 从 3,994 增至 4,984 个。缩写词汇需要更精确的路径位置和证据权重，当前结果只证明补漏有效。
+## Experiment Results
 
-层级 V2 消除了根摘要漏候选，但没有减少目录成本：Nession 目录判断均值从首轮 65.7 增至 108.3，OpenClaw 从 1,398 增至 1,425.3。Adaptive V2 合并两路候选后始终比单独语义词法更贵，也没有提高主要目标召回。当前层级与组合方案不晋级。
-
-### 相对保护分母错误
-
-Nession 文件系统任务的目标已进入所有 V2 候选集，但最终仍未选中：
-
-```text
-target = crates/nession-agent/src/fs/sandbox.rs
-V2 score = 0.53
-absolute threshold = 0.65
-```
-
-全量 V1 中该目标分数为 0.50–0.52，同样低于绝对阈值，但它被全仓库 top-1% 相对保护保留。全量仓库有 1,096 个文件，相对保护约有 11 个位置。
-
-候选缩减后，当前实现错误地基于“已打分候选数”重新计算 1%。例如语义词法只打分 71 个文件，保护名额缩为 1 个。候选塑形因此改变了下游选择语义，使一个分数更高且已找回的目标反而丢失。
-
-这不是模型召回失败，而是相对保护的参考总体不稳定。候选塑形前后的对照必须保持原始总体定义：相对保护数量应从机械枚举的全仓库文件数计算，再应用到实际候选排名；若候选少于保护数量，则保留全部候选。
-
-## 实验结果
-
-1. 语义路径检索是当前最有希望的候选生成基线：本轮候选召回 9/9，无目录模型判断，Codex 和 OpenClaw 平均分别打分约 1,358 和 2,655 个文件。
-2. 本轮最差任务仍有 4,984 个候选，尚未稳定达到一个数量级缩减；不能宣称算法已经收敛。
-3. 根安全层级路由解决了单点剪枝，却增加大量目录判断；当前设计停止晋级。
-4. Adaptive 合并没有质量收益，停止晋级。
-5. 下一步先用已有产物回放稳定的全仓库相对保护分母，验证最终召回变化，不重新调用模型。
-
-回放后才决定是否缩小语义检索候选和进入重复/新任务验证。原始轨迹、候选来源、用量和各文件分数保存在 Workflow artifacts 中。
+1. Semantic lexical retrieval became the next baseline: it achieved 9/9 candidate recall without directory-model decisions.
+2. The worst task still scored 4,984 candidates, so the algorithm had not reached a stable order-of-magnitude reduction.
+3. Root-safe hierarchy removed root-summary omission but increased directory cost and was rejected.
+4. Adaptive union increased cost without recall improvement and was rejected.
+5. The next step was a zero-model replay using the original enumerated repository population for the relative guard.

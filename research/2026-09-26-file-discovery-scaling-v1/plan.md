@@ -1,106 +1,71 @@
-# 超大仓库文件发现：算法缩减与并发请求研究
+# Large-Repository File Discovery: Algorithmic Reduction and Concurrent Requests
 
-## 状态与目标
+## Status and Goal
 
-状态：首轮诊断已完成。结果见 [三仓库首轮报告](README.md)，Workflow 为 [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068)。
+The first diagnostic round is complete; see the [result report](README.md) and [Workflow 36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068).
 
-承接 [大仓库扩展性诊断](../../docs/research/file-discovery-large-repo-scaling-diagnosis.md)，研究如何在保持相关文件召回的同时，通过算法减少参与 System One 打分的文件和目录，并并发执行独立请求。
+Following the [large-repository scaling diagnosis](../../docs/research/file-discovery-large-repo-scaling-diagnosis.md), this experiment studied how to reduce file and directory scoring while preserving relevant-file recall, and how to execute independent System One requests concurrently.
 
-**不设文件或目录累计打分数量上限，不采用固定 top-k、候选配额或达到数量即停止。** 数量应由任务相关性、检索证据和探索状态自然决定。十倍缩减、2,000 个文件及旧方案的 128–512 个文件仅可作为观察结果的参考，不能作为截断规则或通过实验的替代证据。
+The design imposed no cumulative file or directory cap, fixed top-k, or channel quota. Counts had to emerge from task relevance, retrieval evidence, and exploration state. An order-of-magnitude reduction, 2,000 files, and earlier 128–512-file targets were observations rather than truncation or pass criteria.
 
-所有测试、索引构建和实验均在 GitHub Actions Workflow 执行，每次研究都生成报告。单请求大小、并发数、重试次数等传输控制仍可设置；它们只能决定分批与排队，不得丢弃逻辑候选。Workflow 超时属于未完成运行，不是算法成功停止。
+All tests, indexing, and experiments ran through GitHub Actions. Request size, concurrency, and retries could control transport but could not discard logical candidates.
 
-## 已有证据
+## Existing Evidence
 
-- `src/file_discovery_v1.py::score_files` 逐批串行调用；批次之间没有分数依赖，结果最终按路径排序。
-- `compact_state_v4` 已将共享指令放入批次状态，可作为减少重复输入的独立对照。
-- 当前 Workflow 任务矩阵 `max-parallel: 9`，任务并行和新增请求并发会叠加。
-- 原 OpenClaw V1 每任务打分 43,748 个文件、684 次请求、约 848 万输入 tokens、332.6 秒。来源：[运行 36109538329](https://github.com/BestNathan/system-one-code-explore/actions/runs/36109538329)。
+- V1 scored file batches sequentially even though batches had no score dependency.
+- `compact_state_v4` already separated shared instructions from batch content.
+- The prior OpenClaw V1 run scored 43,748 files per task through 684 requests, used about 8.48 million input tokens, and took 332.6 seconds.
+- Full scoring was known to be costly, but no routing strategy had demonstrated stable recall with an order-of-magnitude reduction.
 
-目前只知道全量打分在大仓库上成本过高，尚未证明某种路由策略能够稳定保留召回并减少一个数量级。
+## Compared Policies
 
-## 研究假设与方案比较
-
-| 方案 | 隔离的问题 | 主要风险 |
+| Policy | Isolated question | Main risk |
 | --- | --- | --- |
-| V1 全量打分 + 并发 | 独立请求的等待时间能减少多少 | 文件数和输入 tokens 不减少 |
-| 全局元数据检索 + 文件打分 | 词法/路径证据能减少多少模型判断 | 弱命名关联和跨模块文件可能遗漏 |
-| 全局检索 + 自适应层级路由 + 关系补漏 | 能否同时减少文件和目录判断 | 摘要丢失少数相关后代，停止条件误判 |
+| Full V1 plus concurrency | How much independent waiting time can be removed? | File and token counts remain unchanged |
+| Global metadata retrieval plus file scoring | How many model decisions can path evidence avoid? | Weak naming and cross-module files may be missed |
+| Retrieval plus adaptive hierarchy and rescue | Can file and directory decisions both fall? | Summaries may hide rare descendants or stop early |
 
-第三种是主要算法研究方向；前两种保留为对照。并发与算法缩减先分别验证，再组合。
+## Algorithm Design
 
-## 算法研究设计
+### Global metadata retrieval
 
-### 1. 全局元数据索引与任务相关检索
+Build a revision-keyed index of paths, filename terms, directory relations, and descendant summaries. Preserve all matches that satisfy evidence rules. Wide matches should be summarized by module rather than truncated.
 
-按仓库 commit 建立路径、文件名词元、目录关系和后代摘要索引。用任务与元数据的匹配证据获得起始文件、模块及检索线索，保留匹配依据。按证据分组处理完整命中集合，不固定取前若干条；命中过宽时先形成模块摘要再判断。
+### Adaptive module summaries
 
-检索入口不依赖父目录得分。它用于发现跨目录线索和补漏，不能被当作完备的相关文件集合。机械扫描与索引构建仍有 O(N) 成本，分别报告首次构建、索引体积和复用成本。
+Use descendant terms, representative paths, child composition, and counts. Ask separately whether relevant descendants may exist and whether the summary is sufficient. Expand mixed, uncertain, or relevant modules. A low-scoring parent must not permanently hide descendants reachable through another retrieval path.
 
-### 2. 自适应目录/模块摘要
+### Evidence-driven continuation
 
-优先研究按目录结构与后代路径语义形成的多层模块摘要，避免逐一打分所有目录。摘要包含后代词元、代表路径、子模块组成及文件数量；不能只使用目录名。
+Record new clues, unresolved coverage, deferred modules, uncertainty, and candidate changes after every wave. Stop only when the exploration queue is exhausted. This is a heuristic stop, not proof of complete coverage.
 
-模型判断“是否存在与任务相关的后代”和“当前摘要是否足以判断”，而不是目录内文件的平均相关性。少量相关实现不能被大量无关文件稀释。对混杂、摘要不充分或存在相关线索的模块继续细分；已清晰的模块直接进入文件候选阶段。
+### Independent scoring and reuse
 
-超宽目录在索引层形成语义分组或虚拟层级，比较这两种组织方式的成本与召回。层级本身不保证效率：若所有分组都需要展开，应如实报告算法退化，而不是强制停止。
+Score discovered files independently and cache identical semantic batches. Preserve candidate provenance and routing decisions so failures can be classified as retrieval omission, routing omission, early stopping, or file-score rejection.
 
-### 3. 全局补漏与关系驱动扩展
+## Concurrency Design
 
-路径检索、模块判断和已发现文件共同提供新线索，持续补充相关模块、同目录实现和元数据可支持的关联文件。候选合并去重，不为各通道设置数量配额。
+- Compare worker counts 1, 2, 4, and 8 with fixed candidates, prompts, and batches.
+- Bound in-flight requests with a queue; never discard logical candidates when the transport window fills.
+- Merge results by stable ID and advance exploration only after a complete wave.
+- Retry timeouts, 429 responses, and server errors with bounded backoff while preserving failure accounting.
+- Report summed request time, queue time, scoring wall time, and end-to-end time.
 
-暂缓模块保留索引引用和判断依据，新线索可触发重新评估。低分父目录不能永久屏蔽后代的其他检索入口。初期仅使用元数据关系，不通过隐式全量源码读取转移成本。
+## Frozen Three-Repository Suite
 
-### 4. 基于证据的继续与停止
-
-每轮记录新增相关线索、尚未判断的模块、摘要不确定性、未解决的任务覆盖项和文件集合变化。继续条件是存在新的相关线索、未解决覆盖项或需要细分的模块；探索队列耗尽可结束本轮。
-
-研究如何结合这些信号决定是否继续探索，比较单纯“集合不再变化”和包含不确定性/补漏检查的停止策略。相关性与不确定性阈值在实验前冻结，不能使用隐藏目标或期望文件数量反向调参。
-
-没有新增文件并不证明没有遗漏。无法可靠消除的不确定范围须记录为未解决；模型分数也不能直接当作遗漏概率上界。任何实用停止规则都需要召回实验验证，不宣称无损剪枝或普遍次线性复杂度。
-
-### 5. 文件独立打分与复用
-
-对算法实际发现的候选执行独立 Noul 判断，按内容身份缓存重复语义状态。保留每个文件的发现来源和每个模块的展开依据，区分检索遗漏、路由遗漏、过早停止及文件评分误判。
-
-评价累计参与逻辑打分的去重文件数、模块状态数以及实际模型请求数，避免把缓存命中或缩小最终输出误报为候选空间缩减。
-
-## 并发研究
-
-- 固定输入、profile 和批次，比较请求并发度 `1 / 2 / 4 / 8`。独立文件批次及独立模块可以并发；父子探索依赖仍须等待证据。
-- 使用队列、背压和有限在途请求；传输窗口满时排队，逻辑候选不被删除。
-- 按稳定 ID 合并结果，协调缓存、trace 和 usage 写入。使用完整波次结果推进探索，避免响应先后改变算法路径。
-- 超时、429 和服务端错误采用有限重试与退避，记录实际成本；缺失答案不能变成低相关分数。
-- 首轮固定 Workflow 任务并行数为 1，以隔离请求并发收益，再研究任务并行与请求并发叠加。
-- 分别记录请求耗时总和、排队时间、评分阶段墙钟时间和端到端时间；并发不代表输入 tokens 必然下降。
-
-## 三仓库实验设计
-
-沿用 `fixtures/file-discovery/system1-vs-system2-cases.json` 中的冻结版本和任务，不更换仓库：
-
-| 仓库 | 冻结 commit | 首轮三个任务 |
+| Repository | Revision | Tasks |
 | --- | --- | --- |
-| `BestNathan/nession` | `7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df` | 重连生命周期、符号链接删除安全、前端请求关联 |
-| `openai/codex` | `d7b07d45517a793acfba4cbf8de697d723cceb46` | 命令审批、MCP 调用审批、线程创建/恢复/持久化 |
-| `openclaw/openclaw` | `932abb0a841b522ebaa5b81921119a61b6a80b21` | Gateway 分发、技能来源优先级、记忆混合检索 |
+| `BestNathan/nession` | `7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df` | reconnect lifecycle, symlink deletion safety, frontend request correlation |
+| `openai/codex` | `d7b07d45517a793acfba4cbf8de697d723cceb46` | command approval, MCP call approval, thread create/resume/persistence |
+| `openclaw/openclaw` | `932abb0a841b522ebaa5b81921119a61b6a80b21` | Gateway dispatch, skill-source precedence, hybrid memory retrieval |
 
-1. **调度与索引验证：** 在 Workflow 中使用固定响应、乱序完成、失败注入、超宽/超深目录样本验证完整处理与去重。改变分批大小和传输窗口不能丢候选。
-2. **并发隔离实验：** 九任务固定输入，仅改变并发；回放验证调度一致性，真实请求测延迟、限流和抖动。现有 profile 保持一致，另测 compact profile，避免混淆收益来源。
-3. **算法消融实验：** 固定并发和模型，对比全量 V1、仅全局检索、增加层级路由、再增加关系补漏及不确定性停止。记录每阶段新增模型判断及找回/遗漏的文件。
-4. **组合验证：** 冻结算法后加入胜出的并发配置，在三仓库重复运行。相同语义请求在算法 A/B 中可共享缓存；真实并发性能实验必须区分缓存命中与实际调用。
-5. **新任务验证：** 原九任务已用于诊断，不能声称是全新泛化测试。继续在这三个仓库中冻结未用于调参的多文件任务，补充必要支持文件标签；标签仅供评估，不进入检索或路由输入。
+The original nine tasks were diagnostic cases. Any generalization claim requires new tasks frozen before their labels or results are inspected.
 
-先以每配置三次重复筛选方向；对入选方案的压力任务增加重复，记录样本量、经验 p50/p95/max 及尾延迟估计局限。避免一次穷举所有参数组合。
+## Evaluation and Reporting
 
-## 结果判定与报告
-
-- 原九任务主要目标须全部召回；新任务分别报告主要和必要支持文件的召回、精度和遗漏。仅命中一个主要文件不足以证明完整覆盖。
-- 报告 `全量文件数 / 实际参与打分文件数`，观察能否自然缩减一个数量级；未达到、反而膨胀的任务也必须保留。没有 2,000 文件通过线。
-- 同时报告目录/模块逻辑判断数、重复判断数、文件数、tokens、调用数、费用、限流、错误及端到端耗时，不能把文件节省转移成海量目录打分。
-- 分仓库、分任务报告结果与最差情况，并展示数量随仓库规模和任务类型的变化。三个仓库只能提供规模证据，不能单独证明复杂度结论。
-- 对比并发 V1 的总体收益，纳入冷/热索引成本；如另测 System2 升级，单独列出升级成本和未解决任务，不混作纯 System One 的成功结果。
-- 对新增结果给出质量与成本权衡、失败机制及下一变量，不以达到指定数量替代算法改进证据。
-
-每次实验保存在根目录 `research/` 的独立目录，包含冻结配置、代码和目标仓库 commit、Workflow URL、产物链接、各任务指标、失败/未解决案例及结论。候选来源、路由轨迹、停止依据和原始用量作为 Workflow 产物，失败时也上传可用结果。
-
-当前结论仅为研究设计：通过检索、摘要、按需展开和复用减少不必要判断，通过并发减少独立请求等待；实际缩减量及召回效果由三仓库实验测量。
+- Require all primary targets from the original nine tasks; report primary and supporting-file recall separately for new tasks.
+- Report total repository files versus actually scored files without enforcing a 2,000-file threshold.
+- Report directory decisions, duplicates, files, tokens, calls, cost, rate limits, errors, and end-to-end latency.
+- Break results down by repository and task and retain the worst cases.
+- Record quality/cost tradeoffs, failure mechanisms, and the next isolated variable.
+- Store every experiment in its own root `research/` directory. Keep traces, provenance, stopping evidence, and raw usage in Workflow artifacts even when a run fails.

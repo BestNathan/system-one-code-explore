@@ -1,55 +1,42 @@
-# File Discovery：稳定相对保护回放
+# File Discovery: Stable Relative-Guard Replay
 
-## 实验目标
+## Experiment Goal
 
-候选塑形后，top-1% 相对保护应以缩减后的候选数还是机械枚举的原始仓库文件数为总体？
+Determine whether the top-1% relative guard should use the reduced candidate count or the mechanically enumerated original repository population.
 
-## 实验方案
+## Experiment Design
 
-V1 的保护语义建立在全仓库总体上。若改用候选数，同一个文件即使模型分数不变，也会因为上游算法缩小候选而失去保护。回放将总体固定为原始仓库文件数，并把保护数限制在实际已打分候选数内。
+Replay existing file scores with the guard population fixed to the original repository file count. Limit the protected count to the number of candidates actually scored. This preserves V1 selection semantics without making new model calls.
 
-## 实验过程
+## Experiment Process
 
-完成零模型回放。来源 Workflow：[36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492)，回放 Workflow：[36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855)。回放直接使用已保存文件分数，没有新增 System One 调用。
+The source was [Workflow 36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492); [replay Workflow 36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855) downloaded its artifacts, applied old and stable population semantics, and uploaded per-task comparisons. The replay made zero System One calls.
 
-回放 Workflow 下载 V2 artifacts，使用相同文件分数分别执行旧分母与稳定仓库总体分母的选择逻辑，再上传逐任务回放表。提交内保存了 [固定汇总](data/summary.json) 和 [来源/回放 Workflow、Job 与产物元数据](workflow/metadata.json)。
+The repository contains the [fixed summary](data/summary.json) and [source/replay Workflow metadata](workflow/metadata.json).
 
-| 产物 | 用途 | 保留期 |
+| Artifact | Purpose | Retention |
 | --- | --- | --- |
-| `fd-stable-selection-replay-36214118855` | 四个方案的逐任务回放、候选排名和聚合报告 | 90 天，至 2026-12-25 |
+| `fd-stable-selection-replay-36214118855` | Per-task rankings and aggregate replay for four policies | 90 days, through 2026-12-25 |
 
-迁移到 `main` 时冻结配置又触发一次零模型回放 [36220565302](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565302)，运行成功，产物 `fd-stable-selection-replay-36220565302` 保留 90 天至 2026-12-25。它用于验证迁移后的 Workflow，不作为新的独立实验；完整记录见 [main 复跑元数据](workflow/main-replay-36220565302.json)。
+Moving the frozen configuration to `main` produced a second zero-model [validation replay 36220565302](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565302). It succeeded and uploaded `fd-stable-selection-replay-36220565302`, retained for 90 days through 2026-12-25. It is validation of the migrated Workflow rather than a separate experiment; see its [metadata](workflow/main-replay-36220565302.json).
 
-## 实验数据
+## Experiment Data
 
-| 方案 | 案例 | 原选择召回 | 稳定总体回放召回 | 回放入选文件均值 |
+| Policy | Cases | Original recall | Stable-population recall | Mean selected files |
 | --- | ---: | ---: | ---: | ---: |
 | semantic lexical | 9 | 88.9% | 100% | 182.9 |
 | hierarchy V2 | 9 | 88.9% | 100% | 186.9 |
 | adaptive V2 quality | 9 | 88.9% | 100% | 189.3 |
 | adaptive V2 cold | 9 | 88.9% | 100% | 184.7 |
 
-Nession 文件系统任务的 `crates/nession-agent/src/fs/sandbox.rs` 在四个方案中均恢复。仓库有 1,096 个文件，因此保护名额为 11，而不是缩减候选集的 1%。
+All four policies recovered `crates/nession-agent/src/fs/sandbox.rs`. Nession's 1,096 files produce 11 protected positions instead of one. Codex receives 63 positions and OpenClaw 438; score ties can select slightly more.
 
-其他案例的主要目标召回没有下降。Codex 保护名额为 63；OpenClaw 为 438。由于分数并列，实际入选可以略多于保护名额。
+Stable population semantics provide a valid V1-compatible comparison, but they are unsuitable as the production policy. Semantic lexical retrieval still selected roughly 442–456 OpenClaw files per task because the repository-wide 1% fallback dominates downstream cost.
 
-### 数据解释
+## Experiment Results
 
-稳定总体是正确的 A/B 语义：候选塑形不应暗中改变下游选择策略。它也说明 V1 的相对保护不适合作为最终生产选择策略。
-
-OpenClaw 的语义词法方案每任务最终入选约 442–456 个文件。即使文件级模型只打分 1,126–4,984 个候选，机械保留全仓库 1% 仍会给后续证据定位带来很大成本。
-
-因此需要区分两个用途：
-
-- 全仓库相对保护用于与 V1 做语义稳定的研究对照；
-- 生产候选选择需要使用明确的检索证据和文件分数决定低分救援，不能永久依赖全仓库 1%。
-
-## 实验结果
-
-1. 研究对照统一使用原始仓库总体计算相对保护。
-2. 当前三个层级/组合方案仍不晋级；稳定选择没有改变其高目录成本。
-3. 语义词法候选生成保留为下一阶段基线。
-4. 下一阶段研究基于候选来源强度的低分救援，同时改进语义概念计数，避免一个别名扩展成多个匹配证据。
-5. 所有救援阈值先在当前九任务上诊断，再冻结到三个仓库的新任务；当前结果不能作为泛化证据。
-
-完整逐任务回放表和候选排名保存在回放 Workflow artifact 中。
+1. V1-compatible research comparisons must calculate the relative guard from the original repository population.
+2. Stable selection restored 9/9 primary recall but did not make hierarchical or adaptive routing cost-effective.
+3. Semantic lexical discovery remains the candidate-generation baseline.
+4. Production selection needs provenance-aware low-score rescue rather than a permanent repository-wide 1% fallback.
+5. Rescue rules must first be diagnosed on the existing tasks, then frozen and evaluated on fresh tasks from all three repositories.

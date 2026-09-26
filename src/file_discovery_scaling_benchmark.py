@@ -31,29 +31,29 @@ def write_json(path, data):
 def render_report(payload):
     rows = payload["rows"]
     completed = [r for r in rows if r["status"] == "success"]
-    lines = ["# File Discovery 算法缩减与并发实验报告", "",
+    lines = ["# File Discovery Algorithm Reduction and Concurrency Report", "",
              f"- Workflow: {payload['run_url']}", f"- Code commit: `{payload['code_sha']}`",
-             f"- 已记录 {len(rows)}/{payload['expected_rows']} 个实验单元；成功 {len(completed)}。",
-             "- 文件/目录无数量上限、无固定 top-k、无通道配额。",
-             "- 此轮为既有九任务诊断；主要目标标签并非完整支持文件真值。单次结果不证明稳定性。",
-             "- quality 组复用完全相同的批次决策；其实际耗时包含缓存收益，不能视作独立运行延迟。",
-             "- 不同候选集合会改变分批，公共文件不一定共享同一次判断；本轮不是逐文件严格配对的因果比较。",
-             "- cold 组不共享缓存，适合观察真实端到端耗时；不同请求的模型噪声仍可能影响结果。",
-             "- 逻辑 tokens/费用包括缓存命中；物理 tokens/费用来自响应 usage，包含已返回但解析失败的响应。",
-             "- 未返回 usage 的失败请求费用未知；HTTP attempts 是 send 数与重试事件数之和。", "",
-             "## 每任务结果", "",
-             "| Case | Arm | 状态 | 总文件 | 打分文件 | 缩减倍数 | 目录判断 | 候选召回 | 最终召回 | 入选 | 物理调用 | 逻辑输入 tokens | 逻辑 USD | 实际秒 | 缓存批次 |",
+             f"- Recorded {len(rows)}/{payload['expected_rows']} experiment units; {len(completed)} succeeded.",
+             "- File and directory counts are uncapped, with no fixed top-k or channel quota.",
+             "- This round diagnoses nine existing tasks; primary labels are not complete supporting-file ground truth, and one run does not establish stability.",
+             "- Quality arms reuse identical batch decisions, so their elapsed time includes cache benefits and is not independent-run latency.",
+             "- Candidate changes alter batching; shared files may not share decisions, so this is not a strict paired per-file causal comparison.",
+             "- Cold arms do not share cache and expose end-to-end latency, although model noise may still vary between requests.",
+             "- Logical tokens and cost include cache hits; physical usage includes returned responses that later failed parsing.",
+             "- Failed requests without usage have unknown cost; HTTP attempts equal sends plus retry events.", "",
+             "## Per-Task Results", "",
+             "| Case | Arm | Status | Total files | Scored files | Reduction | Directory decisions | Candidate recall | Final recall | Selected | Physical calls | Logical input tokens | Logical USD | Wall seconds | Cached batches |",
              "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for r in rows:
         if r["status"] != "success":
-            detail = str(r.get("error", "未完成")).replace("|", "/").replace("\n", " ")
+            detail = str(r.get("error", "incomplete")).replace("|", "/").replace("\n", " ")
             lines.append(f"| {r['case_id']} | {r['arm']} | {r['status']}: {detail[:240]} | — | — | — | — | — | — | — | — | — | — | — | — |")
             continue
         u = r["usage"]
-        reduction = f"{r['reduction_factor']:.2f}" if r["reduction_factor"] is not None else "无文件打分"
+        reduction = f"{r['reduction_factor']:.2f}" if r["reduction_factor"] is not None else "no file scoring"
         lines.append(f"| {r['case_id']} | {r['arm']} | success | {r['enumerated_file_count']} | {r['scored_file_count']} | {reduction} | {r['route_scored_count']} | {r['candidate_recall']:.0%} | {r['primary_recall']:.0%} | {r['selected_file_count']} | {u['model_calls']} | {u['logical_input_tokens']} | {r['logical_pricing']['estimated_cost_usd']:.5f} | {r['wall_time_ms']/1000:.2f} | {u['cache_hits']} |")
-    lines += ["", "## 分仓库与方案汇总", "",
-              "| Repository | Arm | 完成/计划 | 主要目标召回均值 | 文件数均值 | 目录数均值 | 输入 tokens 均值（逻辑） | 实际秒均值 |",
+    lines += ["", "## Repository and Policy Summary", "",
+              "| Repository | Arm | Completed/planned | Mean primary recall | Mean files | Mean directories | Mean logical input tokens | Mean wall seconds |",
               "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     groups = sorted({(r.get("repository", "unknown"), r["arm"]) for r in rows})
     for repo, arm in groups:
@@ -65,20 +65,20 @@ def render_report(payload):
         mean = lambda key: statistics.fmean(r[key] for r in ok)
         inputs = statistics.fmean(r["usage"]["logical_input_tokens"] for r in ok)
         lines.append(f"| {repo} | {arm} | {len(ok)}/{len(group)} | {mean('primary_recall'):.1%} | {mean('scored_file_count'):.1f} | {mean('route_scored_count'):.1f} | {inputs:.0f} | {mean('wall_time_ms')/1000:.2f} |")
-    lines += ["", "## 遗漏与失败", ""]
+    lines += ["", "## Omissions and Failures", ""]
     misses = [r for r in completed if r["missing_primary"]]
     for r in misses:
         lines.append(f"- {r['case_id']} / {r['arm']}: {json.dumps(r['missing_primary'], ensure_ascii=False)}")
     if not misses:
-        lines.append("- 已完成实验未发现主要目标遗漏；不代表支持文件完整召回。")
+        lines.append("- Completed units had no primary-target omissions; this does not imply complete supporting-file recall.")
     for r in rows:
         if r["status"] != "success":
-            lines.append(f"- {r['case_id']} / {r['arm']}: {r['status']}；{r.get('error', '未完成')}；已知用量 {json.dumps(r.get('usage', {}))}")
-    lines += ["", "## 解释边界与下一步", "",
-              "- 对比并发组时固定候选与提示；对比算法组时同时查看文件数、目录数和逻辑 tokens，不能仅看最终输出大小。",
-              "- 延后模块可能仍含相关文件，停止仅表示当前策略的探索队列耗尽，不是完整覆盖证明。",
-              "- 重点分析召回退化所在阶段；首轮诊断后再冻结配置做重复与三仓库新任务验证。",
-              "- 原始配置、每条用量、路由轨迹、候选来源及响应模型名在同一运行的 artifacts 中。", ""]
+            lines.append(f"- {r['case_id']} / {r['arm']}: {r['status']}; {r.get('error', 'incomplete')}; known usage {json.dumps(r.get('usage', {}))}")
+    lines += ["", "## Interpretation Boundaries and Next Step", "",
+              "- Concurrency comparisons fix candidates and prompts; algorithm comparisons must consider files, directories, and logical tokens together.",
+              "- Deferred modules may contain relevant files; stopping means only that the current exploration queue is exhausted.",
+              "- Diagnose the stage of each recall loss, then freeze repeats and fresh tasks across all three repositories.",
+              "- Raw configuration, usage, routing traces, provenance, and response model names are stored in the run artifacts.", ""]
     return "\n".join(lines)
 
 

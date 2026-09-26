@@ -1,56 +1,48 @@
-# File Discovery 算法缩减与并发：三仓库首轮结果
+# File Discovery Algorithm Scaling and Concurrency: First Three-Repository Results
 
-## 实验目标
+## Experiment Goal
 
-1. 独立 System One 文件批次并发能否降低延迟而不改变逻辑输入？
-2. 全局路径检索和层级模块路由能否自然减少文件打分量，同时保留主要目标？
-3. 文件缩减是否会转化成过多目录判断和提示 tokens？
+1. Determine whether concurrent independent System One file batches reduce latency without changing logical input.
+2. Test whether global path retrieval and hierarchical routing naturally reduce file scoring while retaining primary targets.
+3. Measure whether fewer file decisions merely shift cost into directory decisions and prompt tokens.
 
-## 实验方案
+## Experiment Design
 
-- `all_c1_cold` / `all_c4_cold`：同一全量候选和批次，分别串行和四并发。
-- `lexical_c4_quality`：按任务词与完整路径词的确定性证据发现文件。
-- `hierarchy_c4_quality`：使用压缩后代词元和代表路径逐层判断模块。
-- `hybrid_c4_quality` / `hybrid_c4_cold`：合并词法、层级路由及高分文件同目录补充。
+- `all_c1_cold` and `all_c4_cold`: identical full candidate sets with one versus four workers.
+- `lexical_c4_quality`: deterministic query-to-path evidence.
+- `hierarchy_c4_quality`: recursive routing over compressed descendant terms and representative paths.
+- `hybrid_c4_quality` and `hybrid_c4_cold`: lexical plus hierarchy candidates and same-directory expansion.
 
-算法质量组仅对完全相同的请求批次共享缓存。候选集合变化会改变分批，因此这不是严格的逐文件配对因果实验。首轮只有一次重复，不能说明稳定性。
+Quality arms shared only identical request batches. Candidate-set changes alter batching, so this was not a strict paired per-file causal comparison. The first round had one repeat.
 
-## 实验过程
+## Experiment Process
 
-完成首轮诊断。Workflow：[36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068)，代码 commit：`ebe7e0748c78704a061f177a2746efde21657ae9`。54/54 个实验单元成功，模型响应版本均为 `jev-1.13.0`。
+[Workflow 36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068) ran commit `ebe7e0748c78704a061f177a2746efde21657ae9`. All 54 units succeeded with model response version `jev-1.13.0`. The frozen suite contained three tasks each for Nession, Codex, and OpenClaw. Primary labels were used only after execution.
 
-本轮使用冻结的 Nession、Codex、OpenClaw 各三个任务。候选算法没有文件或目录数量上限、固定 top-k 或通道配额。主要目标标签用于运行后评估，不进入候选生成。
+The committed evidence includes the [fixed summary](data/summary.json) and [Workflow, job, and artifact metadata](workflow/metadata.json).
 
-完整运行由 [GitHub Actions Workflow 36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068) 执行。提交内保存了 [固定汇总](data/summary.json) 和 [Workflow、Jobs 与产物元数据](workflow/metadata.json)。Workflow 产物包括三个仓库的逐任务结果及聚合报告；产物名称、摘要、大小和到期时间均记录在元数据中。
-
-| 产物 | 用途 | 保留期 |
+| Artifact | Purpose | Retention |
 | --- | --- | --- |
-| `fd-scaling-nession` | Nession 逐任务结果、轨迹和用量 | 30 天，至 2026-10-25 |
-| `fd-scaling-codex` | Codex 逐任务结果、轨迹和用量 | 30 天，至 2026-10-25 |
-| `fd-scaling-openclaw` | OpenClaw 逐任务结果、轨迹和用量 | 30 天，至 2026-10-25 |
-| `fd-scaling-report-36155715068` | 54 个实验单元的聚合 JSON 与 Markdown | 90 天，至 2026-12-24 |
+| `fd-scaling-nession` | Nession task results, traces, and usage | 30 days, through 2026-10-25 |
+| `fd-scaling-codex` | Codex task results, traces, and usage | 30 days, through 2026-10-25 |
+| `fd-scaling-openclaw` | OpenClaw task results, traces, and usage | 30 days, through 2026-10-25 |
+| `fd-scaling-report-36155715068` | Aggregate JSON and Markdown for all 54 units | 90 days, through 2026-12-24 |
 
-将历史提交首次快进到 `main` 时，新增的冻结配置触发了重复运行 [36220565316](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565316)。发现后立即取消；Codex 和 OpenClaw 未执行，Nession 执行阶段约 13 秒后取消。该运行不属于实验数据，也不参与结论；取消状态、Jobs 和两个部分产物记录在 [迁移触发运行元数据](workflow/migration-triggered-run-36220565316.json) 中。
+Moving the historical commits to `main` triggered duplicate [run 36220565316](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565316). It was canceled immediately: Codex and OpenClaw did not execute, and Nession was canceled about 13 seconds into its experiment step. The run is excluded from all results; its state and partial artifacts are preserved in [migration-run metadata](workflow/migration-triggered-run-36220565316.json).
 
-## 实验数据
+## Experiment Data
 
-### 并发结果
+Full scoring retained 9/9 primary targets with unchanged logical input tokens.
 
-全量打分保持 9/9 主要目标召回，逻辑输入 tokens 不变：
-
-| 仓库 | 文件数 | 串行均值 | 四并发均值 | 加速 |
+| Repository | Files | Serial mean | Four-worker mean | Speedup |
 | --- | ---: | ---: | ---: | ---: |
 | Nession | 1,096 | 3.90s | 1.13s | 3.44× |
 | Codex | 6,277 | 31.65s | 7.88s | 4.02× |
 | OpenClaw | 43,748 | 156.92s | 40.01s | 3.92× |
 
-并发解决等待时间，没有减少文件数或 tokens。全部实验共记录 74 次重试事件，25/54 个单元出现重试，未出现 429 重试。四并发在本轮没有造成限流。
+There were 74 retry events across 25 of 54 units and no 429 retries.
 
-### 算法缩减结果
-
-下表为每个仓库三个任务的均值：
-
-| 仓库 | 方案 | 主要目标召回 | 文件打分 | 目录判断 | 逻辑输入 tokens |
+| Repository | Policy | Primary recall | Scored files | Directory decisions | Logical input tokens |
 | --- | --- | ---: | ---: | ---: | ---: |
 | Nession | lexical | 2/3 | 26.7 | 0 | 5,251 |
 | Nession | hierarchy | 2/3 | 97.7 | 65.7 | 69,333 |
@@ -62,32 +54,12 @@
 | OpenClaw | hierarchy | 3/3 | 7,072.0 | 1,398.0 | 2,529,199 |
 | OpenClaw | hybrid cold | 3/3 | 14,512.7 | 1,377.3 | 3,965,194 |
 
-词法检索最便宜，但遗漏两类弱路径表达：
+Lexical retrieval missed `crates/nession-agent/src/fs/sandbox.rs` because it did not align `filesystem` with `fs`, and missed `src/gateway/server/ws-connection/message-handler.ts` because it did not align `websocket` with `ws`. Hierarchical routing recovered the OpenClaw target but stopped the Nession filesystem task at the root summary. Same-directory expansion did not repair these failures and greatly enlarged OpenClaw candidates.
 
-- Nession 文件系统安全任务：目标 `crates/nession-agent/src/fs/sandbox.rs`，任务使用 `filesystem`、`symlink`、`delete`，当前分词没有建立 `filesystem -> fs` 关系，也无法从 `sandbox` 推出安全实现。
-- OpenClaw Gateway WebSocket 任务：目标 `src/gateway/server/ws-connection/message-handler.ts`；当前规则未把 `websocket` 与 `ws` 对齐，单个常见的 `gateway` 命中不足以入选。
+## Experiment Results
 
-层级路由在 Codex 和 OpenClaw 保持 6/6 召回，但文件缩减仅约 2.36× 和 6.19×；目录判断增加到约 535 和 1,398 个。目录提示使 Codex tokens 只比全量基线少约 16%，说明文件数量下降不能单独代表成本下降。
-
-Nession 文件系统任务的层级路由在根摘要直接停止：相关性 `0.16`，继续探索必要性 `0.46`，低于冻结阈值 `0.5`。根摘要只展示少量代表路径，`fs` 模块没有获得充分表示。这是摘要压缩后的过早停止，不是目标文件被模型打低分。
-
-Hybrid 的同目录补充没有修复上述遗漏，并显著扩大候选：OpenClaw 从 hierarchy 的 7,072 个文件增至约 14,513 个。该补充规则不进入下一轮。
-
-## 实验结果
-
-1. 独立文件批次采用四并发；本轮接近理想 4×，且没有 429。
-2. 词法检索可以自然获得一个数量级以上缩减，但现有词法边界不具备足够召回。
-3. 当前层级摘要能补回 OpenClaw 的词法遗漏，但根级单次判断会错误关闭整棵树。
-4. 大量模块判断会吞掉文件缩减收益。下一步必须同时减少目录判断和文件判断。
-5. 同目录邻居不是有效的通用补漏机制，停止研究当前版本。
-
-### 后续方向
-
-只改变两个已定位机制：
-
-1. 确定性路径语义正规化：复合词、单复数、常见代码缩写与完整词对齐，先覆盖本轮暴露的 `filesystem/fs`、`websocket/ws`，规则必须通用于任务与路径，不能写入目标文件名。
-2. 根和高损摘要不再承担整棵树的单点剪枝。先形成可独立判断的顶层/虚拟模块卡，再对相关或不确定模块按需细分；同时复用确定性词法证据跳过无必要的模型目录判断。
-
-第二轮继续使用相同三仓库九任务做机制回归，并新增未用于调参的任务后才能讨论泛化。报告必须同时给出主要目标召回、文件打分数、目录判断数、tokens、调用和延迟。
-
-原始每任务结果、路由轨迹、候选来源、用量和失败诊断保存在 Workflow artifacts 中。
+1. Four concurrent independent batches produced near-ideal speedup without rate limiting.
+2. Lexical retrieval delivered large natural reductions but insufficient recall.
+3. Hierarchical summaries repaired one lexical miss while adding too many directory decisions.
+4. Same-directory expansion was rejected.
+5. The next experiment should add symmetric path-semantic normalization and remove root-level single-point pruning, while continuing to report file count, directory count, tokens, calls, latency, and failures.
