@@ -114,16 +114,32 @@ def semantic_concepts(text):
     """Return distinct task concepts without counting aliases as extra evidence."""
     aliases = {alias: canonical for canonical, values in SEMANTIC_CONCEPT_ALIASES.items()
                for alias in values}
-    raw = {p.lower() for p in re.split(r"[^A-Za-z0-9]+|(?<=[a-z0-9])(?=[A-Z])", text) if p}
     concepts = set()
-    for part in raw:
-        normalized = part[:-1] if part.endswith("s") and len(part) > 4 else part
-        if normalized in aliases:
-            concepts.add(aliases[normalized])
-        elif normalized in SEMANTIC_CONCEPT_ALIASES:
-            concepts.add(normalized)
-        elif len(normalized) >= 3 and normalized not in STOP:
-            concepts.add(normalized)
+    for chunk in re.split(r"[^A-Za-z0-9]+", text):
+        if not chunk:
+            continue
+        whole = chunk.lower()
+        if whole.endswith("s") and len(whole) > 4:
+            whole = whole[:-1]
+        if whole in aliases:
+            concepts.add(aliases[whole])
+            continue
+        if whole in SEMANTIC_CONCEPT_ALIASES:
+            concepts.add(whole)
+            continue
+        # Keep recognized compounds intact before splitting unknown CamelCase
+        # names such as OpenClaw into their useful path components.
+        parts = re.split(r"(?<=[a-z0-9])(?=[A-Z])", chunk)
+        for part in parts:
+            normalized = part.lower()
+            if normalized.endswith("s") and len(normalized) > 4:
+                normalized = normalized[:-1]
+            if normalized in aliases:
+                concepts.add(aliases[normalized])
+            elif normalized in SEMANTIC_CONCEPT_ALIASES:
+                concepts.add(normalized)
+            elif len(normalized) >= 3 and normalized not in STOP:
+                concepts.add(normalized)
     return concepts
 
 

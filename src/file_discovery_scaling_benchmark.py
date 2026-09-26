@@ -38,7 +38,7 @@ def render_report(payload):
              "- This round diagnoses nine existing tasks; primary labels are not complete supporting-file ground truth, and one run does not establish stability.",
              "- Quality arms reuse identical batch decisions, so their elapsed time includes cache benefits and is not independent-run latency.",
              "- Candidate changes alter batching; shared files may not share decisions, so this is not a strict paired per-file causal comparison.",
-             "- Cold arms do not share cache and expose end-to-end latency, although model noise may still vary between requests.",
+             "- Cached selection arms replay exact score batches and do not expose standalone latency.",
              "- Logical tokens and cost include cache hits; physical usage includes returned responses that later failed parsing.",
              "- Failed requests without usage have unknown cost; HTTP attempts equal sends plus retry events.", "",
              "## Per-Task Results", "",
