@@ -12,15 +12,16 @@ The run must make zero System One calls and zero directory model decisions. Thre
 
 ## Experiment Process
 
-V3 increased OpenClaw mean scoring from 2,655 to 4,729 files and missed a Gateway target. V4 fixed the PascalCase normalization and restored all nine primary targets, but weighted retrieval still scored 4,632 OpenClaw files. This frontier study checks whether a metadata-only score threshold can reduce that cost before another paid scoring experiment. The GitHub Actions Workflow validates the test suite, checks out the same pinned repositories, computes the full threshold frontier, aggregates the results, and retains artifacts for 90 days.
+V3 increased OpenClaw mean scoring from 2,655 to 4,729 files and missed a Gateway target. V4 fixed the PascalCase normalization and restored all nine primary targets, but weighted retrieval still scored 4,632 OpenClaw files. Workflow [36230341725](https://github.com/BestNathan/system-one-code-explore/actions/runs/36230341725) validated 154 tests and completed all three repositories with zero model calls and zero directory model decisions. Artifacts are retained for 90 days.
 
 ## Experiment Data
 
 - Frozen thresholds and pass criteria: [`data/frontier-experiment.json`](data/frontier-experiment.json)
 - Frozen tasks and repository revisions: [`data/cases.json`](data/cases.json)
+- Aggregate threshold frontier: [`data/summary.json`](data/summary.json)
 - Workflow jobs, aggregate artifact, and retention inventory: [`workflow/metadata.json`](workflow/metadata.json)
 - Per-repository artifacts contain each task's threshold counts, primary recall, and misses. No raw model-call files are expected because the experiment is offline and makes no calls.
 
 ## Experiment Results
 
-Pending the GitHub Actions run. The principal result is the Pareto frontier of candidate count versus primary recall; the experiment passes its operational gate only if at least one threshold reaches 9/9 recall and fewer than 2,000 mean OpenClaw candidates.
+No tested threshold met both gates. Threshold 6 retained all 9/9 primary targets but averaged 4,181 OpenClaw candidates. Threshold 8 reduced that mean to 2,451 but lost one target. Threshold 10 reached 1,933 candidates but retained only 6/9 targets. The available score thresholds therefore expose a sharp recall/cost tradeoff; the next experiment calculates the exact smallest candidate population any scalar score threshold can retain while preserving all known primary targets.

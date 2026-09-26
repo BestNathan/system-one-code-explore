@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "experiment": "uncapped-weighted-path-score-frontier-v5",
+  "workflow_run_id": 36230341725,
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36230341725",
+  "code_sha": "ca49af562cfa981189fd510ec5cf1902ef2eaec2",
+  "successful_repository_jobs": 3,
+  "test_count": 154,
+  "model_calls": 0,
+  "directory_model_decisions": 0,
+  "thresholds": [
+    {"score": 0, "primary_recall": 1.0, "mean_candidates": 4705.8, "maximum_candidates": 11136, "openclaw_mean_candidates": 7911.7},
+    {"score": 2, "primary_recall": 1.0, "mean_candidates": 3136.7, "maximum_candidates": 11136, "openclaw_mean_candidates": 7911.7},
+    {"score": 3, "primary_recall": 1.0, "mean_candidates": 2886.7, "maximum_candidates": 10701, "openclaw_mean_candidates": 7196.7},
+    {"score": 4, "primary_recall": 1.0, "mean_candidates": 2598.4, "maximum_candidates": 9884, "openclaw_mean_candidates": 6744.0},
+    {"score": 5, "primary_recall": 1.0, "mean_candidates": 2100.2, "maximum_candidates": 8066, "openclaw_mean_candidates": 5376.0},
+    {"score": 6, "primary_recall": 1.0, "mean_candidates": 1648.4, "maximum_candidates": 8066, "openclaw_mean_candidates": 4181.0},
+    {"score": 8, "primary_recall": 0.8888888889, "mean_candidates": 1018.9, "maximum_candidates": 4459, "openclaw_mean_candidates": 2451.3},
+    {"score": 10, "primary_recall": 0.6666666667, "mean_candidates": 779.8, "maximum_candidates": 3435, "openclaw_mean_candidates": 1933.0},
+    {"score": 12, "primary_recall": 0.6666666667, "mean_candidates": 426.0, "maximum_candidates": 1787, "openclaw_mean_candidates": 1069.3},
+    {"score": 16, "primary_recall": 0.4444444444, "mean_candidates": 180.2, "maximum_candidates": 874, "openclaw_mean_candidates": 455.0},
+    {"score": 20, "primary_recall": 0.2222222222, "mean_candidates": 68.7, "maximum_candidates": 307, "openclaw_mean_candidates": 167.3}
+  ],
+  "gate": {
+    "primary_recall_required": 1.0,
+    "openclaw_mean_candidates_required_below": 2000,
+    "passing_thresholds": []
+  },
+  "decision": "No tested numeric score threshold preserved all primary targets while bringing OpenClaw below 2,000 mean candidates. An exact recall-constrained minimum-candidate calculation is the next analysis."
+}
