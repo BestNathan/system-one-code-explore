@@ -1,5 +1,5 @@
 {
-  "experiment": "uncapped-adaptive-discovery-diagnostic-v1",
+  "experiment": "semantic-rescue-root-safe-routing-v2",
   "repeats": 1,
   "profile": "baseline_v1",
   "batch_size": 64,
@@ -7,21 +7,21 @@
   "uncertainty_threshold": 0.5,
   "file_threshold": 0.65,
   "arms": [
-    {"name": "all_c1_cold", "policy": "all", "workers": 1},
-    {"name": "all_c4_cold", "policy": "all", "workers": 4},
-    {"name": "lexical_c4_quality", "policy": "lexical", "workers": 4, "cache_group": "quality"},
-    {"name": "hierarchy_c4_quality", "policy": "hierarchy", "workers": 4, "cache_group": "quality"},
-    {"name": "hybrid_c4_quality", "policy": "hybrid", "workers": 4, "cache_group": "quality"},
-    {"name": "hybrid_c4_cold", "policy": "hybrid", "workers": 4}
+    {"name": "semantic_lexical_c4_quality", "policy": "semantic_lexical", "workers": 4, "cache_group": "v2-quality"},
+    {"name": "hierarchy_v2_c4_quality", "policy": "hierarchy_v2", "workers": 4, "cache_group": "v2-quality"},
+    {"name": "adaptive_v2_c4_quality", "policy": "adaptive_v2", "workers": 4, "cache_group": "v2-quality"},
+    {"name": "adaptive_v2_c4_cold", "policy": "adaptive_v2", "workers": 4}
   ],
   "notes": [
     "No cumulative file or directory candidate cap, no top-k candidate truncation.",
-    "Hierarchy virtual grouping width is 32; all children retained. Summary samples do not cap candidates.",
-    "Lexical rescue: two informative query tokens, or a token present in <=2% of paths; a single-token query retains every exact match.",
+    "V2 starts routing from top-level or virtual module cards; a lossy repository-root summary cannot prune the whole tree.",
+    "Semantic path retrieval symmetrically expands a frozen general code vocabulary including filesystem/fs and websocket/ws.",
+    "Retrieval still requires two semantic query tokens or a token present in <=2% of paths; no fixed result count is used.",
+    "Adaptive V2 unions semantic retrieval and hierarchy candidates without same-directory sibling expansion.",
     "Final selection uses the same >=0.65 OR top-1%-with-ties rule as V1, applied after scoring, not as a candidate cap.",
     "Transport max_candidate_bytes=48000 is a batch payload partition, not a logical candidate budget.",
-    "Cold arms have independent calls; quality arms share exact semantic batch responses. Do not compare cached wall time as standalone latency.",
-    "First-repeat diagnostic; further repeats chosen after inspecting algorithmic failure modes. No stability claims.",
-    "Same-directory neighbor closure is the first metadata-only relation ablation; learned relations and calibrated stopping remain future work."
+    "The prior all-file concurrency baselines come from source run 36155715068 and are not paid for again.",
+    "Cold adaptive has independent calls; quality arms share only exact semantic batch responses. Cached wall time is not standalone latency.",
+    "Single-repeat mechanism regression on the same nine diagnostic tasks; no stability or fresh-generalization claims."
   ]
 }

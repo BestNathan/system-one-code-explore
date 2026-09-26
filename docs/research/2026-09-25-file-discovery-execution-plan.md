@@ -32,6 +32,14 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 - [ ] Report original inputs, candidate recall before file scoring, final primary recall, file/card counts, token/call usage, costs, request latency sum versus wall time, failures, retries, and unresolved subtrees. Reuse the frozen System2 reference only as historical context, not a new paid arm.
 - [ ] Download Workflow reports, review failure traces and summarize findings in `docs/research/`; link artifacts and commit IDs. A first-repeat diagnostic is not a stability/generalization claim. Use results to choose further repeats rather than blindly rerunning all expensive baselines.
 
+## 5. Second mechanism iteration
+
+- [x] Record first-run results and frozen aggregate summary; identify abbreviation mismatch, root-summary premature stopping, and sibling candidate inflation.
+- [x] Add failing CI tests for semantic path aliases, recovery of both diagnosed misses, root-safe routing, and removal of sibling expansion. Red run: [36213550189](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213550189).
+- [x] Implement semantic path normalization plus root-safe V2 routing. Green run: [36213604335](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213604335), 139 tests passed.
+- [ ] Run `semantic_lexical`, `hierarchy_v2`, and `adaptive_v2` across the same frozen nine cases. Reuse run 36155715068 as the full-scoring baseline rather than paying for it again.
+- [ ] Produce a second research report and decide whether the mechanism is ready for repeats and fresh tasks.
+
 ## 4. Review and completion
 
 - [ ] Request independent code review, fix important issues, and verify final CI remotely.
