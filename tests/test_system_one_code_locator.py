@@ -887,12 +887,14 @@ class DemoTest(unittest.TestCase):
             self.assertEqual(2, len(states[0]["files"]))
 
     def test_transient_520_is_retried(self):
+        import system_one_client
+
         with tempfile.TemporaryDirectory() as temp:
             trace = MODULE.Trace(pathlib.Path(temp) / "trace.jsonl")
             decider = MODULE.SystemOneDecider("test", trace)
             calls = {"count": 0}
-            original_urlopen = MODULE.urllib.request.urlopen
-            original_sleep = MODULE.time.sleep
+            original_urlopen = decider.client.opener
+            original_sleep = decider.client.sleeper
 
             class Response:
                 def __enter__(self):
@@ -907,7 +909,7 @@ class DemoTest(unittest.TestCase):
             def fake_urlopen(*args, **kwargs):
                 calls["count"] += 1
                 if calls["count"] == 1:
-                    raise MODULE.urllib.error.HTTPError(
+                    raise system_one_client.urllib.error.HTTPError(
                         "https://api.typesafe.ai/v1/systemone",
                         520,
                         "origin error",
@@ -917,12 +919,12 @@ class DemoTest(unittest.TestCase):
                 return Response()
 
             try:
-                MODULE.urllib.request.urlopen = fake_urlopen
-                MODULE.time.sleep = lambda _: None
+                decider.client.opener = fake_urlopen
+                decider.client.sleeper = lambda _: None
                 decider.request({"model": "jev-latest", "questions": {}})
             finally:
-                MODULE.urllib.request.urlopen = original_urlopen
-                MODULE.time.sleep = original_sleep
+                decider.client.opener = original_urlopen
+                decider.client.sleeper = original_sleep
 
             self.assertEqual(2, calls["count"])
 
