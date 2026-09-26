@@ -12,7 +12,7 @@ Compare two uncapped arms on the same nine task/revision pairs: (A) semantic wei
 
 ## Experiment Process
 
-The design was registered and run on `main`. Validation and all three repository jobs passed in [experiment Workflow 36253022973](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253022973). Its report job initially failed because aggregate mode incorrectly required a repository argument. [Aggregation Workflow 36253471860](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253471860) reused the three uploaded repository artifacts; no model calls were repeated. Progressive-state checkpoints were written after each complete wave. All 18 arm-level call manifests are complete and retained in the source Workflow artifacts for 90 days. The final experiment status is complete; the acceptance gate failed.
+The design was registered and run on `main`. Validation and all three repository jobs passed in [experiment Workflow 36253022973](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253022973). Its report job initially failed because aggregate mode incorrectly required a repository argument. [Aggregation Workflow 36253788131](https://github.com/BestNathan/system-one-code-explore/actions/runs/36253788131) reused the three uploaded repository artifacts; no model calls were repeated. Progressive-state checkpoints were written after each complete wave. All 18 arm-level call manifests are complete, covering 755 physical calls, and are retained in the source Workflow artifacts for 90 days. The final experiment status is complete; the acceptance gate failed.
 
 ## Experiment Data
 
@@ -20,7 +20,7 @@ The design was registered and run on `main`. Validation and all three repository
 - Frozen thresholds, model profile, concurrency, and constraints: [`data/design.json`](data/design.json).
 - Frozen arm-level metrics and p50/p95 state sizes: [`data/summary.json`](data/summary.json).
 - Workflow metadata and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json).
-- Per-task raw calls, retries, outcomes, and SHA-256 manifests are retained in the repository-specific Workflow artifacts for 90 days. The aggregate summary and report are retained in artifact `issue13-aggregate-36253471860` for 90 days. Every artifact is inventoried in `workflow/metadata.json`.
+- Per-task raw calls, retries, outcomes, and SHA-256 manifests are retained in the repository-specific Workflow artifacts for 90 days. The aggregate summary and report are retained in artifact `issue13-aggregate-36253788131` for 90 days. Every artifact is inventoried in `workflow/metadata.json`.
 
 ## Experiment Results
 

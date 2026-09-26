@@ -3,8 +3,8 @@
   "run_id": "36253022973",
   "commit_sha": "a52eedc18b5339efc36fb83f9fba1572bac3e41c",
   "status": "success",
-  "report_workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36253471860",
-  "report_workflow_run_id": "36253471860",
+  "report_workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36253788131",
+  "report_workflow_run_id": "36253788131",
   "jobs": {
     "validate": "success",
     "experiment": "success",
@@ -139,7 +139,7 @@
       "complete": true
     },
     {
-      "name": "issue13-progressive-report-36253022973",
+      "name": "issue13-aggregate-36253788131",
       "purpose": "Aggregate metrics, Workflow metadata and experiment report",
       "retention_days": 90
     }
