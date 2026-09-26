@@ -126,6 +126,32 @@ class ScalingTests(unittest.TestCase):
         self.assertEqual(module_card(node, "task")["payload"]["common_descendant_tokens"],
                          ["alpha", "bravo", "charlie"])
 
+    def test_semantic_path_tokens_expand_common_code_abbreviations(self):
+        from file_discovery_adaptive import semantic_tokens
+        self.assertTrue({"filesystem", "fs"} <= semantic_tokens("filesystem safety"))
+        self.assertTrue({"websocket", "ws"} <= semantic_tokens("WebSocket dispatch"))
+
+    def test_semantic_lexical_recovers_first_round_misses(self):
+        from file_discovery_adaptive import semantic_lexical_matches
+        items = [candidate("crates/nession-agent/src/fs/sandbox.rs"),
+                 candidate("src/gateway/server/ws-connection/message-handler.ts"),
+                 candidate("docs/unrelated.md")]
+        fs = semantic_lexical_matches(items, "filesystem symlink delete safety")
+        ws = semantic_lexical_matches(items, "Gateway WebSocket request dispatch")
+        self.assertIn("crates/nession-agent/src/fs/sandbox.rs", fs)
+        self.assertIn("src/gateway/server/ws-connection/message-handler.ts", ws)
+
+    def test_adaptive_v2_starts_below_lossy_root_and_has_no_sibling_expansion(self):
+        items = [candidate("alpha/reconnect.py"), candidate("alpha/opaque.py"),
+                 candidate("beta/unrelated.py")]
+        decider = FakeDecider(route=0.01, uncertainty=0.01)
+        scorer = self.Scorer("reconnect", decider)
+        result = self.discover(items, "reconnect", scorer, policy="adaptive_v2")
+        route_ids = [x["id"] for x in result["route_decisions"]]
+        self.assertNotIn("module:.", route_ids)
+        self.assertIn("alpha/reconnect.py", result["file_scores"])
+        self.assertNotIn("alpha/opaque.py", result["file_scores"])
+
     def test_trace_retains_billed_usage_even_before_answer_validation(self):
         from file_discovery_scoring import LockedTrace
         trace = LockedTrace(None)
