@@ -15,11 +15,35 @@ STOP = set("a an the and or to of for in on with without from by as is are be "
            "implementation debugging debug reviewing review understand how which "
            "that this these those it its into before after used use using caller callers".split())
 
+SEMANTIC_ALIASES = {
+    "filesystem": {"fs", "file", "system"},
+    "websocket": {"ws", "web", "socket"},
+    "javascript": {"js"},
+    "typescript": {"ts"},
+    "configuration": {"config"},
+    "authentication": {"auth"},
+    "authorization": {"authz"},
+    "database": {"db"},
+}
+
 
 def tokens(text):
     parts = re.split(r"[^A-Za-z0-9]+|(?<=[a-z0-9])(?=[A-Z])", text)
     return {p.lower()[:-1] if p.lower().endswith("s") and len(p) > 4 else p.lower()
             for p in parts if len(p) >= 3 and p.lower() not in STOP}
+
+
+def semantic_tokens(text):
+    """Expand common code-path abbreviations symmetrically."""
+    base = tokens(text)
+    # Short path abbreviations are intentionally retained for this vocabulary.
+    raw = {p.lower() for p in re.split(r"[^A-Za-z0-9]+|(?<=[a-z0-9])(?=[A-Z])", text) if p}
+    expanded = set(base)
+    for canonical, aliases in SEMANTIC_ALIASES.items():
+        if canonical in raw or raw & aliases:
+            expanded.add(canonical)
+            expanded.update(aliases)
+    return expanded
 
 
 class AdaptiveDecider(ProfiledFileDiscoveryDecider):
@@ -63,6 +87,15 @@ def lexical_matches(candidates, query):
                          or any(frequencies[t] / max(1, len(candidates)) <= 0.02 for t in hits))}
 
 
+def semantic_lexical_matches(candidates, query):
+    terms = semantic_tokens(query)
+    matched = {c["path"]: semantic_tokens(c["path"]) & terms for c in candidates}
+    frequencies = Counter(t for terms_here in matched.values() for t in terms_here)
+    return {path for path, hits in matched.items()
+            if hits and (len(terms) == 1 or len(hits) >= 2
+                         or any(frequencies[t] / max(1, len(candidates)) <= 0.02 for t in hits))}
+
+
 def build_tree(candidates, fanout=32):
     """Virtual grouping is a representation width; every child is retained."""
     raw = {"dirs": {}, "files": [], "prefix": "."}
@@ -98,11 +131,12 @@ def build_tree(candidates, fanout=32):
     return finish(raw)
 
 
-def module_card(node, query):
+def module_card(node, query, *, semantic=False):
     paths = node["members"]
-    terms = tokens(query)
-    frequencies = Counter(t for p in paths for t in sorted(tokens(p)))
-    matches = [p for p in paths if tokens(p) & terms]
+    tokenize = semantic_tokens if semantic else tokens
+    terms = tokenize(query)
+    frequencies = Counter(t for p in paths for t in sorted(tokenize(p)))
+    matches = [p for p in paths if tokenize(p) & terms]
     # Compact samples are summary content, never a restriction on reachable files.
     step = max(1, len(paths) // 8)
     samples = paths[::step][:8]
@@ -118,7 +152,8 @@ def module_card(node, query):
 
 def discover(candidates, query, scorer, *, policy="hybrid", route_threshold=0.5,
              uncertainty_threshold=0.5, file_threshold=0.65):
-    if policy not in {"all", "lexical", "hierarchy", "hybrid"}:
+    if policy not in {"all", "lexical", "hierarchy", "hybrid",
+                      "semantic_lexical", "hierarchy_v2", "adaptive_v2"}:
         raise ValueError("unknown policy")
     started = time.perf_counter()
     by_path = {c["path"]: c for c in candidates}
@@ -130,15 +165,23 @@ def discover(candidates, query, scorer, *, policy="hybrid", route_threshold=0.5,
     if policy in {"lexical", "hybrid"}:
         for p in lexical_matches(candidates, query):
             reasons[p].add("global_path_retrieval")
+    if policy in {"semantic_lexical", "adaptive_v2"}:
+        for p in semantic_lexical_matches(candidates, query):
+            reasons[p].add("semantic_path_retrieval")
     indexing_ms = 0.0
-    if policy in {"hierarchy", "hybrid"} and candidates:
+    hierarchical = policy in {"hierarchy", "hybrid", "hierarchy_v2", "adaptive_v2"}
+    v2 = policy in {"hierarchy_v2", "adaptive_v2"}
+    if hierarchical and candidates:
         tick = time.perf_counter()
         root = build_tree(candidates)
         indexing_ms = (time.perf_counter() - tick) * 1000
-        pending = [root]
+        # V2 removes the lossy repository-root summary as a single pruning gate.
+        # Virtual grouping already guarantees a bounded first wave without
+        # removing any child from the logical tree.
+        pending = (list(root["children"]) or [root]) if v2 else [root]
         while pending:
             nodes = {n["id"]: n for n in pending}
-            scored = scorer.score("route", [module_card(n, query) for n in pending])
+            scored = scorer.score("route", [module_card(n, query, semantic=v2) for n in pending])
             pending = []
             for item in scored:
                 node = nodes[item["id"]]
