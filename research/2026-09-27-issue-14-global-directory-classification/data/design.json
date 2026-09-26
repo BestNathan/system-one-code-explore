@@ -1,0 +1,24 @@
+{
+  "experiment": "issue-14-global-directory-classification",
+  "model": "jev-latest",
+  "profile": "compact_state_v4",
+  "repeats": 1,
+  "directory_threshold": 0.65,
+  "file_threshold": 0.65,
+  "workers": 4,
+  "batch_size": 64,
+  "max_candidate_bytes": 48000,
+  "repository_revisions": {
+    "BestNathan/nession": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+    "openai/codex": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+    "openclaw/openclaw": "932abb0a841b522ebaa5b81921119a61b6a80b21"
+  },
+  "notes": [
+    "The entire eligible directory candidate population is enumerated before any System One directory decision.",
+    "Directory classification is one logical phase; physical batching is fixed and never conditional on earlier answers.",
+    "Selected directories expose their direct files only. Descendant files are not recursively included.",
+    "The comparison baseline is uncapped semantic weighted path retrieval followed by independent file scoring.",
+    "No top-k, candidate cap, source-body read, ancestor gate, deferred frontier, or recursive expansion is permitted.",
+    "The nine frozen primary targets are a single-repeat diagnostic suite, not a generalization claim."
+  ]
+}
