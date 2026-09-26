@@ -30,6 +30,8 @@
 | `fd-scaling-openclaw` | OpenClaw 逐任务结果、轨迹和用量 | 30 天，至 2026-10-25 |
 | `fd-scaling-report-36155715068` | 54 个实验单元的聚合 JSON 与 Markdown | 90 天，至 2026-12-24 |
 
+将历史提交首次快进到 `main` 时，新增的冻结配置触发了重复运行 [36220565316](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565316)。发现后立即取消；Codex 和 OpenClaw 未执行，Nession 执行阶段约 13 秒后取消。该运行不属于实验数据，也不参与结论；取消状态、Jobs 和两个部分产物记录在 [迁移触发运行元数据](workflow/migration-triggered-run-36220565316.json) 中。
+
 ## 实验数据
 
 ### 并发结果

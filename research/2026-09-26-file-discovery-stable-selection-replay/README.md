@@ -18,6 +18,8 @@ V1 的保护语义建立在全仓库总体上。若改用候选数，同一个�
 | --- | --- | --- |
 | `fd-stable-selection-replay-36214118855` | 四个方案的逐任务回放、候选排名和聚合报告 | 90 天，至 2026-12-25 |
 
+迁移到 `main` 时冻结配置又触发一次零模型回放 [36220565302](https://github.com/BestNathan/system-one-code-explore/actions/runs/36220565302)，运行成功，产物 `fd-stable-selection-replay-36220565302` 保留 90 天至 2026-12-25。它用于验证迁移后的 Workflow，不作为新的独立实验；完整记录见 [main 复跑元数据](workflow/main-replay-36220565302.json)。
+
 ## 实验数据
 
 | 方案 | 案例 | 原选择召回 | 稳定总体回放召回 | 回放入选文件均值 |
