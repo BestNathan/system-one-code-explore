@@ -208,6 +208,66 @@ class ScalingTests(unittest.TestCase):
         self.assertEqual(failure["error_type"], "RuntimeError")
         self.assertEqual(failure["message"], "offline failure")
 
+    def test_call_dataset_pairs_events_and_writes_checksum_manifest(self):
+        import file_discovery_scoring
+
+        writer = getattr(file_discovery_scoring, "write_call_dataset", None)
+        self.assertIsNotNone(writer, "missing raw-call dataset writer")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trace = root / "trace.jsonl"
+            calls = root / "raw-model-calls.jsonl"
+            manifest = root / "call-manifest.json"
+            trace.write_text("\n".join(json.dumps(event) for event in [
+                {"event": "system_one_request", "call_id": "call-1",
+                 "request_hash": "sha256:request", "request": {"model": "m"}},
+                {"event": "system_one_retry", "call_id": "call-1", "status": 429},
+                {"event": "system_one_response", "call_id": "call-1",
+                 "request_hash": "sha256:request", "response": {"id": "r-1"}},
+                {"event": "system_one_cache_reuse", "logical_call_id": "logical-1",
+                 "source_call_id": "call-1", "request_hash": "sha256:request"},
+            ]) + "\n")
+            result = writer(trace, calls, manifest)
+            records = [json.loads(line) for line in calls.read_text().splitlines()]
+            persisted = json.loads(manifest.read_text())
+
+        self.assertEqual(records[0]["request"]["call_id"], "call-1")
+        self.assertEqual(records[0]["retries"][0]["status"], 429)
+        self.assertEqual(records[0]["outcome"]["response"]["id"], "r-1")
+        self.assertEqual(result, persisted)
+        self.assertEqual(persisted["physical_calls"], 1)
+        self.assertEqual(persisted["cache_reuses"], 1)
+        self.assertTrue(persisted["complete"])
+        self.assertRegex(persisted["calls_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_cache_reuse_links_logical_decision_to_physical_call(self):
+        class RecordingTrace:
+            def __init__(self):
+                self.events = []
+
+            def emit(self, event, **data):
+                self.events.append({"event": event, **data})
+
+        class TracedDecider(FakeDecider):
+            def __init__(self, trace):
+                super().__init__()
+                self.trace = trace
+
+            def score_candidates(self, query, stage, candidates):
+                results, usage = super().score_candidates(query, stage, candidates)
+                return results, {**usage, "call_id": "call-source",
+                                 "request_hash": "sha256:request"}
+
+        cache = {}
+        trace = RecordingTrace()
+        items = [candidate("src/example.py")]
+        self.Scorer("task", TracedDecider(trace), cache=cache).score("file", items)
+        self.Scorer("task", TracedDecider(trace), cache=cache).score("file", items)
+        event = next(item for item in trace.events if item["event"] == "system_one_cache_reuse")
+        self.assertEqual(event["source_call_id"], "call-source")
+        self.assertEqual(event["request_hash"], "sha256:request")
+        self.assertTrue(event["logical_call_id"].startswith("logical-"))
+
 
 class ScalingReportTests(unittest.TestCase):
     def test_report_preserves_failed_arm_and_expected_count(self):
