@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "experiment": "camel-case-concept-normalization-v4",
+  "workflow_run_id": 36229721717,
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36229721717",
+  "code_sha": "0a3e50ba7c9dd54503e29cfb6610200b565dfc7d",
+  "units": 27,
+  "successful_units": 27,
+  "test_count": 153,
+  "physical_system_one_calls": 492,
+  "directory_model_decisions": 0,
+  "pass_gates": {
+    "all_27_units_succeeded": true,
+    "weighted_primary_recall_9_of_9": true,
+    "weighted_openclaw_mean_scored_files_below_2000": false
+  },
+  "arms": {
+    "semantic_lexical_stable_c4": {
+      "primary_recall": 1.0,
+      "mean_scored_files": 1423.56,
+      "mean_selected_files": 183.33,
+      "mean_logical_input_tokens": 276991.22,
+      "physical_calls": 203
+    },
+    "semantic_weighted_stable_c4": {
+      "primary_recall": 1.0,
+      "mean_scored_files": 2026.44,
+      "mean_selected_files": 184.56,
+      "mean_logical_input_tokens": 396982.56,
+      "physical_calls": 289
+    },
+    "semantic_weighted_rescue_c4": {
+      "primary_recall": 1.0,
+      "mean_scored_files": 2026.44,
+      "mean_selected_files": 145.56,
+      "mean_logical_input_tokens": 396982.56,
+      "physical_calls": 0
+    }
+  },
+  "repository_means": {
+    "BestNathan/nession": {
+      "broad_scored_files": 258.33,
+      "weighted_scored_files": 47.33,
+      "broad_input_tokens": 49749.67,
+      "weighted_input_tokens": 9243.67,
+      "weighted_primary_recall": 1.0
+    },
+    "openai/codex": {
+      "broad_scored_files": 1357.67,
+      "weighted_scored_files": 1400.0,
+      "broad_input_tokens": 260792.0,
+      "weighted_input_tokens": 269023.33,
+      "weighted_primary_recall": 1.0
+    },
+    "openclaw/openclaw": {
+      "broad_scored_files": 2654.67,
+      "weighted_scored_files": 4632.0,
+      "broad_input_tokens": 520432.0,
+      "weighted_input_tokens": 912680.67,
+      "weighted_primary_recall": 1.0
+    }
+  },
+  "decision": "CamelCase normalization restored target recall but weighted path retrieval did not reduce OpenClaw scoring volume; investigate an uncapped score-threshold frontier before another model-scoring experiment."
+}

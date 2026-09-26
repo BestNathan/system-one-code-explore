@@ -12,15 +12,16 @@ Track candidate and final primary recall, scored and selected file counts, reduc
 
 ## Experiment Process
 
-V3 failed its recall and scale gates in [Workflow 36229213515](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515): the weighted OpenClaw Gateway arm missed `src/gateway/server/ws-connection/message-handler.ts` and averaged 4,729 scored files. Test-first regression coverage then failed in CI run [36229609799](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229609799), showing `WebSocket` became separate `web` and `socket` concepts. The corrected implementation and frozen V4 configuration will be committed on `main`; GitHub Actions validates all tests before model calls and archives complete traces and aggregates.
+V3 failed its recall and scale gates in [Workflow 36229213515](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229213515): the weighted OpenClaw Gateway arm missed `src/gateway/server/ws-connection/message-handler.ts` and averaged 4,729 scored files. Test-first regression coverage then failed in CI run [36229609799](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229609799), showing `WebSocket` became separate `web` and `socket` concepts. The corrected implementation ran on `main` in [Workflow 36229721717](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229721717). All 27 units succeeded, and all 153 GitHub Actions tests passed before paid requests.
 
 ## Experiment Data
 
 - Frozen configuration: [`data/scaling-experiment.json`](data/scaling-experiment.json)
 - Frozen tasks and repository revisions: [`data/cases.json`](data/cases.json)
+- Aggregate metrics: [`data/summary.json`](data/summary.json)
 - Workflow, jobs, and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json)
 - Each repository artifact contains per-task scores, raw model requests and responses, manifests, usage, errors/retries, and the report. Artifacts are retained for 90 days.
 
 ## Experiment Results
 
-Pending the V4 Workflow. A pass requires all 27 units to complete, the weighted policy to retain all nine primary candidates, and the weighted OpenClaw arm to average fewer than 2,000 scored files. Selection rescue is considered separately and cannot compensate for a retrieval-stage miss.
+The correction restored the missing OpenClaw Gateway candidate; the weighted policy reached 9/9 primary recall across the nine diagnostic tasks. It failed the scale gate: OpenClaw weighted retrieval averaged 4,632 files and 912,681 input tokens, versus 2,655 files and 520,432 tokens for broad semantic retrieval. Weighted retrieval averaged 47 files on Nession, but 1,400 on Codex, so improvements did not transfer consistently across repository sizes. The order-of-magnitude target remains unmet. The next experiment will replay score thresholds across every enumerated path without model calls to measure the candidate-count/recall frontier before another paid scoring run.
