@@ -1,5 +1,7 @@
 import importlib.util
+import json
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -159,6 +161,52 @@ class ScalingTests(unittest.TestCase):
                    usage={"input_tokens": 123, "output_tokens": 4}, answers={})
         self.assertEqual(getattr(trace, "input_tokens", None), 123)
         self.assertEqual(getattr(trace, "response_count", None), 1)
+
+    def test_model_call_trace_links_request_to_full_raw_response(self):
+        from system_one_code_locator import SystemOneDecider, Trace
+
+        class OfflineDecider(SystemOneDecider):
+            def request(self, payload):
+                return {"id": "response-1", "model": "pinned-model",
+                        "usage": {"input_tokens": 7, "output_tokens": 2},
+                        "answers": {"question": {"type": "noul", "noul": 0.75}},
+                        "server_metadata": {"revision": "2026-09-26"}}
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            decider = OfflineDecider("secret", Trace(path), model="pinned-model")
+            decider.send("file_scoring", {"goal": "find target"}, {
+                "question": {"type": "noul"},
+            })
+            events = [json.loads(line) for line in path.read_text().splitlines()]
+
+        request = next(event for event in events if event["event"] == "system_one_request")
+        response = next(event for event in events if event["event"] == "system_one_response")
+        self.assertTrue(request["call_id"])
+        self.assertEqual(response["call_id"], request["call_id"])
+        self.assertEqual(response["request_hash"], request["request_hash"])
+        self.assertEqual(response["response"]["id"], "response-1")
+        self.assertEqual(response["response"]["server_metadata"]["revision"], "2026-09-26")
+
+    def test_model_call_trace_records_terminal_failure(self):
+        from system_one_code_locator import SystemOneDecider, Trace
+
+        class FailingDecider(SystemOneDecider):
+            def request(self, payload):
+                raise RuntimeError("offline failure")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            decider = FailingDecider("secret", Trace(path))
+            with self.assertRaisesRegex(RuntimeError, "offline failure"):
+                decider.send("file_scoring", {"goal": "find target"}, {})
+            events = [json.loads(line) for line in path.read_text().splitlines()]
+
+        request = next(event for event in events if event["event"] == "system_one_request")
+        failure = next(event for event in events if event["event"] == "system_one_error")
+        self.assertEqual(failure["call_id"], request["call_id"])
+        self.assertEqual(failure["error_type"], "RuntimeError")
+        self.assertEqual(failure["message"], "offline failure")
 
 
 class ScalingReportTests(unittest.TestCase):
