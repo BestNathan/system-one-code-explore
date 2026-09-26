@@ -133,6 +133,11 @@ class ScalingTests(unittest.TestCase):
         self.assertTrue({"filesystem", "fs"} <= semantic_tokens("filesystem safety"))
         self.assertTrue({"websocket", "ws"} <= semantic_tokens("WebSocket dispatch"))
 
+    def test_semantic_aliases_do_not_create_generic_file_system_evidence(self):
+        from file_discovery_adaptive import semantic_tokens
+        self.assertEqual(semantic_tokens("filesystem"), {"filesystem", "fs"})
+        self.assertEqual(semantic_tokens("WebSocket"), {"websocket", "ws"})
+
     def test_semantic_lexical_recovers_first_round_misses(self):
         from file_discovery_adaptive import semantic_lexical_matches
         items = [candidate("crates/nession-agent/src/fs/sandbox.rs"),
