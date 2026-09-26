@@ -14,16 +14,22 @@ The primary gates are 100% target candidate recall, final recall no worse than a
 
 ## Experiment Process
 
-Preregister on `main`, run tests and all three frozen repositories through GitHub Actions, inspect each job and raw-call manifest, then freeze the aggregate and interpretation here. The runner deterministically enumerates the entire directory population before classification and logs separate Phase 1 and Phase 2 calls. Raw requests, responses, retries, terminal errors, and SHA-256 manifests are archived as Workflow artifacts. Workflow execution status: pending.
+The design was registered and executed on `main`. [Workflow 36255811807](https://github.com/BestNathan/system-one-code-explore/actions/runs/36255811807) completed successfully: validation, all three repository jobs, and aggregation passed. The aggregate artifact and all repository-level raw-call artifacts are retained for 90 days. All 18 arm-level call manifests are complete and cover 493 physical model calls. No local experiment or model call was run.
 
 ## Experiment Data
 
 - Frozen tasks and target labels: [`data/cases.json`](data/cases.json).
 - Frozen thresholds, model, revisions, and transport settings: [`data/design.json`](data/design.json).
-- Aggregated task and cost data: [`data/summary.json`](data/summary.json), populated after Actions completes.
-- Workflow/job status and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json), populated from the aggregate Workflow.
-- Repository-specific raw-call, result, and batch artifacts are retained for 90 days. The aggregate report, summary, and metadata artifact are retained for 90 days; exact artifact names appear in `workflow/metadata.json`.
+- Aggregated task and cost data: [`data/summary.json`](data/summary.json).
+- Workflow/job status and artifact inventory: [`workflow/metadata.json`](workflow/metadata.json).
+- Repository-specific raw-call, result, and batch artifacts are retained for 90 days. Aggregate artifact `issue14-aggregate-36255811807` is retained for 90 days; exact artifact names appear in `workflow/metadata.json`.
 
 ## Experiment Results
 
-Pending GitHub Actions execution. Do not infer the result from Issue #13: this experiment scores the complete directory population independently and has a separate acceptance gate.
+The global-directory arm recovered **5/9** targets at both candidate and final stages. The path baseline had **9/9 candidate recall** and **8/9 final recall**, so the global-directory design fails both recall gates. Every directory path was scored independently, so the four misses were low own-directory scores rather than ancestor gating: all three Codex target directories scored below 0.65 (0.29 for `codex-rs/core/src/tools`, 0.41 and 0.46 for `codex-rs/core/src`), and the Nession filesystem directory scored 0.46. The baseline had already exposed that Nession file, but its file score was 0.56, below the shared 0.65 file threshold.
+
+OpenClaw shows the compression benefit in isolation. Its 1,907-directory population was scored once for each task. The selected directories exposed an average of **865 direct files** per task, versus 4,632 path-baseline file candidates and 43,748 repository files. That is an 81% reduction from the current path candidate set and about a 50× reduction from the full file population. Counting both phases, model-visible nodes averaged 2,772 versus 4,632, input tokens averaged 554k versus 796k, and physical calls averaged 44 versus 73. All three OpenClaw targets were selected and promoted.
+
+The compression did not transfer across the frozen suite. Codex scored 938 directories per task but selected only 4–6, leaving all three target files unexposed; Nession exposed only 4 files per task on average and missed the filesystem target directory. The all-arm end-to-end distribution was p50/p95 1,005/7,918 model-visible nodes and 17/124 physical calls; both directory and file batch sizes were 64 at p50, p95, and maximum.
+
+This exact path-and-count directory representation is **not viable as a general replacement** for path retrieval: overall candidate recall fell to 5/9. It does show that direct-file scoring can become small on OpenClaw when relevant directory paths are selected. The likely missing signal is direct-file naming: the frozen directory payload had only the path, basename, depth, and file/directory counts. The next experiment should add deterministic direct-filename token frequencies and rare-name evidence without truncating directories at a fixed file count; keep every directory globally visible and test whether this recovers the low-scoring Codex/Nession directories without giving back OpenClaw's Phase 2 reduction. Issue #13 remains a separate failed recursive-tree-search result; its outcome does not falsify this two-stage mechanism.
