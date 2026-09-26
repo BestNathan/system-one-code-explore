@@ -42,16 +42,16 @@ def render_report(payload):
              "- Logical tokens and cost include cache hits; physical usage includes returned responses that later failed parsing.",
              "- Failed requests without usage have unknown cost; HTTP attempts equal sends plus retry events.", "",
              "## Per-Task Results", "",
-             "| Case | Arm | Status | Total files | Scored files | Reduction | Directory decisions | Candidate recall | Final recall | Selected | Physical calls | Logical input tokens | Logical USD | Wall seconds | Cached batches |",
-             "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
+             "| Case | Arm | Status | Selection | Total files | Scored files | Reduction | Directory decisions | Candidate recall | Final recall | Selected | Physical calls | Logical input tokens | Logical USD | Wall seconds | Cached batches |",
+             "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for r in rows:
         if r["status"] != "success":
             detail = str(r.get("error", "incomplete")).replace("|", "/").replace("\n", " ")
-            lines.append(f"| {r['case_id']} | {r['arm']} | {r['status']}: {detail[:240]} | — | — | — | — | — | — | — | — | — | — | — | — |")
+            lines.append(f"| {r['case_id']} | {r['arm']} | {r['status']}: {detail[:240]} | — | — | — | — | — | — | — | — | — | — | — | — | — |")
             continue
         u = r["usage"]
         reduction = f"{r['reduction_factor']:.2f}" if r["reduction_factor"] is not None else "no file scoring"
-        lines.append(f"| {r['case_id']} | {r['arm']} | success | {r['enumerated_file_count']} | {r['scored_file_count']} | {reduction} | {r['route_scored_count']} | {r['candidate_recall']:.0%} | {r['primary_recall']:.0%} | {r['selected_file_count']} | {u['model_calls']} | {u['logical_input_tokens']} | {r['logical_pricing']['estimated_cost_usd']:.5f} | {r['wall_time_ms']/1000:.2f} | {u['cache_hits']} |")
+        lines.append(f"| {r['case_id']} | {r['arm']} | success | {r['selection_policy']} | {r['enumerated_file_count']} | {r['scored_file_count']} | {reduction} | {r['route_scored_count']} | {r['candidate_recall']:.0%} | {r['primary_recall']:.0%} | {r['selected_file_count']} | {u['model_calls']} | {u['logical_input_tokens']} | {r['logical_pricing']['estimated_cost_usd']:.5f} | {r['wall_time_ms']/1000:.2f} | {u['cache_hits']} |")
     lines += ["", "## Repository and Policy Summary", "",
               "| Repository | Arm | Completed/planned | Mean primary recall | Mean files | Mean directories | Mean logical input tokens | Mean wall seconds |",
               "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
@@ -132,7 +132,9 @@ def benchmark(args):
             result = discover(candidates, case["goal"], scorer, policy=arm["policy"],
                               route_threshold=config["route_threshold"],
                               uncertainty_threshold=config["uncertainty_threshold"],
-                              file_threshold=config["file_threshold"])
+                              file_threshold=config["file_threshold"],
+                              selection_policy=arm.get("selection_policy", "stable_population"),
+                              rescue_threshold=config.get("rescue_threshold", 0.50))
             write_json(folder / "run.json", result)
             primary = set(case["primary_files"])
             scored_paths = set(result["file_scores"])
@@ -144,6 +146,9 @@ def benchmark(args):
                        primary_recall=len(primary & selected) / len(primary),
                        primary_scores={p: result["file_scores"].get(p) for p in sorted(primary)},
                        selected_file_count=len(selected), deferred_module_count=result["deferred_module_count"],
+                       selection_policy=result["selection"]["selection_policy"],
+                       selection_metadata=result["selection"],
+                       retrieval_evidence_count=len(result["retrieval_evidence"]),
                        index_build_ms=result["index_build_ms"],
                        missing_primary={p: "file_score_rejected" if p in scored_paths else "candidate_not_discovered"
                                         for p in sorted(primary - selected)})

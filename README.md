@@ -258,6 +258,7 @@ See [Research path](docs/research-path.md) for the problem-oriented view.
 | 2026-09-26 | [File Discovery scaling V1](research/2026-09-26-file-discovery-scaling-v1/) | completed | [36155715068](https://github.com/BestNathan/system-one-code-explore/actions/runs/36155715068) | Four-way request concurrency delivered 3.44–4.02× speedup; lexical discovery recalled 7/9 primary targets. |
 | 2026-09-26 | [Semantic routing V2](research/2026-09-26-file-discovery-semantic-routing-v2/) | completed | [36213648492](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213648492) | Semantic aliases reached 9/9 candidate recall; hierarchy and adaptive routing were rejected for directory/token cost. |
 | 2026-09-26 | [Stable selection replay](research/2026-09-26-file-discovery-stable-selection-replay/) | completed | [36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855) | Stable population semantics restored 9/9 final recall without model calls; OpenClaw selectivity remains unresolved. |
+| 2026-09-26 | [Concept-weighted retrieval and provenance rescue V3](research/2026-09-26-concept-weighted-retrieval-provenance-rescue/) | preregistered | pending | Tests exposed alias evidence inflation; the frozen comparison measures distinct-concept retrieval and file-provenance rescue against stable 1% selection. |
 
 The [experiment log](research/README.md) links the complete goal, plan, process,
 data, result, Workflow jobs, and artifact inventory for every new experiment.

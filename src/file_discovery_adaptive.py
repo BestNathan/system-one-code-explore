@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from pathlib import PurePosixPath
 
 from file_discovery_profiles import ProfiledFileDiscoveryDecider
+from file_discovery_selection import select_relevant
 
 
 STOP = set("a an the and or to of for in on with without from by as is are be "
@@ -18,6 +19,19 @@ STOP = set("a an the and or to of for in on with without from by as is are be "
 SEMANTIC_ALIASES = {
     "filesystem": {"fs", "file", "system"},
     "websocket": {"ws", "web", "socket"},
+    "javascript": {"js"},
+    "typescript": {"ts"},
+    "configuration": {"config"},
+    "authentication": {"auth"},
+    "authorization": {"authz"},
+    "database": {"db"},
+}
+
+# Narrow high-signal aliases used by the concept-aware experiment. The broader
+# V2 vocabulary above stays unchanged as the comparison baseline.
+SEMANTIC_CONCEPT_ALIASES = {
+    "filesystem": {"fs"},
+    "websocket": {"ws"},
     "javascript": {"js"},
     "typescript": {"ts"},
     "configuration": {"config"},
@@ -96,6 +110,65 @@ def semantic_lexical_matches(candidates, query):
                          or any(frequencies[t] / max(1, len(candidates)) <= 0.02 for t in hits))}
 
 
+def semantic_concepts(text):
+    """Return distinct task concepts without counting aliases as extra evidence."""
+    aliases = {alias: canonical for canonical, values in SEMANTIC_CONCEPT_ALIASES.items()
+               for alias in values}
+    raw = {p.lower() for p in re.split(r"[^A-Za-z0-9]+|(?<=[a-z0-9])(?=[A-Z])", text) if p}
+    concepts = set()
+    for part in raw:
+        normalized = part[:-1] if part.endswith("s") and len(part) > 4 else part
+        if normalized in aliases:
+            concepts.add(aliases[normalized])
+        elif normalized in SEMANTIC_CONCEPT_ALIASES:
+            concepts.add(normalized)
+        elif len(normalized) >= 3 and normalized not in STOP:
+            concepts.add(normalized)
+    return concepts
+
+
+def semantic_weighted_evidence(candidates, query):
+    """Build uncapped, concept-deduplicated path matches and provenance."""
+    query_concepts = semantic_concepts(query)
+    path_concepts = {c["path"]: semantic_concepts(c["path"]) for c in candidates}
+    frequencies = Counter(concept for concepts in path_concepts.values() for concept in concepts)
+    total = max(1, len(candidates))
+    evidence = {}
+    for candidate in candidates:
+        path = candidate["path"]
+        hits = path_concepts[path] & query_concepts
+        if not hits:
+            continue
+        rare = sorted(concept for concept in hits if frequencies[concept] / total <= 0.02)
+        parts = PurePosixPath(path).parts
+        filename_concepts = sorted(semantic_concepts(parts[-1]) & hits) if parts else []
+        segment_weights = []
+        for concept in sorted(hits):
+            positions = [i for i, part in enumerate(parts) if concept in semantic_concepts(part)]
+            path_weight = max((2.0 if i == len(parts) - 1 else 1.5 if i == len(parts) - 2 else 1.0
+                               for i in positions), default=0.0)
+            idf = math.log((total + 1) / (frequencies[concept] + 1)) + 1.0
+            segment_weights.append({"concept": concept, "document_frequency": frequencies[concept],
+                                    "idf": idf, "path_weight": path_weight,
+                                    "weighted_score": idf * path_weight})
+        filename_score = max((item["weighted_score"] for item in segment_weights
+                              if item["concept"] in filename_concepts), default=0.0)
+        if (len(query_concepts) > 1 and len(hits) < 2 and not rare
+                and filename_score < 2.0):
+            continue
+        evidence[path] = {
+            "matched_concepts": sorted(hits), "rare_concepts": rare,
+            "filename_concepts": filename_concepts, "segment_weights": segment_weights,
+            "weighted_score": sum(item["weighted_score"] for item in segment_weights),
+            "filename_weighted_score": filename_score,
+        }
+    return evidence
+
+
+def semantic_weighted_matches(candidates, query):
+    return set(semantic_weighted_evidence(candidates, query))
+
+
 def build_tree(candidates, fanout=32):
     """Virtual grouping is a representation width; every child is retained."""
     raw = {"dirs": {}, "files": [], "prefix": "."}
@@ -151,9 +224,11 @@ def module_card(node, query, *, semantic=False):
 
 
 def discover(candidates, query, scorer, *, policy="hybrid", route_threshold=0.5,
-             uncertainty_threshold=0.5, file_threshold=0.65):
+             uncertainty_threshold=0.5, file_threshold=0.65,
+             selection_policy="stable_population", rescue_threshold=0.50):
     if policy not in {"all", "lexical", "hierarchy", "hybrid",
-                      "semantic_lexical", "hierarchy_v2", "adaptive_v2"}:
+                      "semantic_lexical", "hierarchy_v2", "adaptive_v2",
+                      "semantic_weighted"}:
         raise ValueError("unknown policy")
     started = time.perf_counter()
     by_path = {c["path"]: c for c in candidates}
@@ -168,6 +243,11 @@ def discover(candidates, query, scorer, *, policy="hybrid", route_threshold=0.5,
     if policy in {"semantic_lexical", "adaptive_v2"}:
         for p in semantic_lexical_matches(candidates, query):
             reasons[p].add("semantic_path_retrieval")
+    evidence = {}
+    if policy == "semantic_weighted":
+        evidence = semantic_weighted_evidence(candidates, query)
+        for p in evidence:
+            reasons[p].add("concept_weighted_path_retrieval")
     indexing_ms = 0.0
     hierarchical = policy in {"hierarchy", "hybrid", "hierarchy_v2", "adaptive_v2"}
     v2 = policy in {"hierarchy_v2", "adaptive_v2"}
@@ -213,15 +293,15 @@ def discover(candidates, query, scorer, *, policy="hybrid", route_threshold=0.5,
                 if item["score"] >= file_threshold:
                     for p in siblings[str(PurePosixPath(item["path"]).parent)]:
                         reasons[p].add("high_confidence_sibling")
-    # Exactly the existing V1 final selection policy, including tie preservation.
-    ordered = sorted(file_scores, key=lambda p: (-file_scores[p], p))
-    fallback_count = max(1, math.ceil(len(ordered) * 0.01)) if ordered else 0
-    cutoff = file_scores[ordered[fallback_count - 1]] if fallback_count else None
-    selected = [{"path": p, "score": file_scores[p], "discovery_reasons": sorted(reasons[p])}
-                for p in ordered if file_scores[p] >= file_threshold or file_scores[p] >= cutoff]
+    selected, selection_metadata = select_relevant(
+        file_scores, enumerated_file_count=len(candidates), file_threshold=file_threshold,
+        policy=selection_policy, rescue_threshold=rescue_threshold, evidence=evidence)
+    for item in selected:
+        item["discovery_reasons"] = sorted(reasons[item["path"]])
     return {"policy": policy, "enumerated_file_count": len(candidates),
             "scored_file_count": len(file_scores), "file_scores": file_scores,
-            "relevant_files": selected, "route_scored_count": len(routes),
+            "relevant_files": selected, "selection": selection_metadata,
+            "retrieval_evidence": evidence, "route_scored_count": len(routes),
             "route_decisions": routes, "deferred_module_count": len(deferred),
             "deferred_modules": deferred,
             "discovery_reasons": {p: sorted(r) for p, r in reasons.items()},

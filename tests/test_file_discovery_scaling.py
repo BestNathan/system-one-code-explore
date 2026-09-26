@@ -134,9 +134,9 @@ class ScalingTests(unittest.TestCase):
         self.assertTrue({"websocket", "ws"} <= semantic_tokens("WebSocket dispatch"))
 
     def test_semantic_aliases_do_not_create_generic_file_system_evidence(self):
-        from file_discovery_adaptive import SEMANTIC_ALIASES
-        self.assertEqual(SEMANTIC_ALIASES["filesystem"], {"fs"})
-        self.assertEqual(SEMANTIC_ALIASES["websocket"], {"ws"})
+        from file_discovery_adaptive import SEMANTIC_CONCEPT_ALIASES
+        self.assertEqual(SEMANTIC_CONCEPT_ALIASES["filesystem"], {"fs"})
+        self.assertEqual(SEMANTIC_CONCEPT_ALIASES["websocket"], {"ws"})
 
     def test_semantic_retrieval_counts_aliases_as_one_concept(self):
         from file_discovery_adaptive import semantic_weighted_matches
@@ -164,6 +164,17 @@ class ScalingTests(unittest.TestCase):
                          {"src/fs/sandbox.py", "src/clear.py"})
         self.assertEqual(metadata["selection_policy"], "provenance_rescue")
         self.assertEqual(metadata["relative_fallback_scored_count"], 0)
+
+    def test_weighted_discovery_attaches_path_evidence_to_rescued_file(self):
+        items = [candidate("src/fs/sandbox.py")]
+        items.extend(candidate(f"misc/item_{index}.py") for index in range(99))
+        scorer = self.Scorer("filesystem", FakeDecider(file_score=0.53))
+        result = self.discover(items, "filesystem", scorer,
+                               policy="semantic_weighted",
+                               selection_policy="provenance_rescue")
+        self.assertEqual([item["path"] for item in result["relevant_files"]],
+                         ["src/fs/sandbox.py"])
+        self.assertIn("filesystem", result["retrieval_evidence"]["src/fs/sandbox.py"]["rare_concepts"])
 
     def test_semantic_lexical_recovers_first_round_misses(self):
         from file_discovery_adaptive import semantic_lexical_matches
