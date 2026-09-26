@@ -1,0 +1,12 @@
+{
+  "experiment": "leave-one-task-out-weighted-threshold-validation-v7",
+  "training_scope": "other two primary-labeled tasks from the same repository",
+  "required_primary_recall": 1.0,
+  "openclaw_mean_candidate_target": 2000,
+  "notes": [
+    "For each held-out task, set the weighted score threshold to the minimum primary target score among the other tasks in that repository.",
+    "Held-out primary labels are excluded from threshold calibration and used only for evaluation.",
+    "No candidate-count cap, top-k selection, model call, or directory model decision is used.",
+    "Each repository has only three diagnostic tasks; this leave-one-out check does not replace a fresh holdout suite."
+  ]
+}

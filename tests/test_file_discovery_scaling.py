@@ -175,6 +175,24 @@ class ScalingTests(unittest.TestCase):
         self.assertIn("src/fs/sandbox.py", frontier["candidate_paths"])
         self.assertEqual(frontier["threshold"], frontier["primary_scores"]["src/fs/sandbox.py"])
 
+    def test_leave_one_out_threshold_uses_only_other_tasks_in_repository(self):
+        from file_discovery_threshold_validation import leave_one_out_threshold_predictions
+        cases = [
+            {"case_id": "train_low", "repository": "repo", "primary_scores": {"a": 5.0},
+             "score_by_path": {"a": 5.0, "extra": 3.0}},
+            {"case_id": "train_high", "repository": "repo", "primary_scores": {"b": 7.0},
+             "score_by_path": {"b": 7.0}},
+            {"case_id": "held", "repository": "repo", "primary_scores": {"c": 6.0},
+             "score_by_path": {"c": 6.0, "extra": 5.5}},
+            {"case_id": "other_repo", "repository": "elsewhere", "primary_scores": {"d": 100.0},
+             "score_by_path": {"d": 100.0}},
+        ]
+        predictions = leave_one_out_threshold_predictions(cases)
+        held = next(row for row in predictions if row["case_id"] == "held")
+        self.assertEqual(held["threshold"], 5.0)
+        self.assertEqual(held["primary_recall"], 1.0)
+        self.assertEqual(held["candidate_count"], 2)
+
     def test_provenance_rescue_replaces_repository_wide_relative_guard(self):
         from file_discovery_selection import select_relevant
         selected, metadata = select_relevant(

@@ -262,6 +262,7 @@ See [Research path](docs/research-path.md) for the problem-oriented view.
 | 2026-09-26 | [CamelCase concept normalization V4](research/2026-09-26-camel-case-concept-normalization-v4/) | completed | [36229721717](https://github.com/BestNathan/system-one-code-explore/actions/runs/36229721717) | Restored 9/9 recall, but OpenClaw averaged 4,632 weighted candidates and 913k input tokens; scale gate failed. |
 | 2026-09-26 | [Uncapped weighted path score frontier V5](research/2026-09-26-uncapped-weighted-path-score-frontier-v5/) | completed | [36230341725](https://github.com/BestNathan/system-one-code-explore/actions/runs/36230341725) | No tested score threshold met both gates: threshold 6 retained 9/9 at 4,181 OpenClaw files; threshold 10 fell to 6/9 at 1,933 files. |
 | 2026-09-26 | [Exact primary-safe weighted frontier V6](research/2026-09-26-exact-primary-safe-weighted-frontier-v6/) | completed | [36230858823](https://github.com/BestNathan/system-one-code-explore/actions/runs/36230858823) | Label-calibrated OpenClaw threshold retained all three targets at 802 candidates/task; follow-up must test held-out transfer. |
+| 2026-09-26 | [Leave-one-task-out weighted threshold V7](research/2026-09-26-leave-one-task-out-weighted-threshold-v7/) | preregistered | pending | Calibrate each held-out threshold from two other tasks in the same repository and measure candidate count/recall transfer. |
 
 The [experiment log](research/README.md) links the complete goal, plan, process,
 data, result, Workflow jobs, and artifact inventory for every new experiment.
