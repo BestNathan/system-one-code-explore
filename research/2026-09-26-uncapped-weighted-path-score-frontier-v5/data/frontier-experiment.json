@@ -1,0 +1,13 @@
+{
+  "experiment": "uncapped-weighted-path-score-frontier-v5",
+  "thresholds": [0, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20],
+  "required_primary_recall": 1.0,
+  "openclaw_mean_candidate_target": 2000,
+  "notes": [
+    "Metadata-only replay over all enumerated paths; zero System One calls and zero model directory decisions.",
+    "Evaluate the complete concept-weighted score threshold frontier without fixed candidate counts or top-k truncation.",
+    "Thresholds are preregistered numeric feature scores, not selected candidate quotas.",
+    "The nine frozen primary targets are used only after deterministic scores are computed.",
+    "Primary labels are incomplete for supporting files, and this diagnostic frontier does not establish fresh-task generalization."
+  ]
+}

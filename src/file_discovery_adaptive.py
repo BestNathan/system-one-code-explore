@@ -143,7 +143,7 @@ def semantic_concepts(text):
     return concepts
 
 
-def semantic_weighted_evidence(candidates, query):
+def semantic_weighted_evidence(candidates, query, *, include_ineligible=False):
     """Build uncapped, concept-deduplicated path matches and provenance."""
     query_concepts = semantic_concepts(query)
     path_concepts = {c["path"]: semantic_concepts(c["path"]) for c in candidates}
@@ -169,20 +169,32 @@ def semantic_weighted_evidence(candidates, query):
                                     "weighted_score": idf * path_weight})
         filename_score = max((item["weighted_score"] for item in segment_weights
                               if item["concept"] in filename_concepts), default=0.0)
-        if (len(query_concepts) > 1 and len(hits) < 2 and not rare
-                and filename_score < 2.0):
+        eligible = (len(query_concepts) <= 1 or len(hits) >= 2 or bool(rare)
+                    or filename_score >= 2.0)
+        if not eligible and not include_ineligible:
             continue
         evidence[path] = {
             "matched_concepts": sorted(hits), "rare_concepts": rare,
             "filename_concepts": filename_concepts, "segment_weights": segment_weights,
             "weighted_score": sum(item["weighted_score"] for item in segment_weights),
-            "filename_weighted_score": filename_score,
+            "filename_weighted_score": filename_score, "eligible": eligible,
         }
     return evidence
 
 
 def semantic_weighted_matches(candidates, query):
     return set(semantic_weighted_evidence(candidates, query))
+
+
+def semantic_weighted_threshold_frontier(candidates, query, thresholds):
+    """Replay uncapped score thresholds over all path concepts without model calls."""
+    evidence = semantic_weighted_evidence(candidates, query, include_ineligible=True)
+    rows = []
+    for threshold in sorted({float(value) for value in thresholds}):
+        rows.append({"threshold": threshold,
+                     "paths": sorted(path for path, item in evidence.items()
+                                     if item["weighted_score"] >= threshold)})
+    return rows
 
 
 def build_tree(candidates, fanout=32):
