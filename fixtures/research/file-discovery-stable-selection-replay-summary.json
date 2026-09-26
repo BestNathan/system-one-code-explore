@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "file-discovery-stable-selection-replay-summary",
+  "source_run": 36213648492,
+  "replay_run": 36214118855,
+  "model_calls": 0,
+  "relative_fallback_population": "enumerated_repository_files",
+  "arms": {
+    "semantic_lexical_c4_quality": {"cases": 9, "old_primary_recall": 0.8888888889, "replay_primary_recall": 1.0, "mean_selected_files": 182.9},
+    "hierarchy_v2_c4_quality": {"cases": 9, "old_primary_recall": 0.8888888889, "replay_primary_recall": 1.0, "mean_selected_files": 186.9},
+    "adaptive_v2_c4_quality": {"cases": 9, "old_primary_recall": 0.8888888889, "replay_primary_recall": 1.0, "mean_selected_files": 189.3},
+    "adaptive_v2_c4_cold": {"cases": 9, "old_primary_recall": 0.8888888889, "replay_primary_recall": 1.0, "mean_selected_files": 184.7}
+  },
+  "recovered_primary": {
+    "case_id": "nession_filesystem_symlink_delete_safety",
+    "path": "crates/nession-agent/src/fs/sandbox.rs",
+    "score": 0.53
+  },
+  "decision": "retain stable repository-population guard for V1-compatible research comparisons; research a provenance-aware production replacement"
+}

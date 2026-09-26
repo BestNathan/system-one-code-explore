@@ -30,7 +30,7 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 - [ ] Add `.github/workflows/file-discovery-scaling.yml`, branch-scoped automatic start when the experiment config changes, with the existing owner/environment controls, CI gating and artifact upload on failure.
 - [ ] Freeze `fixtures/file-discovery/scaling-experiment.json`: first repeat, nine cases, `all/c1`, `all/c4`, `lexical/c4`, `hierarchy/c4`, `hybrid/c4`, plus an independent cold `hybrid/c4` latency arm. Baseline V1 file prompts, route/uncertainty thresholds 0.5, file threshold 0.65, all frozen before seeing results. Run jobs sequentially to isolate credential-level concurrency.
 - [ ] Report original inputs, candidate recall before file scoring, final primary recall, file/card counts, token/call usage, costs, request latency sum versus wall time, failures, retries, and unresolved subtrees. Reuse the frozen System2 reference only as historical context, not a new paid arm.
-- [ ] Download Workflow reports, review failure traces and summarize findings in `docs/research/`; link artifacts and commit IDs. A first-repeat diagnostic is not a stability/generalization claim. Use results to choose further repeats rather than blindly rerunning all expensive baselines.
+- [x] Download Workflow reports, review failure traces and summarize findings in `docs/research/`; link artifacts and commit IDs. First-run report: `docs/research/2026-09-26-file-discovery-scaling-results.md`.
 
 ## 5. Second mechanism iteration
 
@@ -38,14 +38,14 @@ Discovery interface: `discover(candidates, query, scorer, policy)` with policies
 - [x] Add failing CI tests for semantic path aliases, recovery of both diagnosed misses, root-safe routing, and removal of sibling expansion. Red run: [36213550189](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213550189).
 - [x] Implement semantic path normalization plus root-safe V2 routing. Green run: [36213604335](https://github.com/BestNathan/system-one-code-explore/actions/runs/36213604335), 139 tests passed.
 - [ ] Run `semantic_lexical`, `hierarchy_v2`, and `adaptive_v2` across the same frozen nine cases. Reuse run 36155715068 as the full-scoring baseline rather than paying for it again.
-- [ ] Produce a second research report and decide whether the mechanism is ready for repeats and fresh tasks.
+- [x] Produce a second research report and decide whether the mechanism is ready for repeats and fresh tasks. Result: semantic lexical retrieval continues; hierarchy/adaptive V2 stop; stable selection replay precedes fresh tasks.
 
 ## 6. Stable selection replay
 
 - [x] Diagnose the remaining miss as a relative-guard population change: the target was scored 0.53 but the top-1% guard shrank from 11 files to 1.
 - [x] Add failing CI tests requiring the guard to use the original enumerated repository population. Red run: [36214019935](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214019935).
 - [x] Implement stable selection and artifact replay. Green run: [36214078706](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214078706).
-- [ ] Replay run 36213648492 artifacts in GitHub Actions with zero model calls and record final recall/selectivity changes.
+- [x] Replay run 36213648492 artifacts in GitHub Actions with zero model calls and record final recall/selectivity changes. Run: [36214118855](https://github.com/BestNathan/system-one-code-explore/actions/runs/36214118855); all four arms recovered 9/9, while OpenClaw retained roughly 438 files per task.
 
 ## 4. Review and completion
 

@@ -85,6 +85,13 @@ The next step is a zero-model replay with stable selection semantics. Current
 hierarchy/adaptive routing is paused because its directory and token cost did
 not beat semantic path retrieval. See the [V2 results](docs/research/2026-09-26-file-discovery-semantic-routing-v2-results.md).
 
+Zero-model replay confirmed that the stable V1 comparison must calculate the
+relative guard from the original repository population: final primary recall
+returned to 9/9. This also retains roughly 438 OpenClaw files per task, so the
+next production-policy research replaces the blanket relative guard with
+provenance-aware rescue and validates it on fresh tasks. See the
+[selection replay](docs/research/2026-09-26-file-discovery-stable-selection-replay.md).
+
 ## Milestone 4 — End-to-end localization
 
 Compose:

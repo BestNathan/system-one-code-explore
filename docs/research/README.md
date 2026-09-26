@@ -47,6 +47,7 @@ Rxx IDs are chronological experiments, not the architecture.
 - [Algorithmic reduction and concurrent requests](2026-09-25-file-discovery-algorithm-scaling-plan.md) — uncapped research design for retrieval, adaptive routing, and independent-request concurrency.
 - [Three-repository scaling results](2026-09-26-file-discovery-scaling-results.md) — four concurrent requests reduced full-scoring latency by 3.44–4.02×; lexical retrieval was cheapest but missed 2/9 targets, hierarchy retained 8/9 while adding substantial directory cost, and same-directory rescue was rejected.
 - [Semantic path and root-safe routing V2](2026-09-26-file-discovery-semantic-routing-v2-results.md) — semantic aliases recovered 9/9 targets into the candidate set; final selection remained 8/9 because candidate reduction incorrectly shrank the relative recall guard. Hierarchy and adaptive union were rejected on directory/token cost.
+- [Stable relative-guard replay](2026-09-26-file-discovery-stable-selection-replay.md) — zero-model replay restored 9/9 final recall by keeping the original repository population, while showing that a full-repository 1% guard still promotes hundreds of OpenClaw files.
 
 ## Current conceptual architecture
 
