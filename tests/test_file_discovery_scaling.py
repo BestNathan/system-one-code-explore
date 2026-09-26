@@ -175,5 +175,27 @@ class ScalingReportTests(unittest.TestCase):
         self.assertIn("https://example.test/run", report)
 
 
+class StableSelectionTests(unittest.TestCase):
+    def test_relative_guard_uses_original_repository_population(self):
+        self.assertIsNotNone(importlib.util.find_spec("file_discovery_selection"),
+                             "missing feature: stable selection")
+        from file_discovery_selection import select_relevant
+        selected, policy = select_relevant(
+            {"best.py": 0.9, "target.py": 0.53},
+            enumerated_file_count=1096,
+            file_threshold=0.65,
+            relative_fallback_fraction=0.01,
+        )
+        self.assertEqual({x["path"] for x in selected}, {"best.py", "target.py"})
+        self.assertEqual(policy["relative_fallback_population"], 1096)
+        self.assertEqual(policy["relative_fallback_min_count"], 11)
+
+    def test_relative_guard_never_discards_scored_candidates_when_guard_is_larger(self):
+        from file_discovery_selection import select_relevant
+        scores = {f"file-{i}.py": i / 100 for i in range(20)}
+        selected, _ = select_relevant(scores, enumerated_file_count=5000)
+        self.assertEqual(len(selected), 20)
+
+
 if __name__ == "__main__":
     unittest.main()
