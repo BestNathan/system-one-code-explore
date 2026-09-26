@@ -7,9 +7,64 @@ import json
 import math
 import threading
 import time
+import uuid
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from pathlib import Path
 
 from system_one_code_locator import Trace
+
+
+def write_call_dataset(trace_path, calls_path, manifest_path):
+    trace_path, calls_path, manifest_path = map(Path, (trace_path, calls_path, manifest_path))
+    events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()
+              if line.strip()]
+    requests = {}
+    retries = {}
+    outcomes = {}
+    cache_reuses = []
+    orphan_outcomes = 0
+    for event in events:
+        kind = event.get("event")
+        call_id = event.get("call_id")
+        if kind == "system_one_request" and call_id:
+            requests[call_id] = event
+        elif kind == "system_one_retry" and call_id:
+            retries.setdefault(call_id, []).append(event)
+        elif kind in {"system_one_response", "system_one_error"} and call_id:
+            outcomes[call_id] = event
+            orphan_outcomes += call_id not in requests
+        elif kind == "system_one_cache_reuse":
+            cache_reuses.append(event)
+    records = [{"schema_version": 1, "call_id": call_id,
+                "request_hash": request.get("request_hash"), "request": request,
+                "retries": retries.get(call_id, []), "outcome": outcomes.get(call_id)}
+               for call_id, request in requests.items()]
+    calls_path.parent.mkdir(parents=True, exist_ok=True)
+    calls_bytes = ("".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+                           for record in records)).encode("utf-8")
+    calls_path.write_bytes(calls_bytes)
+    trace_bytes = trace_path.read_bytes()
+    status_counts = {}
+    for record in records:
+        status = (record["outcome"] or {}).get("event", "missing_outcome")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    manifest = {
+        "schema_version": 1,
+        "trace_file": trace_path.name,
+        "trace_sha256": hashlib.sha256(trace_bytes).hexdigest(),
+        "trace_bytes": len(trace_bytes),
+        "calls_file": calls_path.name,
+        "calls_sha256": hashlib.sha256(calls_bytes).hexdigest(),
+        "calls_bytes": len(calls_bytes),
+        "physical_calls": len(records),
+        "cache_reuses": len(cache_reuses),
+        "status_counts": status_counts,
+        "orphan_outcomes": orphan_outcomes,
+        "complete": orphan_outcomes == 0 and all(record["outcome"] for record in records),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                             encoding="utf-8")
+    return manifest
 
 
 class LockedTrace(Trace):
@@ -145,6 +200,14 @@ class BatchScorer:
                         key = self._key(stage, batch)
                         if key in self.cache:
                             scored, usage, elapsed = copy.deepcopy(self.cache[key])
+                            trace = getattr(self.decider, "trace", None)
+                            if trace is not None:
+                                trace.emit("system_one_cache_reuse",
+                                           logical_call_id="logical-" + uuid.uuid4().hex,
+                                           source_call_id=usage.get("call_id"),
+                                           request_hash=usage.get("request_hash"),
+                                           cache_key=key, stage=stage,
+                                           candidate_ids=[item["id"] for item in batch])
                             self._validate(batch, scored, stage)
                             self._record(stage, usage, elapsed, True)
                             self.stages[stage]["logical_candidates"] += len(batch)

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from file_discovery_adaptive import AdaptiveDecider, discover
 from file_discovery_profiles import repository_metadata_context
-from file_discovery_scoring import BatchScorer, LockedTrace
+from file_discovery_scoring import BatchScorer, LockedTrace, write_call_dataset
 from file_discovery_v1 import enumerate_files
 from model_pricing import jev_cost_record
 from system_one_code_locator import API_URL, MODEL
@@ -168,6 +168,9 @@ def benchmark(args):
             row["stage_usage_complete"] = row["status"] == "success"
             row["physical_pricing"] = jev_cost_record(usage["input_tokens"], usage["output_tokens"])
             row["logical_pricing"] = jev_cost_record(usage["logical_input_tokens"], usage["logical_output_tokens"])
+            row["call_data"] = write_call_dataset(
+                folder / "trace.jsonl", folder / "raw-model-calls.jsonl",
+                folder / "call-manifest.json")
             write_json(folder / "metrics.json", row)
             save_report(output, payload)
             print(f"END {case['id']} {arm['name']} {row['status']} wall={row['wall_time_ms']/1000:.2f}s files={row.get('scored_file_count')} recall={row.get('primary_recall')}", flush=True)
