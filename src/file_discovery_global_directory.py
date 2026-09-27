@@ -20,6 +20,31 @@ BATCH_SIZE = 64
 MAX_CANDIDATE_BYTES = 48000
 DIRECTORY_THRESHOLD = 0.65
 FILE_THRESHOLD = 0.65
+ROOT_INSTRUCTION_FILES = ("CLAUDE.md", "AGENTS.md")
+
+
+def load_root_instruction_context(root):
+    """Load one repository-authored root instruction file verbatim.
+
+    CLAUDE.md takes precedence because some repositories expose AGENTS.md as an
+    alias to the same content. No summarization, nested lookup, or generated
+    repository knowledge is introduced here.
+    """
+    root = Path(root).resolve()
+    for filename in ROOT_INSTRUCTION_FILES:
+        path = root / filename
+        try:
+            if not path.is_file():
+                continue
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        return {
+            "source": filename,
+            "content": content,
+            "bytes": len(content.encode("utf-8")),
+        }
+    return None
 
 
 def eligible_file(entry):
@@ -130,14 +155,21 @@ class GlobalDirectoryDecider(ProfiledFileDiscoveryDecider):
                     "false": "The direct files in this exact directory are unlikely to contain material task evidence.",
                 },
             }
-        response, usage = self.send("global_directory_direct_file_relevance", {
+        state = {
             "goal": query,
             "phase": "global_directory_classification",
             "population_size": getattr(self, "logical_directory_population", len(candidates)),
             "source_visible": False,
             "contract": ("Independent multi-label decisions over one fixed global directory population. "
                          "Directory scores do not expose, hide, or gate any other directory."),
-        }, questions)
+        }
+        instruction_context = getattr(self, "root_instruction_context", None)
+        if instruction_context:
+            state["repository_instruction_context"] = {
+                "source": instruction_context["source"],
+                "content": instruction_context["content"],
+            }
+        response, usage = self.send("global_directory_direct_file_relevance", state, questions)
         answers = response.get("answers", {})
         result = []
         for index, candidate in enumerate(candidates):
@@ -264,6 +296,8 @@ def flat_baseline(root, query, scorer):
 
 def run_repository(args):
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+    instruction_context = (load_root_instruction_context(args.root)
+                           if config.get("load_root_instruction_context") else None)
     cases = json.loads(Path(args.cases).read_text(encoding="utf-8"))["cases"]
     cases = [case for case in cases if case["repository"] == args.repository]
     output = Path(args.output_dir)
@@ -278,6 +312,8 @@ def run_repository(args):
                 profile=config["profile"], repository_context={},
                 endpoint=os.getenv("TYPESAFE_API_URL", API_URL),
                 model=os.getenv("TYPESAFE_MODEL", config["model"] or MODEL))
+            decider.root_instruction_context = (instruction_context
+                                                if arm == "global_directory" else None)
             scorer = BatchScorer(case["goal"], decider, workers=int(config["workers"]),
                 batch_size=int(config["batch_size"]),
                 max_candidate_bytes=int(config["max_candidate_bytes"]))
@@ -290,6 +326,10 @@ def run_repository(args):
                                workers=int(config["workers"]),
                                batch_size=int(config["batch_size"]),
                                max_candidate_bytes=int(config["max_candidate_bytes"])))
+                active_context = decider.root_instruction_context
+                result["root_instruction_context_present"] = bool(active_context)
+                result["root_instruction_context_source"] = (active_context or {}).get("source")
+                result["root_instruction_context_bytes"] = int((active_context or {}).get("bytes", 0))
                 selected_files = {item["path"] for item in result["promoted_files"]}
                 scored_files = set(result["file_scores"])
                 primary = set(case["primary_files"])
@@ -464,7 +504,9 @@ def aggregate(args):
         "candidate_file_count", "file_decisions", "directory_decisions", "model_visible_nodes",
         "candidate_recall", "primary_recall", "missing_primary", "missing_primary_causes",
         "target_details", "phase_usage", "physical_usage", "pricing", "phase1_wall_time_ms",
-        "phase2_enumeration_wall_time_ms", "phase2_scoring_wall_time_ms", "wall_time_ms", "error")
+        "phase2_enumeration_wall_time_ms", "phase2_scoring_wall_time_ms", "wall_time_ms",
+        "root_instruction_context_present", "root_instruction_context_source",
+        "root_instruction_context_bytes", "error")
     compact_rows = []
     for row in rows:
         compact = {key: row[key] for key in summary_fields if key in row}
