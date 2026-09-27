@@ -5,7 +5,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from file_discovery_global_directory import enumerate_directories, enumerate_direct_files, two_stage_discovery
+from file_discovery_global_directory import (
+    enumerate_directories,
+    enumerate_direct_files,
+    load_root_instruction_context,
+    two_stage_discovery,
+)
 
 
 class FakeScorer:
@@ -41,6 +46,24 @@ class GlobalDirectoryTests(unittest.TestCase):
         self.assertEqual(["pkg/sub"], result["selected_directories"])
         self.assertEqual(["pkg/sub/target.py"], list(result["file_scores"]))
         self.assertNotIn("pkg/sub/child/hidden.py", result["file_scores"])
+
+    def test_root_instruction_context_prefers_claude_and_does_not_merge_agents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "CLAUDE.md").write_text("claude context", encoding="utf-8")
+            (root / "AGENTS.md").write_text("agents context", encoding="utf-8")
+            context = load_root_instruction_context(root)
+        self.assertEqual("CLAUDE.md", context["source"])
+        self.assertEqual("claude context", context["content"])
+        self.assertEqual(len(b"claude context"), context["bytes"])
+
+    def test_root_instruction_context_falls_back_to_agents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "AGENTS.md").write_text("agents context", encoding="utf-8")
+            context = load_root_instruction_context(root)
+        self.assertEqual("AGENTS.md", context["source"])
+        self.assertEqual("agents context", context["content"])
 
     def test_direct_file_enumeration_deduplicates_selected_directories(self):
         with tempfile.TemporaryDirectory() as temp:
