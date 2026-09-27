@@ -19,6 +19,7 @@
     "Phase 1 loads root CLAUDE.md verbatim when present, otherwise root AGENTS.md verbatim.",
     "No summary, generated repository prior, nested instruction lookup, or filename-derived context is permitted.",
     "Repository instruction context is injected into Phase 1 directory state only; Phase 2 file scoring remains unchanged.",
-    "The complete eligible directory population is fixed before model decisions; no ancestor gating or recursive expansion is permitted."
+    "The complete eligible directory population is fixed before model decisions; no ancestor gating or recursive expansion is permitted.",
+    "Aggregate publication is a reporting-only change and does not alter model inputs or thresholds."
   ]
 }
