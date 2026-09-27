@@ -1,0 +1,24 @@
+{
+  "experiment": "issue-15-root-instruction-context",
+  "model": "jev-latest",
+  "profile": "compact_state_v4",
+  "repeats": 1,
+  "directory_threshold": 0.65,
+  "file_threshold": 0.65,
+  "workers": 4,
+  "batch_size": 64,
+  "max_candidate_bytes": 48000,
+  "load_root_instruction_context": true,
+  "repository_revisions": {
+    "BestNathan/nession": "7ac9b6e0c2bb43c52f83e7dd706c0c0dc0d7a1df",
+    "openai/codex": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+    "openclaw/openclaw": "932abb0a841b522ebaa5b81921119a61b6a80b21"
+  },
+  "notes": [
+    "Issue 14 architecture and thresholds are frozen unchanged.",
+    "Phase 1 loads root CLAUDE.md verbatim when present, otherwise root AGENTS.md verbatim.",
+    "No summary, generated repository prior, nested instruction lookup, or filename-derived context is permitted.",
+    "Repository instruction context is injected into Phase 1 directory state only; Phase 2 file scoring remains unchanged.",
+    "The complete eligible directory population is fixed before model decisions; no ancestor gating or recursive expansion is permitted."
+  ]
+}
