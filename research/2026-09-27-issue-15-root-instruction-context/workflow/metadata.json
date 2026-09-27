@@ -1,0 +1,147 @@
+{
+  "workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36298796510",
+  "run_id": "36298796510",
+  "commit_sha": "f97edea581f6c9a7eca44ff0bbde303100cc73dc",
+  "status": "success",
+  "report_workflow_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36298796510",
+  "report_workflow_run_id": "36298796510",
+  "jobs": {
+    "validate": "success",
+    "experiment": "success",
+    "source_report": null,
+    "report": "success"
+  },
+  "artifacts": [
+    {
+      "name": "issue15-root-instructions-codex/codex_approval_routing/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 15,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-codex/codex_approval_routing/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 17,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-codex/codex_mcp_tool_approval/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 38,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-codex/codex_mcp_tool_approval/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 17,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-codex/codex_thread_resume_persistence/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 14,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-codex/codex_thread_resume_persistence/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 17,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_backend_reconnect_lifecycle/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 2,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_backend_reconnect_lifecycle/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 7,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_filesystem_symlink_delete_safety/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 1,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_filesystem_symlink_delete_safety/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 6,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_frontend_request_correlation/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 1,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-nession/nession_frontend_request_correlation/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 7,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_gateway_ws_dispatch/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 124,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_gateway_ws_dispatch/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 35,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_memory_hybrid_search/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 22,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_memory_hybrid_search/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 35,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_skill_source_precedence/flat_path/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 72,
+      "complete": true
+    },
+    {
+      "name": "issue15-root-instructions-openclaw/openclaw_skill_source_precedence/global_directory/call-manifest.json",
+      "purpose": "Immutable raw System One requests, responses, retries, errors, and SHA manifest",
+      "retention_days": 90,
+      "physical_calls": 33,
+      "complete": true
+    },
+    {
+      "name": "issue14-aggregate-36298796510",
+      "purpose": "Aggregate metrics, report, and Workflow metadata",
+      "retention_days": 90
+    }
+  ]
+}

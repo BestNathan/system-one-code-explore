@@ -1,0 +1,1624 @@
+{
+  "run_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36298796510",
+  "run_id": "36298796510",
+  "commit": "f97edea581f6c9a7eca44ff0bbde303100cc73dc",
+  "report_run_url": "https://github.com/BestNathan/system-one-code-explore/actions/runs/36298796510",
+  "report_run_id": "36298796510",
+  "expected_rows": 18,
+  "rows": [
+    {
+      "case_id": "codex_approval_routing",
+      "repository": "openai/codex",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 928,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 928,
+      "file_decisions": 928,
+      "directory_decisions": 0,
+      "model_visible_nodes": 928,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/tools/approvals.rs",
+          "directory": "codex-rs/core/src/tools",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.87,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 15,
+          "input_tokens": 165743,
+          "output_tokens": 17542,
+          "response_count": 15,
+          "retry_events": 0,
+          "http_attempts": 15,
+          "latency_sum_ms": 3836.8599999999997
+        }
+      },
+      "physical_usage": {
+        "model_calls": 15,
+        "input_tokens": 165743,
+        "output_tokens": 17542,
+        "http_attempts": 15,
+        "retry_events": 0,
+        "max_request_bytes": 39962
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 165743,
+        "output_tokens": 17542,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.006961206,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 1916.1732020000031,
+      "wall_time_ms": 1921.5168010000027,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 75
+    },
+    {
+      "case_id": "codex_approval_routing",
+      "repository": "openai/codex",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 938,
+      "deduplicated_file_candidate_count": 116,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        42
+      ],
+      "file_batch_sizes": [
+        64,
+        52
+      ],
+      "file_decisions": 116,
+      "directory_decisions": 938,
+      "model_visible_nodes": 1054,
+      "candidate_recall": 0.0,
+      "primary_recall": 0.0,
+      "missing_primary": [
+        "codex-rs/core/src/tools/approvals.rs"
+      ],
+      "missing_primary_causes": {
+        "codex-rs/core/src/tools/approvals.rs": "target_directory_not_selected"
+      },
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/tools/approvals.rs",
+          "directory": "codex-rs/core/src/tools",
+          "directory_selected": false,
+          "file_scored": false,
+          "file_score": null,
+          "promoted": false
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 15,
+          "input_tokens": 277293,
+          "output_tokens": 17732,
+          "response_count": 15,
+          "retry_events": 0,
+          "http_attempts": 15,
+          "latency_sum_ms": 4037.5060000000003
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 2,
+          "input_tokens": 22091,
+          "output_tokens": 2192,
+          "response_count": 2,
+          "retry_events": 0,
+          "http_attempts": 2,
+          "latency_sum_ms": 393.781
+        }
+      },
+      "physical_usage": {
+        "model_calls": 17,
+        "input_tokens": 299384,
+        "output_tokens": 19924,
+        "http_attempts": 17,
+        "retry_events": 0,
+        "max_request_bytes": 84206
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 299384,
+        "output_tokens": 19924,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.012574128,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 1085.2157059999995,
+      "phase2_enumeration_wall_time_ms": 2.099135000001695,
+      "phase2_scoring_wall_time_ms": 221.74420900000058,
+      "wall_time_ms": 1469.2314939999987,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 22397,
+      "selected_directory_count": 9,
+      "promoted_file_count": 29
+    },
+    {
+      "case_id": "codex_mcp_tool_approval",
+      "repository": "openai/codex",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 2414,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 2414,
+      "file_decisions": 2414,
+      "directory_decisions": 0,
+      "model_visible_nodes": 2414,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/mcp_tool_call.rs",
+          "directory": "codex-rs/core/src",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.86,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 38,
+          "input_tokens": 444623,
+          "output_tokens": 45638,
+          "response_count": 38,
+          "retry_events": 0,
+          "http_attempts": 38,
+          "latency_sum_ms": 8058.4270000000015
+        }
+      },
+      "physical_usage": {
+        "model_calls": 38,
+        "input_tokens": 444623,
+        "output_tokens": 45638,
+        "http_attempts": 38,
+        "retry_events": 0,
+        "max_request_bytes": 41629
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 444623,
+        "output_tokens": 45638,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.018674166,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 3120.642357999998,
+      "wall_time_ms": 3133.675413000006,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 106
+    },
+    {
+      "case_id": "codex_mcp_tool_approval",
+      "repository": "openai/codex",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 938,
+      "deduplicated_file_candidate_count": 72,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        42
+      ],
+      "file_batch_sizes": [
+        64,
+        8
+      ],
+      "file_decisions": 72,
+      "directory_decisions": 938,
+      "model_visible_nodes": 1010,
+      "candidate_recall": 0.0,
+      "primary_recall": 0.0,
+      "missing_primary": [
+        "codex-rs/core/src/mcp_tool_call.rs"
+      ],
+      "missing_primary_causes": {
+        "codex-rs/core/src/mcp_tool_call.rs": "target_directory_not_selected"
+      },
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/mcp_tool_call.rs",
+          "directory": "codex-rs/core/src",
+          "directory_selected": false,
+          "file_scored": false,
+          "file_score": null,
+          "promoted": false
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 15,
+          "input_tokens": 272528,
+          "output_tokens": 17732,
+          "response_count": 15,
+          "retry_events": 0,
+          "http_attempts": 15,
+          "latency_sum_ms": 3775.373
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 2,
+          "input_tokens": 14192,
+          "output_tokens": 1358,
+          "response_count": 2,
+          "retry_events": 0,
+          "http_attempts": 2,
+          "latency_sum_ms": 349.72
+        }
+      },
+      "physical_usage": {
+        "model_calls": 17,
+        "input_tokens": 286720,
+        "output_tokens": 19090,
+        "http_attempts": 17,
+        "retry_events": 0,
+        "max_request_bytes": 81411
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 286720,
+        "output_tokens": 19090,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.01204224,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 1047.494708000002,
+      "phase2_enumeration_wall_time_ms": 1.3467540000036138,
+      "phase2_scoring_wall_time_ms": 213.27040199999914,
+      "wall_time_ms": 1417.9757779999989,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 22397,
+      "selected_directory_count": 5,
+      "promoted_file_count": 7
+    },
+    {
+      "case_id": "codex_thread_resume_persistence",
+      "repository": "openai/codex",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 858,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 858,
+      "file_decisions": 858,
+      "directory_decisions": 0,
+      "model_visible_nodes": 858,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/thread_manager.rs",
+          "directory": "codex-rs/core/src",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.86,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 14,
+          "input_tokens": 155416,
+          "output_tokens": 16218,
+          "response_count": 14,
+          "retry_events": 0,
+          "http_attempts": 14,
+          "latency_sum_ms": 3047.879
+        }
+      },
+      "physical_usage": {
+        "model_calls": 14,
+        "input_tokens": 155416,
+        "output_tokens": 16218,
+        "http_attempts": 14,
+        "retry_events": 0,
+        "max_request_bytes": 40858
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 155416,
+        "output_tokens": 16218,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.006527472,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 1728.2213520000055,
+      "wall_time_ms": 1733.0823259999945,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 87
+    },
+    {
+      "case_id": "codex_thread_resume_persistence",
+      "repository": "openai/codex",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 938,
+      "deduplicated_file_candidate_count": 124,
+      "total_repository_file_count": 6277,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        42
+      ],
+      "file_batch_sizes": [
+        64,
+        60
+      ],
+      "file_decisions": 124,
+      "directory_decisions": 938,
+      "model_visible_nodes": 1062,
+      "candidate_recall": 0.0,
+      "primary_recall": 0.0,
+      "missing_primary": [
+        "codex-rs/core/src/thread_manager.rs"
+      ],
+      "missing_primary_causes": {
+        "codex-rs/core/src/thread_manager.rs": "target_directory_not_selected"
+      },
+      "target_details": [
+        {
+          "path": "codex-rs/core/src/thread_manager.rs",
+          "directory": "codex-rs/core/src",
+          "directory_selected": false,
+          "file_scored": false,
+          "file_score": null,
+          "promoted": false
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 15,
+          "input_tokens": 276340,
+          "output_tokens": 17732,
+          "response_count": 15,
+          "retry_events": 0,
+          "http_attempts": 15,
+          "latency_sum_ms": 3862.9089999999997
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 2,
+          "input_tokens": 22876,
+          "output_tokens": 2344,
+          "response_count": 2,
+          "retry_events": 0,
+          "http_attempts": 2,
+          "latency_sum_ms": 431.433
+        }
+      },
+      "physical_usage": {
+        "model_calls": 17,
+        "input_tokens": 299216,
+        "output_tokens": 20076,
+        "http_attempts": 17,
+        "retry_events": 0,
+        "max_request_bytes": 84401
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 299216,
+        "output_tokens": 20076,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.012567072,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 1076.2075809999985,
+      "phase2_enumeration_wall_time_ms": 2.1354430000002367,
+      "phase2_scoring_wall_time_ms": 227.12986800000579,
+      "wall_time_ms": 1463.8962340000035,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 22397,
+      "selected_directory_count": 7,
+      "promoted_file_count": 33
+    },
+    {
+      "case_id": "nession_backend_reconnect_lifecycle",
+      "repository": "BestNathan/nession",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 100,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 100,
+      "file_decisions": 100,
+      "directory_decisions": 0,
+      "model_visible_nodes": 100,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "crates/nession-agent/src/connection/server_client.rs",
+          "directory": "crates/nession-agent/src/connection",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.82,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 2,
+          "input_tokens": 18361,
+          "output_tokens": 1888,
+          "response_count": 2,
+          "retry_events": 0,
+          "http_attempts": 2,
+          "latency_sum_ms": 544.7139999999999
+        }
+      },
+      "physical_usage": {
+        "model_calls": 2,
+        "input_tokens": 18361,
+        "output_tokens": 1888,
+        "http_attempts": 2,
+        "retry_events": 0,
+        "max_request_bytes": 36328
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 18361,
+        "output_tokens": 1888,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.000771162,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 412.9328310000062,
+      "wall_time_ms": 413.66020800001024,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 10
+    },
+    {
+      "case_id": "nession_backend_reconnect_lifecycle",
+      "repository": "BestNathan/nession",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 381,
+      "deduplicated_file_candidate_count": 2,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        61
+      ],
+      "file_batch_sizes": [
+        2
+      ],
+      "file_decisions": 2,
+      "directory_decisions": 381,
+      "model_visible_nodes": 383,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "crates/nession-agent/src/connection/server_client.rs",
+          "directory": "crates/nession-agent/src/connection",
+          "directory_selected": true,
+          "file_scored": true,
+          "file_score": 0.83,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 6,
+          "input_tokens": 184649,
+          "output_tokens": 7203,
+          "response_count": 6,
+          "retry_events": 0,
+          "http_attempts": 6,
+          "latency_sum_ms": 1889.987
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 1,
+          "input_tokens": 894,
+          "output_tokens": 40,
+          "response_count": 1,
+          "retry_events": 0,
+          "http_attempts": 1,
+          "latency_sum_ms": 125.124
+        }
+      },
+      "physical_usage": {
+        "model_calls": 7,
+        "input_tokens": 185543,
+        "output_tokens": 7243,
+        "http_attempts": 7,
+        "retry_events": 0,
+        "max_request_bytes": 119227
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 185543,
+        "output_tokens": 7243,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.007792806,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 643.3169379999981,
+      "phase2_enumeration_wall_time_ms": 0.1564250000001266,
+      "phase2_scoring_wall_time_ms": 125.97600399999465,
+      "wall_time_ms": 828.894082000005,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "CLAUDE.md",
+      "root_instruction_context_bytes": 59370,
+      "selected_directory_count": 1,
+      "promoted_file_count": 2
+    },
+    {
+      "case_id": "nession_filesystem_symlink_delete_safety",
+      "repository": "BestNathan/nession",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 15,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 15,
+      "file_decisions": 15,
+      "directory_decisions": 0,
+      "model_visible_nodes": 15,
+      "candidate_recall": 1.0,
+      "primary_recall": 0.0,
+      "missing_primary": [
+        "crates/nession-agent/src/fs/sandbox.rs"
+      ],
+      "missing_primary_causes": {
+        "crates/nession-agent/src/fs/sandbox.rs": "file_score_rejected"
+      },
+      "target_details": [
+        {
+          "path": "crates/nession-agent/src/fs/sandbox.rs",
+          "directory": "crates/nession-agent/src/fs",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.55,
+          "promoted": false
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 1,
+          "input_tokens": 3072,
+          "output_tokens": 279,
+          "response_count": 1,
+          "retry_events": 0,
+          "http_attempts": 1,
+          "latency_sum_ms": 125.285
+        }
+      },
+      "physical_usage": {
+        "model_calls": 1,
+        "input_tokens": 3072,
+        "output_tokens": 279,
+        "http_attempts": 1,
+        "retry_events": 0,
+        "max_request_bytes": 9462
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 3072,
+        "output_tokens": 279,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.000129024,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 238.63103900001192,
+      "wall_time_ms": 238.86035099999958,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 1
+    },
+    {
+      "case_id": "nession_filesystem_symlink_delete_safety",
+      "repository": "BestNathan/nession",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 381,
+      "deduplicated_file_candidate_count": 0,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        61
+      ],
+      "file_batch_sizes": [],
+      "file_decisions": 0,
+      "directory_decisions": 381,
+      "model_visible_nodes": 381,
+      "candidate_recall": 0.0,
+      "primary_recall": 0.0,
+      "missing_primary": [
+        "crates/nession-agent/src/fs/sandbox.rs"
+      ],
+      "missing_primary_causes": {
+        "crates/nession-agent/src/fs/sandbox.rs": "target_directory_not_selected"
+      },
+      "target_details": [
+        {
+          "path": "crates/nession-agent/src/fs/sandbox.rs",
+          "directory": "crates/nession-agent/src/fs",
+          "directory_selected": false,
+          "file_scored": false,
+          "file_score": null,
+          "promoted": false
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 6,
+          "input_tokens": 186584,
+          "output_tokens": 7203,
+          "response_count": 6,
+          "retry_events": 0,
+          "http_attempts": 6,
+          "latency_sum_ms": 1903.7030000000002
+        }
+      },
+      "physical_usage": {
+        "model_calls": 6,
+        "input_tokens": 186584,
+        "output_tokens": 7203,
+        "http_attempts": 6,
+        "retry_events": 0,
+        "max_request_bytes": 117277
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 186584,
+        "output_tokens": 7203,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.007836528,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 716.294793000003,
+      "phase2_enumeration_wall_time_ms": 0.06871900001215181,
+      "phase2_scoring_wall_time_ms": 0.0002399999914359796,
+      "wall_time_ms": 772.7383300000099,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "CLAUDE.md",
+      "root_instruction_context_bytes": 59370,
+      "selected_directory_count": 0,
+      "promoted_file_count": 0
+    },
+    {
+      "case_id": "nession_frontend_request_correlation",
+      "repository": "BestNathan/nession",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 27,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 27,
+      "file_decisions": 27,
+      "directory_decisions": 0,
+      "model_visible_nodes": 27,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "web/src/platform/socket/MessageRouter.ts",
+          "directory": "web/src/platform/socket",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.8,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 1,
+          "input_tokens": 5137,
+          "output_tokens": 507,
+          "response_count": 1,
+          "retry_events": 0,
+          "http_attempts": 1,
+          "latency_sum_ms": 124.338
+        }
+      },
+      "physical_usage": {
+        "model_calls": 1,
+        "input_tokens": 5137,
+        "output_tokens": 507,
+        "http_attempts": 1,
+        "retry_events": 0,
+        "max_request_bytes": 15804
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 5137,
+        "output_tokens": 507,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.000215754,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 239.85509099998126,
+      "wall_time_ms": 240.1676190000046,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 3
+    },
+    {
+      "case_id": "nession_frontend_request_correlation",
+      "repository": "BestNathan/nession",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 381,
+      "deduplicated_file_candidate_count": 5,
+      "total_repository_file_count": 1096,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        61
+      ],
+      "file_batch_sizes": [
+        5
+      ],
+      "file_decisions": 5,
+      "directory_decisions": 381,
+      "model_visible_nodes": 386,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "web/src/platform/socket/MessageRouter.ts",
+          "directory": "web/src/platform/socket",
+          "directory_selected": true,
+          "file_scored": true,
+          "file_score": 0.8,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 6,
+          "input_tokens": 186584,
+          "output_tokens": 7203,
+          "response_count": 6,
+          "retry_events": 0,
+          "http_attempts": 6,
+          "latency_sum_ms": 1993.068
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 1,
+          "input_tokens": 1348,
+          "output_tokens": 94,
+          "response_count": 1,
+          "retry_events": 0,
+          "http_attempts": 1,
+          "latency_sum_ms": 118.037
+        }
+      },
+      "physical_usage": {
+        "model_calls": 7,
+        "input_tokens": 187932,
+        "output_tokens": 7297,
+        "http_attempts": 7,
+        "retry_events": 0,
+        "max_request_bytes": 119682
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 187932,
+        "output_tokens": 7297,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.007893144,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 611.0399979999954,
+      "phase2_enumeration_wall_time_ms": 0.19631899999694724,
+      "phase2_scoring_wall_time_ms": 119.20758200000137,
+      "wall_time_ms": 788.6478539999757,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "CLAUDE.md",
+      "root_instruction_context_bytes": 59370,
+      "selected_directory_count": 1,
+      "promoted_file_count": 2
+    },
+    {
+      "case_id": "openclaw_gateway_ws_dispatch",
+      "repository": "openclaw/openclaw",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 7918,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 7918,
+      "file_decisions": 7918,
+      "directory_decisions": 0,
+      "model_visible_nodes": 7918,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "src/gateway/server/ws-connection/message-handler.ts",
+          "directory": "src/gateway/server/ws-connection",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.89,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 124,
+          "input_tokens": 1367934,
+          "output_tokens": 149698,
+          "response_count": 124,
+          "retry_events": 0,
+          "http_attempts": 124,
+          "latency_sum_ms": 33599.14399999999
+        }
+      },
+      "physical_usage": {
+        "model_calls": 124,
+        "input_tokens": 1367934,
+        "output_tokens": 149698,
+        "http_attempts": 124,
+        "retry_events": 0,
+        "max_request_bytes": 40323
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 1367934,
+        "output_tokens": 149698,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.057453228,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 12329.970877999984,
+      "wall_time_ms": 12368.968173000014,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 257
+    },
+    {
+      "case_id": "openclaw_gateway_ws_dispatch",
+      "repository": "openclaw/openclaw",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 1907,
+      "deduplicated_file_candidate_count": 292,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        51
+      ],
+      "file_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        36
+      ],
+      "file_decisions": 292,
+      "directory_decisions": 1907,
+      "model_visible_nodes": 2199,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "src/gateway/server/ws-connection/message-handler.ts",
+          "directory": "src/gateway/server/ws-connection",
+          "directory_selected": true,
+          "file_scored": true,
+          "file_score": 0.88,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 30,
+          "input_tokens": 559100,
+          "output_tokens": 36053,
+          "response_count": 30,
+          "retry_events": 0,
+          "http_attempts": 30,
+          "latency_sum_ms": 9744.438
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 5,
+          "input_tokens": 54748,
+          "output_tokens": 5518,
+          "response_count": 5,
+          "retry_events": 0,
+          "http_attempts": 5,
+          "latency_sum_ms": 1357.3509999999999
+        }
+      },
+      "physical_usage": {
+        "model_calls": 35,
+        "input_tokens": 613848,
+        "output_tokens": 41571,
+        "http_attempts": 35,
+        "retry_events": 0,
+        "max_request_bytes": 87548
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 613848,
+        "output_tokens": 41571,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.025781616,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 2720.7507089999863,
+      "phase2_enumeration_wall_time_ms": 4.539796000017304,
+      "phase2_scoring_wall_time_ms": 497.74682299999995,
+      "wall_time_ms": 3685.3838239999845,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 26380,
+      "selected_directory_count": 6,
+      "promoted_file_count": 52
+    },
+    {
+      "case_id": "openclaw_skill_source_precedence",
+      "repository": "openclaw/openclaw",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 4587,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 4587,
+      "file_decisions": 4587,
+      "directory_decisions": 0,
+      "model_visible_nodes": 4587,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "src/skills/loading/workspace-skill-sources.ts",
+          "directory": "src/skills/loading",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.87,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 72,
+          "input_tokens": 784913,
+          "output_tokens": 86721,
+          "response_count": 72,
+          "retry_events": 0,
+          "http_attempts": 72,
+          "latency_sum_ms": 19645.16899999999
+        }
+      },
+      "physical_usage": {
+        "model_calls": 72,
+        "input_tokens": 784913,
+        "output_tokens": 86721,
+        "http_attempts": 72,
+        "retry_events": 0,
+        "max_request_bytes": 40089
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 784913,
+        "output_tokens": 86721,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.032966346,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 8831.743871000015,
+      "wall_time_ms": 8854.912796999997,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 79
+    },
+    {
+      "case_id": "openclaw_skill_source_precedence",
+      "repository": "openclaw/openclaw",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 1907,
+      "deduplicated_file_candidate_count": 148,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        51
+      ],
+      "file_batch_sizes": [
+        64,
+        64,
+        20
+      ],
+      "file_decisions": 148,
+      "directory_decisions": 1907,
+      "model_visible_nodes": 2055,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "src/skills/loading/workspace-skill-sources.ts",
+          "directory": "src/skills/loading",
+          "directory_selected": true,
+          "file_scored": true,
+          "file_score": 0.88,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 30,
+          "input_tokens": 561037,
+          "output_tokens": 36053,
+          "response_count": 30,
+          "retry_events": 0,
+          "http_attempts": 30,
+          "latency_sum_ms": 9953.737
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 3,
+          "input_tokens": 26312,
+          "output_tokens": 2794,
+          "response_count": 3,
+          "retry_events": 0,
+          "http_attempts": 3,
+          "latency_sum_ms": 763.7280000000001
+        }
+      },
+      "physical_usage": {
+        "model_calls": 33,
+        "input_tokens": 587349,
+        "output_tokens": 38847,
+        "http_attempts": 33,
+        "retry_events": 0,
+        "max_request_bytes": 87548
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 587349,
+        "output_tokens": 38847,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.024668658,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 2688.54374,
+      "phase2_enumeration_wall_time_ms": 2.30130899998926,
+      "phase2_scoring_wall_time_ms": 294.49394499999926,
+      "wall_time_ms": 3438.0057080000197,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 26380,
+      "selected_directory_count": 3,
+      "promoted_file_count": 27
+    },
+    {
+      "case_id": "openclaw_memory_hybrid_search",
+      "repository": "openclaw/openclaw",
+      "arm": "flat_path",
+      "status": "success",
+      "algorithm": "uncapped_semantic_weighted_path_then_file_score",
+      "directory_population": 0,
+      "deduplicated_file_candidate_count": 1391,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [],
+      "file_batch_sizes": [],
+      "candidate_file_count": 1391,
+      "file_decisions": 1391,
+      "directory_decisions": 0,
+      "model_visible_nodes": 1391,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "extensions/memory-core/src/memory/manager-search-orchestration.ts",
+          "directory": "extensions/memory-core/src/memory",
+          "directory_selected": null,
+          "file_scored": true,
+          "file_score": 0.89,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 22,
+          "input_tokens": 236520,
+          "output_tokens": 26297,
+          "response_count": 22,
+          "retry_events": 0,
+          "http_attempts": 22,
+          "latency_sum_ms": 5779.503
+        }
+      },
+      "physical_usage": {
+        "model_calls": 22,
+        "input_tokens": 236520,
+        "output_tokens": 26297,
+        "http_attempts": 22,
+        "retry_events": 0,
+        "max_request_bytes": 38083
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 236520,
+        "output_tokens": 26297,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.00993384,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 0.0,
+      "phase2_enumeration_wall_time_ms": 0.0,
+      "phase2_scoring_wall_time_ms": 4944.365863000002,
+      "wall_time_ms": 4951.572969000012,
+      "root_instruction_context_present": false,
+      "root_instruction_context_source": null,
+      "root_instruction_context_bytes": 0,
+      "selected_directory_count": 0,
+      "promoted_file_count": 62
+    },
+    {
+      "case_id": "openclaw_memory_hybrid_search",
+      "repository": "openclaw/openclaw",
+      "arm": "global_directory",
+      "status": "success",
+      "algorithm": "global_directory_classification_then_direct_files",
+      "directory_population": 1907,
+      "deduplicated_file_candidate_count": 287,
+      "total_repository_file_count": 43748,
+      "directory_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        51
+      ],
+      "file_batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        31
+      ],
+      "file_decisions": 287,
+      "directory_decisions": 1907,
+      "model_visible_nodes": 2194,
+      "candidate_recall": 1.0,
+      "primary_recall": 1.0,
+      "missing_primary": [],
+      "missing_primary_causes": {},
+      "target_details": [
+        {
+          "path": "extensions/memory-core/src/memory/manager-search-orchestration.ts",
+          "directory": "extensions/memory-core/src/memory",
+          "directory_selected": true,
+          "file_scored": true,
+          "file_score": 0.89,
+          "promoted": true
+        }
+      ],
+      "phase_usage": {
+        "global_directory_direct_file_relevance": {
+          "physical_calls": 30,
+          "input_tokens": 547478,
+          "output_tokens": 36053,
+          "response_count": 30,
+          "retry_events": 0,
+          "http_attempts": 30,
+          "latency_sum_ms": 9875.996000000001
+        },
+        "file_discovery_compact_state_v4": {
+          "physical_calls": 5,
+          "input_tokens": 53306,
+          "output_tokens": 5423,
+          "response_count": 5,
+          "retry_events": 0,
+          "http_attempts": 5,
+          "latency_sum_ms": 1344.866
+        }
+      },
+      "physical_usage": {
+        "model_calls": 35,
+        "input_tokens": 600784,
+        "output_tokens": 41476,
+        "http_attempts": 35,
+        "retry_events": 0,
+        "max_request_bytes": 83973
+      },
+      "pricing": {
+        "provider": "TypeSafe AI",
+        "model_family": "Jev",
+        "pricing_snapshot_date": "2026-09-25",
+        "input_tokens": 600784,
+        "output_tokens": 41476,
+        "input_usd_per_million": 0.042,
+        "output_usd_per_million": 0.0,
+        "estimated_cost_usd": 0.025232928,
+        "sources": [
+          "https://typesafe.ai/",
+          "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+        ]
+      },
+      "phase1_wall_time_ms": 2617.4975849999955,
+      "phase2_enumeration_wall_time_ms": 4.54214100000172,
+      "phase2_scoring_wall_time_ms": 549.0950260000034,
+      "wall_time_ms": 3630.190993000014,
+      "root_instruction_context_present": true,
+      "root_instruction_context_source": "AGENTS.md",
+      "root_instruction_context_bytes": 26380,
+      "selected_directory_count": 7,
+      "promoted_file_count": 44
+    }
+  ],
+  "batch_size_summary": {
+    "directory": {
+      "p50": 64,
+      "p95": 64,
+      "max": 64
+    },
+    "file": {
+      "p50": 64,
+      "p95": 64,
+      "max": 64
+    }
+  },
+  "cost_summary": {
+    "model_visible_nodes": {
+      "p50": 1010,
+      "p95": 7918,
+      "max": 7918
+    },
+    "physical_calls": {
+      "p50": 17,
+      "p95": 124,
+      "max": 124
+    },
+    "input_tokens": {
+      "p50": 236520,
+      "p95": 1367934,
+      "max": 1367934
+    },
+    "output_tokens": {
+      "p50": 19090,
+      "p95": 149698,
+      "max": 149698
+    },
+    "phase_1_directory_candidates": {
+      "p50": 0,
+      "p95": 1907,
+      "max": 1907
+    },
+    "phase_2_file_candidates": {
+      "p50": 124,
+      "p95": 7918,
+      "max": 7918
+    }
+  }
+}
